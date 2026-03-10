@@ -1,0 +1,82 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ForgeShift Docker Compose
+#
+# Start production:   docker compose up -d
+# Start staging:      docker compose --profile staging up -d forgeshift-staging
+# Start development:  docker compose --profile dev up forgeshift-dev
+#
+# View logs:          docker compose logs -f
+# Stop all:           docker compose down
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Production ──────────────────────────────────────────────────────────
+  forgeshift:
+    build: .
+    container_name: forgeshift-prod
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"   # Only bind to localhost – nginx proxies
+    volumes:
+      - ./data:/app/data         # Persist database
+    environment:
+      NODE_ENV:        production
+      PORT:            3000
+      HOST:            0.0.0.0
+      TRUST_PROXY:     1
+      COOKIE_SECURE:   "true"
+      DB_PATH:         ./data/forgeshift.db
+      SESSION_DB_PATH: ./data/sessions.db
+    env_file:
+      - .env                     # Copy .env.example → .env and fill in values before running                     # Copy .env.example → .env and fill in values before running
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/config"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Staging ─────────────────────────────────────────────────────────────
+  forgeshift-staging:
+    build: .
+    container_name: forgeshift-staging
+    profiles: ["staging"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      NODE_ENV:        staging
+      PORT:            3000
+      TRUST_PROXY:     1
+      COOKIE_SECURE:   "true"
+      DB_PATH:         ./data/forgeshift-staging.db
+      SESSION_DB_PATH: ./data/sessions-staging.db
+    env_file:
+      - .env                     # Copy .env.example → .env and fill in values before running
+
+  # ── Development ─────────────────────────────────────────────────────────
+  forgeshift-dev:
+    build: .
+    container_name: forgeshift-dev
+    profiles: ["dev"]
+    restart: "no"
+    ports:
+      - "3002:3000"              # Accessible directly without proxy
+    volumes:
+      - .:/app                   # Live code mount for dev
+      - /app/node_modules        # Don't mount over node_modules
+    environment:
+      NODE_ENV:        development
+      PORT:            3000
+      HOST:            0.0.0.0
+      TRUST_PROXY:     0
+      COOKIE_SECURE:   "false"
+      DB_PATH:         ./data/forgeshift-dev.db
+      SESSION_DB_PATH: ./data/sessions-dev.db
+      SESSION_SECRET:  dev-secret-not-for-production
+      ADMIN_EMAIL:     admin@localhost
+      ADMIN_PASSWORD:  admin123

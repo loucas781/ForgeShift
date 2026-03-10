@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="ForgeShift – Work Shift Rota Management">
+  <meta name="app-env" content="production">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>ForgeShift</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Environment Bar (content injected by server via meta tag + JS) -->
+  <div class="env-bar production" id="env-bar">
+    <span id="env-label">Production</span>
+  </div>
+
+  <!-- App Root -->
+  <div id="root">
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;padding-top:28px">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
+      <div style="font-size:14px;color:var(--text-muted)">Loading ForgeShift…</div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/state.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      // Read environment from server-injected meta tag
+      const envMeta = document.querySelector('meta[name="app-env"]');
+      const env = envMeta?.content || 'production';
+
+      // Style env bar
+      const envBar = document.getElementById('env-bar');
+      const envLabel = document.getElementById('env-label');
+      const envNames = { development: 'Development', staging: 'Staging', production: 'Production' };
+      envBar.className = `env-bar ${env}`;
+      envLabel.textContent = envNames[env] || env;
+
+      try {
+        await app.boot();
+      } catch (err) {
+        console.error('Boot error:', err);
+        document.getElementById('root').innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;padding-top:52px">
+            <div style="text-align:center;max-width:400px">
+              <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+              <h2 style="margin-bottom:8px">Failed to Load</h2>
+              <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">${err.message}</p>
+              <button onclick="location.reload()" class="btn btn-primary">Retry</button>
+            </div>
+          </div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
