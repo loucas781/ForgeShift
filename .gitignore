@@ -1,0 +1,24 @@
+# ── Dependencies ───────────────────────────────────────────────────
+node_modules/
+
+# ── Environment files — NEVER commit these ─────────────────────────
+# Only .env.example should exist in the repo
+.env
+.env.*
+!.env.example
+
+# ── Database & runtime data ─────────────────────────────────────────
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# ── Logs ───────────────────────────────────────────────────────────
+npm-debug.log*
+*.log
+
+# ── OS & editor clutter ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
