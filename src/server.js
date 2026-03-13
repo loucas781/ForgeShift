@@ -15,7 +15,7 @@ const fs           = require('fs');
 const authRoutes  = require('./routes/auth');
 const shiftRoutes = require('./routes/shifts');
 const icalRoutes  = require('./routes/ical');
-const { templatesRouter, locationsRouter, usersRouter, settingsRouter } = require('./routes/api');
+const { templatesRouter, locationsRouter, usersRouter, settingsRouter, auditRouter } = require('./routes/api');
 const { loadUser } = require('./middleware/auth');
 
 const app  = express();
@@ -103,6 +103,7 @@ app.use('/api/templates', templatesRouter);
 app.use('/api/locations', locationsRouter);
 app.use('/api/users',     usersRouter);
 app.use('/api/settings',  settingsRouter);
+app.use('/api/audit',     auditRouter);
 
 // ── Load version info ─────────────────────────────────────────────────────
 let versionInfo = { version: '1.0.0', build: 0, commit: 'local', branch: 'main', builtAt: null };

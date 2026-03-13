@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
  * ForgeShift Seed Script
- * Creates default admin user and sample locations
- * Safe to run multiple times (uses INSERT OR IGNORE)
+ * Creates default admin user and sample locations.
+ * Safe to run multiple times — skips if data already exists.
  */
-
 require('dotenv').config();
 const Database = require('better-sqlite3');
-const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const { hashPassword } = require('../src/auth-utils');
 
 const dbPath = process.env.DB_PATH || './data/forgeshift.db';
 
@@ -19,9 +18,7 @@ try {
   console.error('❌ Database not found. Run "npm run migrate" first.');
   process.exit(1);
 }
-
 db.pragma('foreign_keys = ON');
-
 console.log('🌱 Seeding database...');
 
 // ── Admin User ──────────────────────────────────────────────────────────────
@@ -30,21 +27,20 @@ const adminUsername = process.env.ADMIN_USERNAME || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
 const adminName     = process.env.ADMIN_NAME     || 'Administrator';
 
-const existingAdmin = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');
-
+const existingAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
 if (!existingAdmin) {
-  const hash = bcrypt.hashSync(adminPassword, 12);
-  const id = uuidv4();
+  const hash = hashPassword(adminPassword);  // Uses PASSWORD_PEPPER from .env
+  const id   = uuidv4();
   db.prepare(`
     INSERT INTO users (id, username, email, password, name, role, active)
     VALUES (?, ?, ?, ?, ?, 'admin', 1)
   `).run(id, adminUsername, adminEmail, hash, adminName);
 
-  console.log(`✅ Admin user created:`);
-  console.log(`   Email:    ${adminEmail}`);
-  console.log(`   Username: ${adminUsername}`);
-  console.log(`   Password: ${adminPassword}`);
-  console.log(`   ⚠️  Please change the admin password after first login!`);
+  console.log('✅ Admin user created:');
+  console.log(`   Email    : ${adminEmail}`);
+  console.log(`   Username : ${adminUsername}`);
+  console.log(`   Password : ${adminPassword}`);
+  console.log('   ⚠️  Change the admin password immediately after first login!');
 } else {
   console.log('ℹ️  Admin user already exists, skipping.');
 }
@@ -60,10 +56,8 @@ const defaultLocations = [
 
 const locCount = db.prepare('SELECT COUNT(*) as n FROM locations').get().n;
 if (locCount === 0) {
-  const adminUser = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');
-  const insertLoc = db.prepare(
-    'INSERT INTO locations (id, name, address, color, created_by) VALUES (?, ?, ?, ?, ?)'
-  );
+  const adminUser  = db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
+  const insertLoc  = db.prepare('INSERT INTO locations (id, name, address, color, created_by) VALUES (?, ?, ?, ?, ?)');
   defaultLocations.forEach(loc => {
     insertLoc.run(uuidv4(), loc.name, loc.address, loc.color, adminUser?.id || null);
   });
@@ -72,5 +66,5 @@ if (locCount === 0) {
   console.log('ℹ️  Locations already exist, skipping.');
 }
 
-console.log('\n🚀 Seed complete. You can now start the server with: npm start');
+console.log('\n🚀 Seed complete. Start the server with: npm start');
 db.close();

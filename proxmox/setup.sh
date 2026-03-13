@@ -68,7 +68,7 @@ if [ -f "$APP_DIR/package.json" ]; then
   npm ci --omit=dev --quiet
   echo "      Running database migrations..."
   node scripts/migrate.js
-  echo "      Seeding database..."
+  echo "      Seeding database (pepper from .env)..."
   node scripts/seed.js
 else
   echo ""

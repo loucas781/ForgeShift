@@ -158,6 +158,7 @@ echo ""
 echo "[5/6] Writing environment config..."
 
 SESSION_SECRET=$(openssl rand -hex 64)
+PASSWORD_PEPPER=$(openssl rand -hex 32)
 
 pct exec "$CTID" -- bash -c "mkdir -p /opt/forgeshift/data"
 pct exec "$CTID" -- bash -c "cat > /opt/forgeshift/.env << 'ENVEOF'
@@ -172,6 +173,7 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=200
 AUTH_RATE_LIMIT_WINDOW_MS=900000
 AUTH_RATE_LIMIT_MAX=20
+PASSWORD_PEPPER=$PASSWORD_PEPPER
 ADMIN_EMAIL=admin@forgeshift.app
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=ChangeMe123!
