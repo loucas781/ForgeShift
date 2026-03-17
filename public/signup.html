@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeShift — Create Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
+        <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
+        <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
+        <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
+        <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
+        <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/></svg>
+      <span class="auth-logo-text">ForgeShift</span>
+    </div>
+    <h1 class="auth-title">Create account</h1>
+    <p class="auth-subtitle">Get started with ForgeShift</p>
+
+    <div class="auth-error" id="signupError"></div>
+    <div class="auth-success" id="signupSuccess"></div>
+
+    <div class="form-group">
+      <label class="form-label">Full name</label>
+      <input type="text" class="form-input" id="name" placeholder="Jane Smith" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email address</label>
+      <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+
+    <button class="btn btn-primary auth-btn" id="signupBtn" onclick="doSignup()">Create account</button>
+
+    <div class="auth-link">Already have an account? <a href="/login.html">Sign in</a></div>
+  </div>
+</div>
+<script>
+  const t = localStorage.getItem('fs-theme') || 'light'
+  if (t !== 'light') document.documentElement.setAttribute('data-theme', t)
+
+  async function init() {
+    try {
+      const r = await fetch('/api/config')
+      const d = await r.json()
+      if (d.user) { window.location.href = '/'; return }
+      if (!d.allowSignup) {
+        document.querySelector('.auth-card').innerHTML = `
+          <div style="text-align:center;padding:20px">
+            <h2 style="margin-bottom:12px">Registration Disabled</h2>
+            <p style="color:var(--text-3);margin-bottom:20px">Open registration is currently disabled.<br>Contact your administrator to create an account.</p>
+            <a href="/login.html" class="btn btn-primary">Back to Sign In</a>
+          </div>`
+      }
+    } catch {}
+  }
+  init()
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') doSignup() })
+
+  async function doSignup() {
+    const btn = document.getElementById('signupBtn')
+    const err = document.getElementById('signupError')
+    const ok  = document.getElementById('signupSuccess')
+    err.classList.remove('show'); ok.classList.remove('show')
+    const name = document.getElementById('name').value.trim()
+    const email = document.getElementById('email').value.trim()
+    const password = document.getElementById('password').value
+    if (!name || !email || !password) { err.textContent = 'All fields are required.'; err.classList.add('show'); return }
+    btn.disabled = true; btn.textContent = 'Creating account…'
+    try {
+      const r = await fetch('/api/auth/signup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name, email, password }) })
+      const d = await r.json()
+      if (!r.ok) { err.textContent = d.error || 'Signup failed'; err.classList.add('show'); return }
+      window.location.href = '/'
+    } catch {
+      err.textContent = 'Connection error — please try again'
+      err.classList.add('show')
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create account'
+    }
+  }
+</script>
+</body>
+</html>

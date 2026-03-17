@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeShift — My Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">My Profile</h1>
+      </div>
+      <div style="display:grid;gap:20px;max-width:560px">
+
+        <!-- Profile Info -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Profile</h3></div>
+          <div class="card-body">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+              <div class="avatar avatar-xl" id="profileAvatar"></div>
+              <div>
+                <div style="font-size:18px;font-weight:800" id="profileName"></div>
+                <div style="font-size:13px;color:var(--text-3)" id="profileEmail"></div>
+                <span class="badge badge-blue" style="margin-top:6px" id="profileRole"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Display name</label>
+              <input type="text" class="form-input" id="editName">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Accent colour</label>
+              <div id="profileColourPicker"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save changes</button>
+          </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Change Password</h3></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Current password</label>
+              <input type="password" class="form-input" id="curPw" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label class="form-label">New password</label>
+              <input type="password" class="form-input" id="newPw" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm new password</label>
+              <input type="password" class="form-input" id="newPw2" placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="changePassword()">Update password</button>
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Appearance</h3></div>
+          <div class="card-body">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="setTheme('light')">☀️ Light</button>
+              <button class="btn btn-secondary" onclick="setTheme('dark')">🌙 Dark</button>
+              <button class="btn btn-secondary" onclick="setTheme('oled')">⬛ OLED Black</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-3);margin-top:10px">Current: <span id="themeName">light</span></p>
+          </div>
+        </div>
+
+        <!-- iCal Feed -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Calendar Subscription</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+              Subscribe to your shift rota in any calendar app (Google Calendar, Apple Calendar, Outlook) via iCal.
+            </p>
+            <div id="icalContent">Loading…</div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="/js/shell.js"></script>
+<script>
+'use strict'
+
+let cfg = null
+let profileColour = '#4f46e5'
+
+async function init() {
+  cfg = await loadConfig()
+  if (!cfg) return
+  renderShell(cfg, 'profile')
+
+  const u = cfg.user
+  document.getElementById('profileAvatar').style.background = u.color
+  document.getElementById('profileAvatar').textContent = u.initials
+  document.getElementById('profileName').textContent = u.name
+  document.getElementById('profileEmail').textContent = u.email
+  document.getElementById('profileRole').textContent = u.role
+  document.getElementById('editName').value = u.name
+  document.getElementById('themeName').textContent = getTheme()
+
+  profileColour = u.color || '#4f46e5'
+  const picker = document.getElementById('profileColourPicker')
+  renderColourPicker(picker, profileColour, v => { profileColour = v })
+
+  loadIcal()
+}
+
+async function saveProfile() {
+  const name = document.getElementById('editName').value.trim()
+  if (!name) { toast('Name is required', 'error'); return }
+  try {
+    const r = await api('/api/auth/profile', { method: 'PATCH', body: { name, color: profileColour } })
+    document.getElementById('profileAvatar').style.background = profileColour
+    document.getElementById('profileAvatar').textContent = r.user.initials
+    document.getElementById('profileName').textContent = r.user.name
+    toast('Profile saved', 'success')
+    // Invalidate config cache
+    _config = null
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function changePassword() {
+  const cur  = document.getElementById('curPw').value
+  const npw  = document.getElementById('newPw').value
+  const npw2 = document.getElementById('newPw2').value
+  if (!cur || !npw)       { toast('All fields are required', 'error'); return }
+  if (npw !== npw2)       { toast('Passwords do not match', 'error'); return }
+  try {
+    await api('/api/auth/change-password', { method: 'POST', body: { currentPassword: cur, newPassword: npw } })
+    toast('Password updated', 'success')
+    document.getElementById('curPw').value = ''
+    document.getElementById('newPw').value = ''
+    document.getElementById('newPw2').value = ''
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function loadIcal() {
+  try {
+    const data = await api('/api/ical/token')
+    const el = document.getElementById('icalContent')
+    el.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Feed URL</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" value="${data.feedUrl}" readonly id="icalUrl" style="font-size:11px;font-family:var(--mono)">
+          <button class="btn btn-secondary btn-sm" onclick="copyIcal()">Copy</button>
+        </div>
+        <p class="form-hint">Paste this URL into your calendar app to subscribe to your shifts.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${data.feedUrl}" class="btn btn-secondary btn-sm" download>⬇ Download .ics</a>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="regenerateIcal()">Regenerate token</button>
+      </div>`
+  } catch (err) {
+    document.getElementById('icalContent').textContent = 'Failed to load iCal token'
+  }
+}
+
+function copyIcal() {
+  const url = document.getElementById('icalUrl').value
+  navigator.clipboard.writeText(url).then(() => toast('URL copied!', 'success'))
+}
+
+async function regenerateIcal() {
+  if (!confirm('Regenerate iCal token? Your current subscription URL will stop working.')) return
+  try {
+    await api('/api/ical/token', { method: 'DELETE' })
+    await loadIcal()
+    toast('Token regenerated', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+</script>
+</body>
+</html>

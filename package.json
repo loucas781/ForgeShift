@@ -1,33 +1,24 @@
 {
   "name": "forgeshift",
-  "version": "1.0.0",
-  "description": "Work Shift Rota Management System",
-  "main": "src/server.js",
+  "version": "0.0.1",
+  "description": "Self-hosted shift rota management — vanilla HTML/CSS/JS + Node.js/Express + SQLite",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "migrate": "node scripts/migrate.js",
-    "seed": "node scripts/seed.js",
-    "setup": "npm install && node scripts/migrate.js && node scripts/seed.js",
-    "bump": "node scripts/bump-version.js",
-    "bump:patch": "VERSION_BUMP=patch node scripts/bump-version.js",
-    "bump:minor": "VERSION_BUMP=minor node scripts/bump-version.js",
-    "bump:major": "VERSION_BUMP=major node scripts/bump-version.js"
+    "start": "node server/index.js",
+    "dev": "NODE_ENV=development nodemon server/index.js",
+    "dev:win": "set NODE_ENV=development && nodemon server/index.js",
+    "setup": "node server/db/migrate.js",
+    "bump-version": "node scripts/bump-version.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.4.3",
-    "compression": "^1.7.4",
-    "connect-sqlite3": "^0.9.14",
     "cookie-parser": "^1.4.6",
-    "dotenv": "^16.4.5",
     "express": "^4.18.3",
     "express-rate-limit": "^7.2.0",
-    "express-session": "^1.18.0",
-    "express-validator": "^7.0.1",
-    "helmet": "^7.1.0",
-    "morgan": "^1.10.0",
-    "uuid": "^9.0.1"
+    "ical-generator": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

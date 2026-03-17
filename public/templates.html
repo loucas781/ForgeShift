@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeShift — Templates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main class="page-content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Templates</h1>
+          <p class="page-subtitle">Create reusable weekly shift patterns</p>
+        </div>
+        <div style="display:flex;gap:8px" id="adminActions"></div>
+      </div>
+      <div class="template-grid" id="templateGrid">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>
+          <h3>No templates yet</h3>
+          <p>Create a template to quickly apply weekly shift patterns</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Template Modal -->
+<div class="modal-overlay" id="tmplModal">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <h3 class="modal-title" id="tmplModalTitle">New Template</h3>
+      <button class="modal-close" onclick="closeTmplModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Template name</label>
+        <input type="text" class="form-input" id="tmplName" placeholder="e.g. Standard Week">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description (optional)</label>
+        <input type="text" class="form-input" id="tmplDesc" placeholder="Describe this template…">
+      </div>
+      <h4 style="margin:16px 0 12px;font-size:13px">Configure each day</h4>
+      <div class="day-editor-grid" id="dayEditorGrid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeTmplModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTmpl()">Save template</button>
+    </div>
+  </div>
+</div>
+
+<!-- Apply Template Modal -->
+<div class="modal-overlay" id="applyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Apply Template</h3>
+      <button class="modal-close" onclick="closeApplyModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Apply this template to a team member for a specific week.</p>
+      <div class="form-group">
+        <label class="form-label">Team member</label>
+        <select class="form-select" id="applyUser"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Week starting (Monday)</label>
+        <input type="date" class="form-input" id="applyWeekStart">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeApplyModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="doApplyTmpl()">Apply template</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/shell.js"></script>
+<script>
+'use strict'
+
+let cfg = null
+let templates = []
+let locations = []
+let users = []
+let editingTmplId = null
+let applyingTmplId = null
+let dayConfigs = {} // day_of_week -> { location_id, start_time, end_time, notes, note_color, is_off }
+
+const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+async function init() {
+  cfg = await loadConfig()
+  if (!cfg) return
+  renderShell(cfg, 'templates')
+  await Promise.all([loadLocations(), loadUsers(), loadTemplates()])
+
+  if (cfg.user.role === 'admin') {
+    document.getElementById('adminActions').innerHTML = `
+      <button class="btn btn-primary" onclick="openCreateTmpl()">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        New Template
+      </button>`
+  }
+}
+
+async function loadLocations() {
+  locations = await api('/api/locations')
+}
+
+async function loadUsers() {
+  if (cfg.user.role !== 'admin') { users = [cfg.user]; return }
+  users = await api('/api/users')
+  const sel = document.getElementById('applyUser')
+  users.filter(u => u.is_active).forEach(u => {
+    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+    sel.appendChild(o)
+  })
+}
+
+async function loadTemplates() {
+  templates = await api('/api/templates')
+  renderTemplateGrid()
+}
+
+function renderTemplateGrid() {
+  const grid = document.getElementById('templateGrid')
+  if (!templates.length) {
+    grid.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12z"/></svg>
+      <h3>No templates yet</h3>
+      <p>${cfg.user.role==='admin'?'Click "New Template" to get started':'No templates have been created yet'}</p>
+    </div>`
+    return
+  }
+
+  // Mon=0..Sun=6 in template (day_of_week 0=Mon)
+  const dayAbbrs = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+
+  grid.innerHTML = templates.map(t => {
+    const dayMap = {}
+    ;(t.days||[]).forEach(d => { dayMap[d.day_of_week] = d })
+    const dayCells = Array.from({length:7}, (_,i) => {
+      const d = dayMap[i]
+      if (!d) return `<div class="template-day-cell"><div class="day-abbr">${dayAbbrs[i]}</div><div class="day-loc">—</div></div>`
+      const locName = d.location_id ? (locations.find(l=>l.id===d.location_id)?.name||'?') : (d.is_off?'Off':'—')
+      return `<div class="template-day-cell">
+        <div class="day-abbr">${dayAbbrs[i]}</div>
+        <div class="day-loc" title="${locName}">${locName}</div>
+        <div class="day-swatch" style="background:${d.note_color||'#4f46e5'}"></div>
+      </div>`
+    }).join('')
+
+    const adminBtns = cfg.user.role === 'admin' ? `
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditTmpl('${t.id}')" title="Edit">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+        </button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTmpl('${t.id}')" title="Delete" style="color:var(--red)">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>` : ''
+
+    return `<div class="template-card">
+      <div class="template-card-header">
+        <div>
+          <div class="template-card-title">${t.name}</div>
+          ${t.description ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${t.description}</div>` : ''}
+        </div>
+        ${adminBtns}
+      </div>
+      <div class="template-days-row">${dayCells}</div>
+    </div>`
+  }).join('')
+}
+
+// ── Template Editor ────────────────────────────────────────────────────────────
+function openCreateTmpl() {
+  editingTmplId = null
+  dayConfigs = {}
+  document.getElementById('tmplModalTitle').textContent = 'New Template'
+  document.getElementById('tmplName').value = ''
+  document.getElementById('tmplDesc').value = ''
+  renderDayEditor()
+  document.getElementById('tmplModal').classList.add('open')
+}
+
+function openEditTmpl(id) {
+  const t = templates.find(x => x.id === id)
+  if (!t) return
+  editingTmplId = id
+  dayConfigs = {}
+  ;(t.days||[]).forEach(d => { dayConfigs[d.day_of_week] = { ...d } })
+  document.getElementById('tmplModalTitle').textContent = 'Edit Template'
+  document.getElementById('tmplName').value = t.name
+  document.getElementById('tmplDesc').value = t.description || ''
+  renderDayEditor()
+  document.getElementById('tmplModal').classList.add('open')
+}
+
+function closeTmplModal() { document.getElementById('tmplModal').classList.remove('open') }
+
+function renderDayEditor() {
+  const grid = document.getElementById('dayEditorGrid')
+  grid.innerHTML = ''
+  // 0=Mon, 6=Sun
+  for (let i = 0; i < 7; i++) {
+    const cfg_day = dayConfigs[i] || { note_color: '#4f46e5', is_off: 0 }
+    const cell = document.createElement('div')
+    cell.className = 'day-editor-cell'
+    cell.innerHTML = `
+      <div class="day-editor-cell-header">${DAY_FULL[i]}</div>
+      <div class="day-editor-cell-body">
+        <div class="form-group" style="margin-bottom:8px">
+          <select class="form-select" id="dc_loc_${i}" style="font-size:11px;padding:5px 8px">
+            <option value="">No location</option>
+            ${locations.map(l=>`<option value="${l.id}"${cfg_day.location_id===l.id?' selected':''}>${l.name}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
+          <input type="time" class="form-input" id="dc_start_${i}" value="${cfg_day.start_time||''}" style="font-size:11px;padding:5px 6px" placeholder="Start">
+          <input type="time" class="form-input" id="dc_end_${i}" value="${cfg_day.end_time||''}" style="font-size:11px;padding:5px 6px" placeholder="End">
+        </div>
+        <textarea class="form-textarea" id="dc_notes_${i}" rows="2" style="font-size:11px;min-height:48px" placeholder="Notes…">${cfg_day.notes||''}</textarea>
+        <div style="margin-top:6px" id="dc_colours_${i}"></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+          <label class="toggle" style="width:32px;height:18px">
+            <input type="checkbox" id="dc_off_${i}"${cfg_day.is_off?' checked':''}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span style="font-size:10px;color:var(--text-3)">Day off</span>
+        </div>
+      </div>`
+    grid.appendChild(cell)
+
+    // Colour picker
+    const colContainer = document.getElementById(`dc_colours_${i}`)
+    let thisColour = cfg_day.note_color || '#4f46e5'
+    renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v })
+    // Store initial colour
+    if (!dayConfigs[i]) dayConfigs[i] = {}
+    dayConfigs[i].note_color = thisColour
+  }
+}
+
+async function saveTmpl() {
+  const name = document.getElementById('tmplName').value.trim()
+  if (!name) { toast('Template name is required', 'error'); return }
+
+  // Collect day configs
+  const days = []
+  for (let i = 0; i < 7; i++) {
+    const dc = dayConfigs[i] || {}
+    days.push({
+      day_of_week: i,
+      location_id: document.getElementById(`dc_loc_${i}`)?.value || null,
+      start_time:  document.getElementById(`dc_start_${i}`)?.value || null,
+      end_time:    document.getElementById(`dc_end_${i}`)?.value || null,
+      notes:       document.getElementById(`dc_notes_${i}`)?.value.trim() || null,
+      note_color:  dc.note_color || '#4f46e5',
+      is_off:      document.getElementById(`dc_off_${i}`)?.checked || false,
+    })
+  }
+
+  try {
+    if (editingTmplId) {
+      await api(`/api/templates/${editingTmplId}`, { method: 'PUT', body: { name, description: document.getElementById('tmplDesc').value.trim(), days } })
+      toast('Template updated', 'success')
+    } else {
+      await api('/api/templates', { method: 'POST', body: { name, description: document.getElementById('tmplDesc').value.trim(), days } })
+      toast('Template created', 'success')
+    }
+    closeTmplModal()
+    await loadTemplates()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+async function deleteTmpl(id) {
+  const t = templates.find(x => x.id === id)
+  if (!confirm(`Delete template "${t?.name}"?`)) return
+  try {
+    await api(`/api/templates/${id}`, { method: 'DELETE' })
+    toast('Template deleted', 'success')
+    await loadTemplates()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+// ── Apply Template ─────────────────────────────────────────────────────────────
+function openApplyTmpl(id) {
+  applyingTmplId = id
+  // Default to next Monday
+  const d = new Date()
+  const day = d.getDay()
+  const diff = day === 1 ? 0 : (8 - day) % 7 || 7
+  d.setDate(d.getDate() + diff)
+  document.getElementById('applyWeekStart').value = toDateStr(d)
+  document.getElementById('applyModal').classList.add('open')
+}
+
+function closeApplyModal() { document.getElementById('applyModal').classList.remove('open') }
+
+async function doApplyTmpl() {
+  const user_id = document.getElementById('applyUser').value
+  const week_start = document.getElementById('applyWeekStart').value
+  if (!user_id || !week_start) { toast('Please select a user and week', 'error'); return }
+  try {
+    const r = await api('/api/shifts/apply-template', {
+      method: 'POST', body: { template_id: applyingTmplId, user_id, week_start }
+    })
+    toast(`Template applied — ${r.applied} shifts created`, 'success')
+    closeApplyModal()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+// Close modals on overlay click
+document.getElementById('tmplModal').addEventListener('click', e => { if (e.target === document.getElementById('tmplModal')) closeTmplModal() })
+document.getElementById('applyModal').addEventListener('click', e => { if (e.target === document.getElementById('applyModal')) closeApplyModal() })
+
+init()
+</script>
+</body>
+</html>

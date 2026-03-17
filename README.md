@@ -1,139 +1,77 @@
-# 📅 ForgeShift — Shift Rota Management System
+# ForgeShift
 
-A production-ready, server-hosted shift rota management system built with **Node.js**, **Express**, and **SQLite**. Ships with a full Proxmox LXC installer, iCal calendar feeds, Docker support, and Nginx configs.
+Self-hosted **shift rota management** — vanilla HTML/CSS/JS + Node.js/Express + SQLite.
 
----
+## Features
 
-## 🚀 Proxmox Install (Recommended)
+- 📅 **Calendar** — month and week views, click to add/edit shifts
+- 📍 **Locations** — assign locations per shift day, configurable colour coding
+- 📋 **Templates** — reusable weekly shift patterns, apply to any team member
+- 🎨 **Colour-coded notes** — per-day notes with colour tint
+- 👥 **User management** — admin creates/deactivates/deletes accounts
+- 🔐 **Auth** — JWT cookies, HMAC-SHA256 pepper + bcrypt, pepper rotation
+- 📲 **iCal export** — subscribe to your rota in Google/Apple/Outlook Calendar
+- 🌙 **Themes** — light, dark, OLED black (system-level preference)
+- 📱 **Mobile responsive** — works on desktop, tablet and phone
+- 🚀 **Environments** — develop / staging / production
+- 🔄 **Version bumping** — GitHub Actions auto-increments build counter
 
-### On your Proxmox host shell:
-
-```bash
-wget -O create-lxc.sh https://raw.githubusercontent.com/YOUR_ORG/forgeshift/main/proxmox/create-lxc.sh
-chmod +x create-lxc.sh
-
-bash create-lxc.sh production   # or staging / develop
-```
-
-The script will prompt for container ID, hostname, RAM, disk, cores and port (all defaulted), then:
-- Download Ubuntu 22.04 template if needed
-- Create and start the LXC container
-- Generate a secure SESSION_SECRET and write .env into the container
-- Run setup.sh inside the container (Node.js 20, PM2, Nginx, UFW, migrations, seed)
-- Print the container IP and all access URLs
-
-### Container management
+## Quick Start (local)
 
 ```bash
-pct enter <CTID>                           # Shell into container
-pct exec <CTID> -- pm2 logs forgeshift      # Live logs
-pct exec <CTID> -- pm2 restart forgeshift   # Restart app
-pct stop <CTID>                            # Stop container
+git clone https://github.com/YOUR_USER/forgeshift.git
+cd forgeshift
+cp .env.example .env.development
+# Fill in JWT_SECRET and PASSWORD_PEPPER in .env.development
+npm install
+node server/index.js
+# Open http://localhost:3000/signup.html to create the first admin account
 ```
 
----
+## Proxmox LXC Install
 
-## 📅 iCal Calendar Feeds
-
-Subscribe to shift rotas in Google Calendar, Apple Calendar, Outlook, or any iCal app.
-
-1. Log in → **My Profile** → **iCal / Calendar Feeds**
-2. Click **Generate iCal Token**
-3. Copy the feed URL and subscribe in your calendar app
-
-| Feed | Path | Access |
-|------|------|--------|
-| My shifts | `/api/ical/<token>/my-shifts.ics` | All users |
-| Full team | `/api/ical/<token>/team.ics` | Admin only |
-| Specific user | `/api/ical/<token>/user/<userId>.ics` | Admin only |
-
-Feeds cover 3 months past to 12 months ahead and refresh hourly.
-
-**How to subscribe:**
-- **Google Calendar** — Other calendars → + → From URL
-- **Apple Calendar** — File → New Calendar Subscription
-- **Outlook** — Add calendar → Subscribe from web
-
-Tokens are stored as SHA-256 hashes. Revoke or regenerate any time from My Profile.
-
----
-
-## 🏗 Tech Stack
-
-Node.js 20 · Express 4 · SQLite (better-sqlite3) · bcrypt · PM2 · Nginx · Docker
-
----
-
-## 🖥 Other Deployment Options
-
-### Direct server
+Run this **on your Proxmox host** (not inside a container):
 
 ```bash
-git clone https://github.com/YOUR_ORG/forgeshift.git && cd forgeshift
-cp .env.example .env   # Edit: set SESSION_SECRET and ADMIN_PASSWORD
-npm run setup          # migrate + seed
-npm start
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/forgeshift/main/proxmox/ct/forgeshift.sh)"
 ```
 
-### Docker Compose
+The script will:
+1. Show a `whiptail` TUI to configure the LXC (or use defaults)
+2. Download a Debian 12 template if needed
+3. Create and start the container
+4. Run the in-container install script automatically
+5. Print the app URL and container root password when done
 
-```bash
-cp .env.example .env
-docker compose up -d                        # production
-docker compose --profile staging up -d     # staging
-docker compose --profile dev up            # development
-```
+**After install:** visit `http://<container-ip>:3000/signup.html` to create the first admin account.
 
----
+> **Before deploying:** edit `GITHUB_RAW` in `proxmox/ct/forgeshift.sh` and `REPO_URL` in `proxmox/install/forgeshift-install.sh` to point to your repository.
 
-## 📁 Project Structure
+## GitHub Actions
 
-```
-forgeshift/
-├── proxmox/
-│   ├── create-lxc.sh    # Proxmox host: creates LXC container
-│   └── setup.sh         # Container bootstrap: Node, PM2, Nginx, UFW
-├── src/
-│   ├── server.js
-│   ├── config/database.js
-│   ├── middleware/auth.js
-│   └── routes/
-│       ├── auth.js      # Login, logout, register
-│       ├── shifts.js    # Shift CRUD
-│       ├── ical.js      # iCal feeds + token management
-│       └── api.js       # Templates, users, locations, settings
-├── public/
-│   ├── index.html
-│   ├── css/styles.css
-│   └── js/
-│       ├── api.js       # REST + iCal client
-│       ├── state.js
-│       ├── utils.js
-│       └── app.js       # Full SPA renderer
-├── scripts/
-│   ├── migrate.js       # Schema (includes ical_tokens table)
-│   └── seed.js
-├── deploy/
-│   ├── nginx.conf
-│   └── forgeshift.service
-├── docker-compose.yml
-├── Dockerfile
-└── .env.example
-```
+Set up in repo Settings → Actions → General → **Read and write permissions**.
 
----
+Three branches:
+- `develop` — auto-increments build counter on every push
+- `staging`  — bumps patch version + `-rc` suffix on PR merge
+- `main`     — bumps minor version, clean production tag
 
-## 🔒 Security
+## Environment Variables
 
-bcrypt · Helmet.js · Rate limiting · Server-side sessions · httpOnly cookies · iCal tokens hashed as SHA-256 · Input validation via express-validator
+| Variable | Description |
+|---|---|
+| `JWT_SECRET` | JWT signing secret — `openssl rand -hex 48` |
+| `PASSWORD_PEPPER` | HMAC pepper for bcrypt — `openssl rand -hex 32` |
+| `DATABASE_PATH` | SQLite file path (default: `./data/forgeshift.db`) |
+| `PORT` | Server port (default: `3000`) |
+| `COOKIE_SECURE` | Set `true` behind HTTPS |
+| `TRUST_PROXY` | Set `true` behind nginx/Caddy |
 
----
+## Security
 
-## 🔑 Default Credentials
-
-```
-Email    : admin@forgeshift.app
-Password : ChangeMe123!
-```
-
-> ⚠️ Change these immediately after first login.
+- Passwords: HMAC-SHA256 pepper → bcrypt (12 rounds)
+- Pepper rotation: set `PASSWORD_PEPPER_OLD` + new `PASSWORD_PEPPER` — passwords re-hashed transparently on next login
+- Tokens: SHA-256 hashed before storage; two-step reset flow (URL token → in-memory session key)
+- Rate limiting: 20 auth attempts per IP per 15 min
+- Last-admin guard: cannot delete or demote the only admin
+- Audit log: all sensitive operations written to `audit_log` table

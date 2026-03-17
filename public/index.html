@@ -2,69 +2,391 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="ForgeShift – Work Shift Rota Management">
-  <meta name="app-env" content="production">
-  <meta name="theme-color" content="#4f46e5">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>ForgeShift</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeShift — Calendar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap">
-  <link rel="stylesheet" href="/css/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
-
-  <!-- Environment Bar (content injected by server via meta tag + JS) -->
-  <div class="env-bar production" id="env-bar">
-    <span id="env-label">Production</span>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main class="page-content" style="padding:0;display:flex;flex-direction:column;">
+      <div class="cal-wrapper">
+        <!-- Toolbar -->
+        <div class="cal-toolbar">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" id="prevBtn" title="Previous">&#8249;</button>
+            <button class="cal-today-btn" onclick="goToday()">Today</button>
+            <button class="cal-nav-btn" id="nextBtn" title="Next">&#8250;</button>
+          </div>
+          <h2 class="cal-title" id="calTitle">Loading…</h2>
+          <div id="userFilterWrap" style="display:none">
+            <select class="cal-user-filter" id="userFilter" onchange="renderView()">
+              <option value="">All team</option>
+            </select>
+          </div>
+          <div class="cal-view-tabs" style="margin-left:auto">
+            <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')"><span>Month</span></button>
+            <button class="cal-view-tab" id="tabWeek" onclick="setView('week')"><span>Week</span></button>
+          </div>
+        </div>
+        <!-- Grid -->
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+    </main>
   </div>
+</div>
 
-  <!-- App Root -->
-  <div id="root">
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;padding-top:28px">
-      <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
-      <div style="font-size:14px;color:var(--text-muted)">Loading ForgeShift…</div>
+<!-- Shift Modal -->
+<div class="modal-overlay" id="shiftModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Shift</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="adminUserField" style="display:none" class="form-group">
+        <label class="form-label">Team member</label>
+        <select class="form-select" id="modalUser"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="modalDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <select class="form-select" id="modalLocation">
+          <option value="">— No location —</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Start time</label>
+          <input type="time" class="form-input" id="modalStart">
+        </div>
+        <div class="form-group">
+          <label class="form-label">End time</label>
+          <input type="time" class="form-input" id="modalEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="modalNotes" placeholder="Add any notes for this day…" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note colour</label>
+        <div id="modalColourPicker"></div>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <label class="toggle">
+          <input type="checkbox" id="modalIsOff">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="form-label" style="margin:0">Day off / leave</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveShift()">Save shift</button>
     </div>
   </div>
+</div>
 
-  <!-- Toast Container -->
-  <div id="toast-container" class="toast-container"></div>
+<script src="/js/shell.js"></script>
+<script>
+'use strict'
 
-  <script src="/js/api.js"></script>
-  <script src="/js/state.js"></script>
-  <script src="/js/utils.js"></script>
-  <script src="/js/app.js"></script>
-  <script>
-    (async () => {
-      // Read environment from server-injected meta tag
-      const envMeta = document.querySelector('meta[name="app-env"]');
-      const env = envMeta?.content || 'production';
+let cfg = null
+let view = 'month'
+let currentDate = new Date()
+let shifts = []
+let locations = []
+let users = []
+let editingShiftId = null
+let selectedColour = '#4f46e5'
 
-      // Style env bar
-      const envBar = document.getElementById('env-bar');
-      const envLabel = document.getElementById('env-label');
-      const envNames = { development: 'Development', staging: 'Staging', production: 'Production' };
-      envBar.className = `env-bar ${env}`;
-      envLabel.textContent = envNames[env] || env;
+async function init() {
+  cfg = await loadConfig()
+  if (!cfg) return
+  renderShell(cfg, 'calendar')
 
-      try {
-        await app.boot();
-      } catch (err) {
-        console.error('Boot error:', err);
-        document.getElementById('root').innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;padding-top:52px">
-            <div style="text-align:center;max-width:400px">
-              <div style="font-size:48px;margin-bottom:16px">⚠️</div>
-              <h2 style="margin-bottom:8px">Failed to Load</h2>
-              <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">${err.message}</p>
-              <button onclick="location.reload()" class="btn btn-primary">Retry</button>
-            </div>
-          </div>`;
-      }
-    })();
-  </script>
+  if (cfg.user.role === 'admin') {
+    document.getElementById('userFilterWrap').style.display = 'block'
+    document.getElementById('adminUserField').style.display = 'block'
+  }
+
+  await Promise.all([loadLocations(), loadUsers()])
+  renderView()
+
+  document.getElementById('prevBtn').addEventListener('click', prev)
+  document.getElementById('nextBtn').addEventListener('click', next)
+}
+
+async function loadLocations() {
+  locations = await api('/api/locations')
+  const sel = document.getElementById('modalLocation')
+  locations.forEach(l => {
+    const o = document.createElement('option')
+    o.value = l.id; o.textContent = l.name
+    sel.appendChild(o)
+  })
+}
+
+async function loadUsers() {
+  if (cfg.user.role !== 'admin') { users = [cfg.user]; return }
+  users = await api('/api/users')
+  const sel = document.getElementById('userFilter')
+  const msel = document.getElementById('modalUser')
+  users.filter(u => u.is_active).forEach(u => {
+    const o1 = document.createElement('option'); o1.value = u.id; o1.textContent = u.name
+    sel.appendChild(o1.cloneNode(true))
+    const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+    msel.appendChild(o2)
+  })
+}
+
+async function loadShifts() {
+  let start, end
+  if (view === 'month') {
+    start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    end   = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+    // pad to full weeks
+    start.setDate(start.getDate() - start.getDay())
+    end.setDate(end.getDate() + (6 - end.getDay()))
+  } else {
+    start = startOfWeek(currentDate, 1)
+    end   = new Date(start); end.setDate(end.getDate() + 6)
+  }
+  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
+  const uid = document.getElementById('userFilter')?.value
+  if (uid) params.set('user_id', uid)
+  else if (cfg.user.role !== 'admin') params.set('user_id', cfg.user.id)
+  shifts = await api('/api/shifts?' + params)
+}
+
+async function renderView() {
+  await loadShifts()
+  updateTitle()
+  if (view === 'month') renderMonth()
+  else renderWeek()
+  // Update tab styles
+  document.getElementById('tabMonth').className = 'cal-view-tab' + (view==='month'?' active':'')
+  document.getElementById('tabWeek').className  = 'cal-view-tab' + (view==='week'?' active':'')
+}
+
+function updateTitle() {
+  if (view === 'month') {
+    document.getElementById('calTitle').textContent = MONTH_NAMES[currentDate.getMonth()] + ' ' + currentDate.getFullYear()
+  } else {
+    const ws = startOfWeek(currentDate, 1)
+    const we = new Date(ws); we.setDate(we.getDate() + 6)
+    document.getElementById('calTitle').textContent =
+      ws.getDate() + ' ' + MONTH_NAMES[ws.getMonth()].slice(0,3) + ' – ' +
+      we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3) + ' ' + we.getFullYear()
+  }
+}
+
+function renderMonth() {
+  const grid = document.getElementById('calGrid')
+  const today = toDateStr(new Date())
+  const year  = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+  const first = new Date(year, month, 1)
+  const last  = new Date(year, month + 1, 0)
+  const startDay = first.getDay() // 0=Sun
+  const totalCells = Math.ceil((startDay + last.getDate()) / 7) * 7
+
+  // Build shift map: date -> [shifts]
+  const shiftMap = {}
+  shifts.forEach(s => {
+    if (!shiftMap[s.date]) shiftMap[s.date] = []
+    shiftMap[s.date].push(s)
+  })
+
+  let html = `<div class="cal-month">`
+  DAY_ABBR.forEach(d => { html += `<div class="cal-day-header">${d}</div>` })
+
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(year, month, 1 - startDay + i)
+    const ds = toDateStr(d)
+    const isCurrentMonth = d.getMonth() === month
+    const isToday = ds === today
+    const dayShifts = shiftMap[ds] || []
+
+    html += `<div class="cal-cell${isCurrentMonth ? '' : ' other-month'}${isToday ? ' today' : ''}" data-date="${ds}" onclick="openCreateModal('${ds}')">`
+    html += `<div class="cal-cell-date">${d.getDate()}</div>`
+    dayShifts.forEach(s => {
+      const color = s.note_color || '#4f46e5'
+      const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift')
+      html += `<div class="cal-shift-chip${s.is_off?' is-off':''}" style="background:${color}" title="${s.user_name || ''}: ${label}" onclick="event.stopPropagation();openEditModal('${s.id}')">${cfg.user.role==='admin'?s.user_name?.split(' ')[0]+': ':''} ${label}</div>`
+    })
+    html += `</div>`
+  }
+  html += `</div>`
+  grid.innerHTML = html
+}
+
+function renderWeek() {
+  const grid = document.getElementById('calGrid')
+  const today = toDateStr(new Date())
+  const ws    = startOfWeek(currentDate, 1)
+  const shiftMap = {}
+  shifts.forEach(s => {
+    if (!shiftMap[s.date]) shiftMap[s.date] = []
+    shiftMap[s.date].push(s)
+  })
+
+  let html = `<div class="cal-week">`
+  // time gutter header
+  html += `<div style="border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);padding:10px 4px;"></div>`
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ws); d.setDate(d.getDate() + i)
+    const ds = toDateStr(d)
+    const isToday = ds === today
+    html += `<div class="cal-week-day-header${isToday?' today':''}" style="border-right:1px solid var(--border)">
+      <div class="day-name">${DAY_ABBR[d.getDay()]}</div>
+      <div class="day-num">${d.getDate()}</div>
+    </div>`
+  }
+  // time gutter body + day columns
+  html += `<div class="cal-week-time-col" style="padding:8px 4px;font-size:11px;color:var(--text-3)">`
+  for (let h = 7; h <= 21; h++) html += `<div style="height:40px;padding-top:2px">${h}:00</div>`
+  html += `</div>`
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ws); d.setDate(d.getDate() + i)
+    const ds = toDateStr(d)
+    const dayShifts = shiftMap[ds] || []
+    html += `<div class="cal-week-day-col" onclick="openCreateModal('${ds}')">`
+    html += `<div class="cal-week-shifts">`
+    dayShifts.forEach(s => {
+      const color = s.note_color || '#4f46e5'
+      const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
+      const time  = s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : ''
+      html += `<div class="cal-week-shift-card" style="background:${color}" onclick="event.stopPropagation();openEditModal('${s.id}')">
+        <div class="shift-loc">${cfg.user.role==='admin' ? (s.user_name?.split(' ')[0]+': '):''}${label}</div>
+        ${time ? `<div class="shift-time">${time}</div>` : ''}
+        ${s.notes ? `<div class="shift-notes">${s.notes.slice(0,60)}${s.notes.length>60?'…':''}</div>` : ''}
+      </div>`
+    })
+    html += `</div></div>`
+  }
+  html += `</div>`
+  grid.innerHTML = html
+}
+
+function prev() {
+  if (view === 'month') currentDate.setMonth(currentDate.getMonth() - 1)
+  else currentDate.setDate(currentDate.getDate() - 7)
+  renderView()
+}
+
+function next() {
+  if (view === 'month') currentDate.setMonth(currentDate.getMonth() + 1)
+  else currentDate.setDate(currentDate.getDate() + 7)
+  renderView()
+}
+
+function goToday() { currentDate = new Date(); renderView() }
+function setView(v) { view = v; renderView() }
+
+// ── Modal ──────────────────────────────────────────────────────────────────────
+function openCreateModal(date) {
+  editingShiftId = null
+  selectedColour = '#4f46e5'
+  document.getElementById('modalTitle').textContent = 'Add Shift'
+  document.getElementById('modalDate').value = date
+  document.getElementById('modalLocation').value = ''
+  document.getElementById('modalStart').value = ''
+  document.getElementById('modalEnd').value = ''
+  document.getElementById('modalNotes').value = ''
+  document.getElementById('modalIsOff').checked = false
+  document.getElementById('deleteShiftBtn').style.display = 'none'
+  if (cfg.user.role === 'admin') document.getElementById('modalUser').value = ''
+  setupColourPicker()
+  document.getElementById('shiftModal').classList.add('open')
+}
+
+function openEditModal(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  editingShiftId = id
+  selectedColour = s.note_color || '#4f46e5'
+  document.getElementById('modalTitle').textContent = 'Edit Shift'
+  document.getElementById('modalDate').value = s.date
+  document.getElementById('modalLocation').value = s.location_id || ''
+  document.getElementById('modalStart').value = s.start_time || ''
+  document.getElementById('modalEnd').value = s.end_time || ''
+  document.getElementById('modalNotes').value = s.notes || ''
+  document.getElementById('modalIsOff').checked = !!s.is_off
+  document.getElementById('deleteShiftBtn').style.display = 'flex'
+  if (cfg.user.role === 'admin') document.getElementById('modalUser').value = s.user_id
+  setupColourPicker()
+  document.getElementById('shiftModal').classList.add('open')
+}
+
+function setupColourPicker() {
+  const el = document.getElementById('modalColourPicker')
+  el.innerHTML = ''
+  renderColourPicker(el, selectedColour, v => { selectedColour = v })
+}
+
+function closeModal() {
+  document.getElementById('shiftModal').classList.remove('open')
+}
+
+async function saveShift() {
+  const body = {
+    date:        document.getElementById('modalDate').value,
+    location_id: document.getElementById('modalLocation').value || null,
+    start_time:  document.getElementById('modalStart').value || null,
+    end_time:    document.getElementById('modalEnd').value || null,
+    notes:       document.getElementById('modalNotes').value.trim() || null,
+    note_color:  selectedColour,
+    is_off:      document.getElementById('modalIsOff').checked,
+  }
+  if (cfg.user.role === 'admin') {
+    body.user_id = document.getElementById('modalUser').value || cfg.user.id
+  }
+  try {
+    if (editingShiftId) {
+      await api(`/api/shifts/${editingShiftId}`, { method: 'PUT', body })
+      toast('Shift updated', 'success')
+    } else {
+      await api('/api/shifts', { method: 'POST', body })
+      toast('Shift added', 'success')
+    }
+    closeModal()
+    renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+async function deleteShift() {
+  if (!editingShiftId) return
+  if (!confirm('Delete this shift?')) return
+  try {
+    await api(`/api/shifts/${editingShiftId}`, { method: 'DELETE' })
+    toast('Shift deleted', 'success')
+    closeModal()
+    renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('shiftModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('shiftModal')) closeModal()
+})
+
+init()
+</script>
 </body>
 </html>

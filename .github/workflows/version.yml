@@ -1,0 +1,161 @@
+name: Version
+
+on:
+  push:
+    branches: [develop, staging, main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to bump version on'
+        required: true
+        default: 'develop'
+        type: choice
+        options: [develop, staging, main]
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    name: Bump version
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        !contains(github.event.head_commit.message, '[skip ci]') &&
+        (
+          github.ref == 'refs/heads/develop' ||
+          startsWith(github.event.head_commit.message, 'Merge')
+        )
+      )
+
+    steps:
+      - name: Determine target branch
+        id: branch
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "name=${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branch.outputs.name }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          BRANCH="${{ steps.branch.outputs.name }}"
+
+          if [[ "$BRANCH" == "staging" || "$BRANCH" == "main" ]]; then
+            MERGE_MSG="${{ github.event.head_commit.message }}"
+            SOURCE_BRANCH=$(echo "$MERGE_MSG" | grep -oP '(?<=from [a-zA-Z0-9_-]+/)[\w\-/]+' | head -1)
+            if [[ -z "$SOURCE_BRANCH" ]]; then
+              SOURCE_SHA=$(git log --pretty=%P -1 HEAD | awk '{print $2}')
+              CURRENT=$(git show ${SOURCE_SHA}:.version 2>/dev/null | tr -d '[:space:]' || cat .version | tr -d '[:space:]')
+            else
+              git fetch origin "$SOURCE_BRANCH" 2>/dev/null || true
+              CURRENT=$(git show origin/${SOURCE_BRANCH}:.version 2>/dev/null | tr -d '[:space:]' || cat .version | tr -d '[:space:]')
+            fi
+          else
+            CURRENT=$(cat .version | tr -d '[:space:]')
+          fi
+
+          BASE=$(echo "$CURRENT" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
+          MAJOR=$(echo "$BASE" | cut -d. -f1)
+          MINOR=$(echo "$BASE" | cut -d. -f2)
+          PATCH=$(echo "$BASE" | cut -d. -f3)
+
+          if [[ "$BRANCH" == "main" ]]; then
+            MINOR=$((MINOR + 1)); PATCH=0
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          elif [[ "$BRANCH" == "staging" ]]; then
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
+          else
+            if echo "$CURRENT" | grep -q '\-dev\.'; then
+              LAST_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
+            else
+              LAST_NUM=0
+            fi
+            DEV_NUM=$(( LAST_NUM + 1 ))
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}"
+          fi
+
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${NEW_VERSION}"        >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH}"           >> $GITHUB_OUTPUT
+          echo "$NEW_VERSION" > .version
+          echo "Bumped: ${CURRENT} → ${NEW_VERSION}"
+
+      - name: Sync base version into package.json
+        run: |
+          BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+            pkg.version = '${BASE}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Commit version files
+        run: |
+          git add .version package.json
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "[skip ci] chore: bump version to ${{ steps.bump.outputs.new_version }}"
+          git push origin HEAD:${{ steps.branch.outputs.name }}
+
+      - name: Cascade new base version to lower branches
+        if: steps.branch.outputs.name != 'develop'
+        run: |
+          BRANCH="${{ steps.branch.outputs.name }}"
+          NEW_BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
+          DOWNSTREAM=""
+          [[ "$BRANCH" == "main" ]]    && DOWNSTREAM="staging develop"
+          [[ "$BRANCH" == "staging" ]] && DOWNSTREAM="develop"
+
+          for TARGET in $DOWNSTREAM; do
+            git fetch origin $TARGET
+            git checkout $TARGET
+            CURRENT=$(cat .version | tr -d '[:space:]')
+            if echo "$CURRENT" | grep -q '\-dev\.'; then
+              DEV_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
+              NEW_TARGET_VERSION="${NEW_BASE}-dev.${DEV_NUM}"
+            elif echo "$CURRENT" | grep -q '\-rc'; then
+              NEW_TARGET_VERSION="${NEW_BASE}-rc"
+            else
+              NEW_TARGET_VERSION="${NEW_BASE}"
+            fi
+            echo "$NEW_TARGET_VERSION" > .version
+            node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='${NEW_BASE}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+            git add .version package.json
+            git diff --cached --quiet && continue
+            git commit -m "[skip ci] chore: sync base version to ${NEW_BASE} from ${BRANCH}"
+            git push origin HEAD:$TARGET
+          done
+
+      - name: Create or replace Git tag
+        run: |
+          TAG="${{ steps.bump.outputs.tag }}"
+          git fetch --tags --force 2>/dev/null || true
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          git tag -a "$TAG" -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.branch.outputs.name }}"
+          git push origin "$TAG"
+
+      - name: Summary
+        run: |
+          echo "### 🏷️ Version bumped" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ steps.branch.outputs.name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| New version | \`${{ steps.bump.outputs.new_version }}\` |" >> $GITHUB_STEP_SUMMARY

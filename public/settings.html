@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeShift — Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main class="page-content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Settings</h1>
+          <p class="page-subtitle">Manage users, locations, and application settings</p>
+        </div>
+      </div>
+
+      <!-- Tab Nav -->
+      <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:24px">
+        <button class="cal-view-tab active" id="tab-users" onclick="showTab('users')">Users</button>
+        <button class="cal-view-tab" id="tab-locations" onclick="showTab('locations')">Locations</button>
+        <button class="cal-view-tab" id="tab-app" onclick="showTab('app')">Application</button>
+      </div>
+
+      <!-- Users Tab -->
+      <div id="tab-users-content">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <h2 style="font-size:16px;font-weight:700">Team Members</h2>
+          <button class="btn btn-primary btn-sm" onclick="openCreateUser()">+ Add User</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table id="usersTable">
+              <thead><tr>
+                <th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Locations Tab -->
+      <div id="tab-locations-content" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <h2 style="font-size:16px;font-weight:700">Locations</h2>
+          <button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add Location</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Actions</th></tr></thead>
+              <tbody id="locsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- App Tab -->
+      <div id="tab-app-content" style="display:none">
+        <div style="display:grid;gap:16px;max-width:560px">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title">Registration</h3></div>
+            <div class="card-body">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+                <div>
+                  <div style="font-size:13px;font-weight:600">Allow public sign-up</div>
+                  <div style="font-size:12px;color:var(--text-3);margin-top:2px">When disabled, only admins can create accounts</div>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" id="allowSignupToggle" onchange="setAllowSignup(this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3 class="card-title">Version</h3></div>
+            <div class="card-body">
+              <div style="font-size:13px;color:var(--text-3)" id="versionInfo">Loading…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="userModalTitle">Add User</h3>
+      <button class="modal-close" onclick="closeUserModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Full name</label>
+        <input type="text" class="form-input" id="uName">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" id="uEmail">
+      </div>
+      <div class="form-group" id="uPasswordGroup">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="uPassword" placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-select" id="uRole">
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group" id="uStatusGroup" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label class="toggle"><input type="checkbox" id="uActive" checked><span class="toggle-slider"></span></label>
+          <span class="form-label" style="margin:0">Account active</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+      <button class="btn btn-primary" id="userModalSave" onclick="saveUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetPwModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Reset Password</h3>
+      <button class="modal-close" onclick="document.getElementById('resetPwModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:12px" id="resetPwFor"></p>
+      <div class="form-group">
+        <label class="form-label">New password</label>
+        <input type="password" class="form-input" id="resetPwVal" placeholder="••••••••">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('resetPwModal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="doResetPw()">Set password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Location Modal -->
+<div class="modal-overlay" id="locModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="locModalTitle">Add Location</h3>
+      <button class="modal-close" onclick="closeLocModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-input" id="lName" placeholder="e.g. Head Office">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Address (optional)</label>
+        <input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Colour</label>
+        <div id="locColourPicker"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeLocModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLoc()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/shell.js"></script>
+<script>
+'use strict'
+
+let cfg = null
+let users = [], locations = []
+let editingUserId = null, editingLocId = null
+let resetPwUserId = null
+let locColour = '#4f46e5'
+
+async function init() {
+  cfg = await loadConfig()
+  if (!cfg || cfg.user.role !== 'admin') { window.location.href = '/'; return }
+  renderShell(cfg, 'settings')
+  await Promise.all([loadUsers(), loadLocations()])
+  loadAppConfig()
+
+  // Hash-based tab switching
+  const hash = window.location.hash.slice(1)
+  if (['users','locations','app'].includes(hash)) showTab(hash)
+}
+
+async function loadUsers() {
+  users = await api('/api/users')
+  renderUsersTable()
+}
+
+async function loadLocations() {
+  locations = await api('/api/locations')
+  renderLocationsTable()
+}
+
+async function loadAppConfig() {
+  const c = await api('/api/config')
+  document.getElementById('allowSignupToggle').checked = c.allowSignup !== false
+  document.getElementById('versionInfo').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div><span style="font-weight:600">Version:</span> <code style="font-family:var(--mono);background:var(--bg);padding:2px 6px;border-radius:4px;font-size:12px">${c.version}</code></div>
+      <div><span style="font-weight:600">Environment:</span> <span class="badge badge-${c.appEnv==='production'?'red':c.appEnv==='staging'?'orange':'green'}">${c.appEnv}</span></div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">Database: SQLite · Node.js/Express</div>
+    </div>`
+}
+
+function renderUsersTable() {
+  const tbody = document.getElementById('usersBody')
+  if (!users.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:32px">No users found</td></tr>`; return }
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="avatar" style="background:${u.color}">${u.initials}</div>
+          <span style="font-weight:600">${u.name}</span>
+          ${u.id === cfg.user.id ? '<span class="badge badge-blue" style="font-size:10px">You</span>' : ''}
+        </div>
+      </td>
+      <td style="color:var(--text-3)">${u.email}</td>
+      <td><span class="badge ${u.role==='admin'?'badge-blue':'badge-gray'}">${u.role}</span></td>
+      <td><span class="badge ${u.is_active?'badge-green':'badge-red'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')" title="Edit">Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="openResetPw('${u.id}')" title="Reset password">Reset PW</button>
+          ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}')" title="Delete">Delete</button>` : ''}
+        </div>
+      </td>
+    </tr>`).join('')
+}
+
+function renderLocationsTable() {
+  const tbody = document.getElementById('locsBody')
+  if (!locations.length) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:32px">No locations yet</td></tr>`; return }
+  tbody.innerHTML = locations.map(l => `
+    <tr>
+      <td style="font-weight:600">${l.name}</td>
+      <td style="color:var(--text-3)">${l.address||'—'}</td>
+      <td><div style="width:20px;height:20px;border-radius:50%;background:${l.color}"></div></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}')">Delete</button>
+        </div>
+      </td>
+    </tr>`).join('')
+}
+
+function showTab(tab) {
+  ['users','locations','app'].forEach(t => {
+    document.getElementById(`tab-${t}-content`).style.display = t === tab ? 'block' : 'none'
+    const btn = document.getElementById(`tab-${t}`)
+    if (btn) btn.classList.toggle('active', t === tab)
+  })
+  window.location.hash = tab
+}
+
+// ── User Modal ─────────────────────────────────────────────────────────────────
+function openCreateUser() {
+  editingUserId = null
+  document.getElementById('userModalTitle').textContent = 'Add User'
+  document.getElementById('uName').value = ''
+  document.getElementById('uEmail').value = ''
+  document.getElementById('uPassword').value = ''
+  document.getElementById('uRole').value = 'member'
+  document.getElementById('uActive').checked = true
+  document.getElementById('uPasswordGroup').style.display = 'block'
+  document.getElementById('uStatusGroup').style.display = 'none'
+  document.getElementById('userModal').classList.add('open')
+}
+
+function openEditUser(id) {
+  const u = users.find(x => x.id === id); if (!u) return
+  editingUserId = id
+  document.getElementById('userModalTitle').textContent = 'Edit User'
+  document.getElementById('uName').value = u.name
+  document.getElementById('uEmail').value = u.email
+  document.getElementById('uPassword').value = ''
+  document.getElementById('uRole').value = u.role
+  document.getElementById('uActive').checked = !!u.is_active
+  document.getElementById('uPasswordGroup').style.display = 'none'
+  document.getElementById('uStatusGroup').style.display = 'block'
+  document.getElementById('userModal').classList.add('open')
+}
+
+function closeUserModal() { document.getElementById('userModal').classList.remove('open') }
+
+async function saveUser() {
+  const name  = document.getElementById('uName').value.trim()
+  const email = document.getElementById('uEmail').value.trim()
+  const password = document.getElementById('uPassword').value
+  const role  = document.getElementById('uRole').value
+  const is_active = document.getElementById('uActive').checked
+
+  try {
+    if (editingUserId) {
+      const body = { name, email, role, is_active }
+      await api(`/api/users/${editingUserId}`, { method: 'PATCH', body })
+      toast('User updated', 'success')
+    } else {
+      if (!password) { toast('Password is required', 'error'); return }
+      await api('/api/users', { method: 'POST', body: { name, email, password, role } })
+      toast('User created', 'success')
+    }
+    closeUserModal()
+    await loadUsers()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function deleteUser(id) {
+  const u = users.find(x => x.id === id)
+  if (!confirm(`Delete user "${u?.name}"? This cannot be undone.`)) return
+  try {
+    await api(`/api/users/${id}`, { method: 'DELETE' })
+    toast('User deleted', 'success')
+    await loadUsers()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function openResetPw(id) {
+  resetPwUserId = id
+  const u = users.find(x => x.id === id)
+  document.getElementById('resetPwFor').textContent = `Set a new password for ${u?.name}`
+  document.getElementById('resetPwVal').value = ''
+  document.getElementById('resetPwModal').classList.add('open')
+}
+
+async function doResetPw() {
+  const pw = document.getElementById('resetPwVal').value
+  if (!pw) { toast('Password is required', 'error'); return }
+  try {
+    await api(`/api/users/${resetPwUserId}/reset-password`, { method: 'POST', body: { password: pw } })
+    toast('Password reset', 'success')
+    document.getElementById('resetPwModal').classList.remove('open')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Location Modal ─────────────────────────────────────────────────────────────
+function openCreateLoc() {
+  editingLocId = null; locColour = '#4f46e5'
+  document.getElementById('locModalTitle').textContent = 'Add Location'
+  document.getElementById('lName').value = ''
+  document.getElementById('lAddress').value = ''
+  setupLocColour()
+  document.getElementById('locModal').classList.add('open')
+}
+
+function openEditLoc(id) {
+  const l = locations.find(x => x.id === id); if (!l) return
+  editingLocId = id; locColour = l.color || '#4f46e5'
+  document.getElementById('locModalTitle').textContent = 'Edit Location'
+  document.getElementById('lName').value = l.name
+  document.getElementById('lAddress').value = l.address || ''
+  setupLocColour()
+  document.getElementById('locModal').classList.add('open')
+}
+
+function closeLocModal() { document.getElementById('locModal').classList.remove('open') }
+
+function setupLocColour() {
+  const el = document.getElementById('locColourPicker'); el.innerHTML = ''
+  renderColourPicker(el, locColour, v => { locColour = v })
+}
+
+async function saveLoc() {
+  const name = document.getElementById('lName').value.trim()
+  if (!name) { toast('Name is required', 'error'); return }
+  const body = { name, address: document.getElementById('lAddress').value.trim() || null, color: locColour }
+  try {
+    if (editingLocId) {
+      await api(`/api/locations/${editingLocId}`, { method: 'PUT', body })
+      toast('Location updated', 'success')
+    } else {
+      await api('/api/locations', { method: 'POST', body })
+      toast('Location added', 'success')
+    }
+    closeLocModal()
+    await loadLocations()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function deleteLoc(id) {
+  const l = locations.find(x => x.id === id)
+  if (!confirm(`Delete location "${l?.name}"?`)) return
+  try {
+    await api(`/api/locations/${id}`, { method: 'DELETE' })
+    toast('Location deleted', 'success')
+    await loadLocations()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function setAllowSignup(val) {
+  try {
+    await api('/api/config', { method: 'PATCH', body: { allowSignup: val } })
+    toast(`Sign-up ${val ? 'enabled' : 'disabled'}`, 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// Close modals on overlay click
+['userModal','locModal','resetPwModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === document.getElementById(id)) document.getElementById(id).classList.remove('open')
+  })
+})
+
+init()
+</script>
+</body>
+</html>

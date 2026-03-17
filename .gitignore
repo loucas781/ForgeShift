@@ -1,24 +1,16 @@
-# ── Dependencies ───────────────────────────────────────────────────
 node_modules/
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store
+uploads/
 
-# ── Environment files — NEVER commit these ─────────────────────────
-# Only .env.example should exist in the repo
+# Environment files — NEVER commit these
 .env
 .env.*
 !.env.example
 
-# ── Database & runtime data ─────────────────────────────────────────
-data/
-*.db
-*.db-wal
-*.db-shm
-
-# ── Logs ───────────────────────────────────────────────────────────
-npm-debug.log*
-*.log
-
-# ── OS & editor clutter ─────────────────────────────────────────────
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
+# Runtime overrides (toggled via Settings UI)
+.runtime-overrides.json

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeShift — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="36" height="36" rx="9" fill="#4f46e5"/>
+        <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
+        <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
+        <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
+        <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
+        <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/>
+      </svg>
+      <span class="auth-logo-text">ForgeShift</span>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to manage your shift rota</p>
+
+    <div class="auth-error" id="loginError"></div>
+
+    <div class="form-group">
+      <label class="form-label">Email address</label>
+      <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label" style="display:flex;justify-content:space-between;">
+        Password
+        <a href="/forgot-password.html" style="font-weight:400;font-size:12px;">Forgot password?</a>
+      </label>
+      <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
+
+    <div class="auth-link" id="signupLink">
+      Don't have an account? <a href="/signup.html">Sign up</a>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter"></div>
+  </div>
+</div>
+
+<script>
+  // Apply saved theme
+  const t = localStorage.getItem('fs-theme') || 'light'
+  if (t !== 'light') document.documentElement.setAttribute('data-theme', t)
+
+  async function init() {
+    try {
+      const r = await fetch('/api/config')
+      const d = await r.json()
+      if (d.user) window.location.href = '/'
+      if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
+      const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
+      document.getElementById('versionFooter').innerHTML =
+        `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
+    } catch {}
+  }
+  init()
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+
+  async function doLogin() {
+    const btn = document.getElementById('loginBtn')
+    const err = document.getElementById('loginError')
+    const email = document.getElementById('email').value.trim()
+    const password = document.getElementById('password').value
+    err.classList.remove('show')
+    if (!email || !password) { err.textContent = 'Please enter your email and password.'; err.classList.add('show'); return }
+    btn.disabled = true; btn.textContent = 'Signing in…'
+    try {
+      const r = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
+      const d = await r.json()
+      if (!r.ok) { err.textContent = d.error || 'Login failed'; err.classList.add('show'); return }
+      window.location.href = '/'
+    } catch {
+      err.textContent = 'Connection error — please try again'
+      err.classList.add('show')
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign in'
+    }
+  }
+</script>
+</body>
+</html>
