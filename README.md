@@ -4,74 +4,110 @@ Self-hosted **shift rota management** — vanilla HTML/CSS/JS + Node.js/Express 
 
 ## Features
 
-- 📅 **Calendar** — month and week views, click to add/edit shifts
-- 📍 **Locations** — assign locations per shift day, configurable colour coding
-- 📋 **Templates** — reusable weekly shift patterns, apply to any team member
-- 🎨 **Colour-coded notes** — per-day notes with colour tint
-- 👥 **User management** — admin creates/deactivates/deletes accounts
-- 🔐 **Auth** — JWT cookies, HMAC-SHA256 pepper + bcrypt, pepper rotation
-- 📲 **iCal export** — subscribe to your rota in Google/Apple/Outlook Calendar
-- 🌙 **Themes** — light, dark, OLED black (system-level preference)
-- 📱 **Mobile responsive** — works on desktop, tablet and phone
-- 🚀 **Environments** — develop / staging / production
-- 🔄 **Version bumping** — GitHub Actions auto-increments build counter
+- 📅 **Calendar** — month and week views, click any day to add or edit shifts
+- 📍 **Locations** — assign locations per shift, configurable colour coding
+- 📋 **Templates** — reusable weekly shift patterns, apply to any team member for any week
+- 🎨 **Colour-coded notes** — per-day notes with a colour tint applied to the calendar cell
+- 👥 **User management** — admin creates, deactivates, resets passwords and deletes accounts
+- 🔐 **Auth** — JWT cookies, HMAC-SHA256 pepper + bcrypt (12 rounds), transparent pepper rotation
+- 📲 **iCal export** — subscribe to your rota in Google Calendar, Apple Calendar or Outlook
+- 🌙 **Themes** — light, dark, OLED black — system-level, persisted per browser
+- 📱 **Mobile responsive** — scales across desktop, tablet and phone
+- 🚀 **Environments** — develop / staging / production with version badge in the UI
+- 🔄 **Auto-versioning** — GitHub Actions increments build counter on every push
 
-## Quick Start (local)
-
-```bash
-git clone https://github.com/YOUR_USER/forgeshift.git
-cd forgeshift
-cp .env.example .env.development
-# Fill in JWT_SECRET and PASSWORD_PEPPER in .env.development
-npm install
-node server/index.js
-# Open http://localhost:3000/signup.html to create the first admin account
-```
+---
 
 ## Proxmox LXC Install
 
 Run this **on your Proxmox host** (not inside a container):
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/forgeshift/main/proxmox/ct/forgeshift.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeShift/develop/proxmox/ct/forgeshift.sh)"
 ```
 
 The script will:
-1. Show a `whiptail` TUI to configure the LXC (or use defaults)
-2. Download a Debian 12 template if needed
-3. Create and start the container
-4. Run the in-container install script automatically
-5. Print the app URL and container root password when done
+1. Present a `whiptail` TUI — choose default or advanced settings (CPU, RAM, disk, network, environment)
+2. Download a Debian 12 template automatically if one isn't already present
+3. Create and start the LXC container
+4. Push the in-container install script and run it — installs Node.js 20, clones the repo, writes `.env`, runs migrations, and starts the `forgeshift` systemd service
+5. Print the app URL and generated root password when complete
 
-**After install:** visit `http://<container-ip>:3000/signup.html` to create the first admin account.
+**After install:** visit `http://<container-ip>:3000/signup.html` — the first account created automatically becomes admin.
 
-> **Before deploying:** edit `GITHUB_RAW` in `proxmox/ct/forgeshift.sh` and `REPO_URL` in `proxmox/install/forgeshift-install.sh` to point to your repository.
+---
 
-## GitHub Actions
+## Updating ForgeShift
 
-Set up in repo Settings → Actions → General → **Read and write permissions**.
+Once installed, an `update.sh` script is placed at `/opt/forgeshift/update.sh` inside the container. To update to the latest version, run from your **Proxmox host**:
 
-Three branches:
-- `develop` — auto-increments build counter on every push
-- `staging`  — bumps patch version + `-rc` suffix on PR merge
-- `main`     — bumps minor version, clean production tag
+```bash
+pct exec <CTID> -- bash /opt/forgeshift/update.sh
+```
+
+Replace `<CTID>` with your container ID (e.g. `100`). The update script will:
+1. Pull the latest code from `origin/develop`
+2. Run `npm install` to pick up any new dependencies
+3. Run database migrations (additive only — no data loss)
+4. Restart the `forgeshift` systemd service
+
+You can also run it directly if you have a shell inside the container:
+
+```bash
+bash /opt/forgeshift/update.sh
+```
+
+---
+
+## Quick Start (local dev)
+
+```bash
+git clone https://github.com/loucas781/ForgeShift.git
+cd ForgeShift
+cp .env.example .env.development
+# Edit .env.development — fill in JWT_SECRET and PASSWORD_PEPPER
+npm install
+node server/index.js
+# Open http://localhost:3000/signup.html to create the first admin account
+```
+
+---
+
+## GitHub Actions — Versioning
+
+Enable in repo **Settings → Actions → General → Read and write permissions**.
+
+| Branch | Behaviour |
+|---|---|
+| `develop` | Increments build counter on every push — e.g. `0.0.1-dev.42` |
+| `staging` | Bumps patch + `-rc` suffix on PR merge — e.g. `0.0.2-rc` |
+| `main` | Bumps minor, clean version on PR merge — e.g. `0.1.0` |
+
+The version is displayed in the topbar env badge (`development v0.0.1-dev.42`), on the login page footer, and in Settings → Version.
+
+---
 
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
-| `JWT_SECRET` | JWT signing secret — `openssl rand -hex 48` |
-| `PASSWORD_PEPPER` | HMAC pepper for bcrypt — `openssl rand -hex 32` |
+| `JWT_SECRET` | JWT signing secret — generate: `openssl rand -hex 48` |
+| `PASSWORD_PEPPER` | HMAC pepper mixed into every password hash — generate: `openssl rand -hex 32` |
 | `DATABASE_PATH` | SQLite file path (default: `./data/forgeshift.db`) |
-| `PORT` | Server port (default: `3000`) |
-| `COOKIE_SECURE` | Set `true` behind HTTPS |
-| `TRUST_PROXY` | Set `true` behind nginx/Caddy |
+| `PORT` | HTTP server port (default: `3000`) |
+| `APP_URL` | Public-facing URL — used in iCal feed links |
+| `COOKIE_SECURE` | Set `true` when running behind HTTPS |
+| `TRUST_PROXY` | Set `true` when behind a reverse proxy (nginx, Caddy, NPM) |
+| `COOKIE_MAX_AGE_HOURS` | Session length in hours (default: `72`) |
+
+---
 
 ## Security
 
-- Passwords: HMAC-SHA256 pepper → bcrypt (12 rounds)
-- Pepper rotation: set `PASSWORD_PEPPER_OLD` + new `PASSWORD_PEPPER` — passwords re-hashed transparently on next login
-- Tokens: SHA-256 hashed before storage; two-step reset flow (URL token → in-memory session key)
-- Rate limiting: 20 auth attempts per IP per 15 min
-- Last-admin guard: cannot delete or demote the only admin
-- Audit log: all sensitive operations written to `audit_log` table
+- **Passwords** — HMAC-SHA256 pepper applied before bcrypt (12 rounds); pepper never stored in the database
+- **Pepper rotation** — set `PASSWORD_PEPPER_OLD=<old value>` alongside a new `PASSWORD_PEPPER`; passwords are transparently re-hashed on next successful login
+- **Password reset** — two-step flow: URL token is SHA-256 hashed before DB storage and consumed immediately on validation, exchanged for a short-lived in-memory session key
+- **Rate limiting** — 20 auth attempts per IP per 15 minutes (disabled in development)
+- **Last-admin guard** — cannot delete, demote, or deactivate the only admin account
+- **Audit log** — all sensitive operations (login, user create/delete, password reset, shift changes) written to `audit_log` table; failures never surface to callers
+- **`.env` files** — never committed; only `.env.example` is in the repository
