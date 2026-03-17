@@ -55,6 +55,7 @@ const cookieParser = require('cookie-parser')
 const rateLimit    = require('express-rate-limit')
 const { requireAuth, optionalAuth } = require('./middleware/auth')
 const { getPasswordPolicy } = require('./auth-utils')
+const emailSvc = require('./email')
 
 const app = express()
 
@@ -94,6 +95,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     allowSignup:    (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
     cookieSecure:   process.env.COOKIE_SECURE === 'true',
     passwordPolicy: getPasswordPolicy(overrides),
+    smtpEnabled:    emailSvc.getSmtpConfig().enabled,
   })
 })
 
@@ -101,13 +103,37 @@ app.get('/api/config', optionalAuth, (req, res) => {
 app.patch('/api/config', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const overrides = loadOverrides()
-  if (typeof req.body.allowSignup === 'boolean') overrides.ALLOW_SIGNUP = req.body.allowSignup ? 'true' : 'false'
+  if (typeof req.body.allowSignup === 'boolean')  overrides.ALLOW_SIGNUP   = req.body.allowSignup  ? 'true' : 'false'
   if (typeof req.body.cookieSecure === 'boolean') {
     overrides.COOKIE_SECURE = req.body.cookieSecure ? 'true' : 'false'
     process.env.COOKIE_SECURE = overrides.COOKIE_SECURE
   }
   saveOverrides(overrides)
-  res.json({ ok: true, allowSignup: overrides.ALLOW_SIGNUP !== 'false' })
+  res.json({ ok: true, allowSignup: overrides.ALLOW_SIGNUP !== 'false', cookieSecure: process.env.COOKIE_SECURE === 'true' })
+})
+
+// ── PATCH /api/config/password-policy — admin: update password policy ─────────
+app.patch('/api/config/password-policy', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const { getPasswordPolicy } = require('./auth-utils')
+  const overrides = loadOverrides()
+  const current   = getPasswordPolicy(overrides)
+  const allowed   = ['minLength','requireUpper','requireLower','requireNumber','requireSpecial','noSequential']
+  const updated   = { ...current }
+  for (const key of allowed) {
+    if (key === 'minLength') {
+      if (req.body[key] !== undefined) {
+        const v = parseInt(req.body[key])
+        if (isNaN(v) || v < 6 || v > 128) return res.status(400).json({ error: 'minLength must be 6–128' })
+        updated[key] = v
+      }
+    } else if (typeof req.body[key] === 'boolean') {
+      updated[key] = req.body[key]
+    }
+  }
+  overrides.PASSWORD_POLICY = updated
+  saveOverrides(overrides)
+  res.json({ ok: true, passwordPolicy: updated })
 })
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
@@ -132,6 +158,58 @@ app.use('/api/shifts',    require('./routes/shifts'))
 app.use('/api/templates', require('./routes/templates'))
 app.use('/api/locations', require('./routes/locations'))
 app.use('/api/ical',      require('./routes/ical'))
+
+// ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
+app.get('/api/config/email', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const o = loadOverrides()
+  res.json({
+    smtpHost:     o.SMTP_HOST      || '',
+    smtpPort:     o.SMTP_PORT      || '587',
+    smtpSecure:   o.SMTP_SECURE    === 'true',
+    smtpUser:     o.SMTP_USER      || '',
+    smtpPass:     o.SMTP_PASS      ? '••••••••' : '',
+    smtpFromName: o.SMTP_FROM_NAME || '',
+    smtpFromAddr: o.SMTP_FROM_ADDR || '',
+    hasPassword:  !!(o.SMTP_PASS),
+    enabled:      !!(o.SMTP_HOST && o.SMTP_USER),
+  })
+})
+
+// ── PATCH /api/config/email — save SMTP config ────────────────────────────────
+app.patch('/api/config/email', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const o = loadOverrides()
+  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr } = req.body
+  if (smtpHost     !== undefined) o.SMTP_HOST      = smtpHost.trim()
+  if (smtpPort     !== undefined) o.SMTP_PORT      = String(smtpPort)
+  if (smtpSecure   !== undefined) o.SMTP_SECURE    = smtpSecure ? 'true' : 'false'
+  if (smtpUser     !== undefined) o.SMTP_USER      = smtpUser.trim()
+  if (smtpFromName !== undefined) o.SMTP_FROM_NAME = smtpFromName.trim()
+  if (smtpFromAddr !== undefined) o.SMTP_FROM_ADDR = smtpFromAddr.trim()
+  // Only overwrite password if a real value (not the masked placeholder) is provided
+  if (smtpPass !== undefined && smtpPass !== '••••••••' && smtpPass !== '') o.SMTP_PASS = smtpPass
+  if (smtpPass === '') delete o.SMTP_PASS
+  saveOverrides(o)
+  res.json({ ok: true, enabled: !!(o.SMTP_HOST && o.SMTP_USER) })
+})
+
+// ── POST /api/config/email/test — send a test email ───────────────────────────
+app.post('/api/config/email/test', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const result = await emailSvc.testConnection()
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  const db   = require('./db/connection')
+  const me   = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.user.id)
+  const appName = process.env.APP_NAME || 'ForgeShift'
+  await emailSvc.sendMail({
+    to: me.email,
+    subject: `${appName} SMTP test — it works!`,
+    html: `<p>Hi ${me.name},</p><p>Your ${appName} SMTP configuration is working correctly.</p>`,
+    text: `Hi ${me.name}, your ${appName} SMTP configuration is working correctly.`,
+  })
+  res.json({ ok: true, sentTo: me.email })
+})
 
 // ── Page routing ──────────────────────────────────────────────────────────────
 app.get('/login.html',           (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))

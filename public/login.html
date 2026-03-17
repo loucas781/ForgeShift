@@ -36,7 +36,7 @@
     <div class="form-group">
       <label class="form-label" style="display:flex;justify-content:space-between;">
         Password
-        <a href="/forgot-password.html" style="font-weight:400;font-size:12px;">Forgot password?</a>
+        <a href="/forgot-password.html" id="forgotPwLink" style="font-weight:400;font-size:12px;">Forgot password?</a>
       </label>
       <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
     </div>
@@ -52,8 +52,9 @@
 
 <script>
   // Apply saved theme
-  const t = localStorage.getItem('fs-theme') || 'light'
-  if (t !== 'light') document.documentElement.setAttribute('data-theme', t)
+  const t = localStorage.getItem('fs-theme') || 'system'
+  if (t === 'system') { if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme','dark') }
+  else if (t !== 'light') document.documentElement.setAttribute('data-theme', t)
 
   async function init() {
     try {
@@ -64,6 +65,11 @@
       const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
       document.getElementById('versionFooter').innerHTML =
         `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
+      // Update forgot-password link hint based on SMTP
+      const fpLink = document.getElementById('forgotPwLink')
+      if (fpLink && !d.smtpEnabled) {
+        fpLink.title = 'No email server configured — ask your admin to generate a reset link from Settings → Team'
+      }
     } catch {}
   }
   init()

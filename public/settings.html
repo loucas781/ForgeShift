@@ -8,150 +8,129 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <script src="/js/password-policy.js"></script>
+  <script>
+    // Apply theme immediately to avoid flash
+    (function(){
+      var t = localStorage.getItem('fs-theme') || 'system'
+      if (t === 'system') {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme','dark')
+      } else if (t !== 'light') {
+        document.documentElement.setAttribute('data-theme', t)
+      }
+    })()
+  </script>
+  <style>
+    .settings-tabs-wrap { flex-shrink:0; background:var(--surface); border-bottom:1px solid var(--border); overflow:hidden; }
+    .settings-tabs { display:flex; overflow-x:auto; scrollbar-width:none; padding:0 16px; }
+    .settings-tabs::-webkit-scrollbar { display:none; }
+    .settings-tab {
+      display:flex; align-items:center; gap:6px; padding:11px 14px;
+      background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-1px;
+      font-family:var(--font); font-size:13px; font-weight:500; color:var(--text-3);
+      cursor:pointer; white-space:nowrap; flex-shrink:0;
+      transition:color var(--t-fast), border-color var(--t-fast);
+    }
+    .settings-tab:hover { color:var(--text); }
+    .settings-tab.active { color:var(--brand); border-bottom-color:var(--brand); font-weight:600; }
+    .settings-tab svg { width:14px; height:14px; flex-shrink:0; }
+    .settings-panel { display:none; padding:24px; max-width:700px; }
+    .settings-panel.active { display:block; }
+    .section-card { margin-bottom:20px; }
+    .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
+    .pref-row:last-child { border-bottom:none; }
+    .pref-info { flex:1; min-width:0; }
+    .pref-info strong { display:block; font-size:13px; font-weight:600; margin-bottom:2px; }
+    .pref-info span { display:block; font-size:12px; color:var(--text-3); line-height:1.4; }
+    .member-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .member-row:last-child { border-bottom:none; }
+    .member-info { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+    .member-actions { display:flex; gap:6px; flex-wrap:wrap; padding-top:6px; padding-left:48px; width:100%; }
+    .theme-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+    .theme-option {
+      display:flex; flex-direction:column; align-items:center; gap:8px;
+      padding:12px 16px; border:2px solid var(--border); border-radius:var(--r-lg);
+      background:var(--surface-2); cursor:pointer; min-width:80px;
+      transition:border-color var(--t-fast), background var(--t-fast);
+    }
+    .theme-option:hover { border-color:var(--brand); }
+    .theme-option.active { border-color:var(--brand); background:var(--brand-light); }
+    .theme-option span { font-size:12px; font-weight:600; color:var(--text-2); }
+    .theme-option.active span { color:var(--brand); }
+    .theme-swatch { width:44px; height:30px; border-radius:6px; border:1px solid var(--border); }
+    .policy-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); gap:12px; }
+    .policy-row:last-child { border-bottom:none; }
+    .copy-url-row { display:flex; gap:8px; }
+    .copy-url-row input { flex:1; font-size:11px; font-family:var(--mono); }
+    .reset-link-box { background:var(--brand-light); border:1px solid var(--brand); border-radius:var(--r-md); padding:12px 14px; margin-top:10px; display:none; }
+    .reset-link-box a { font-size:11px; word-break:break-all; font-family:var(--mono); }
+    .reset-link-expiry { font-size:11px; color:var(--text-3); margin-top:4px; }
+    @media(max-width:600px){
+      .settings-tabs { gap:0; }
+      .settings-tab span { display:none; }
+      .member-actions { padding-left:0; }
+    }
+  </style>
 </head>
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
-  <div class="app-body">
-    <nav class="sidebar" id="sidebar"></nav>
-    <main class="page-content">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">Settings</h1>
-          <p class="page-subtitle">Manage users, locations, and application settings</p>
-        </div>
-      </div>
-
-      <!-- Tab Nav -->
-      <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:24px">
-        <button class="cal-view-tab active" id="tab-users" onclick="showTab('users')">Users</button>
-        <button class="cal-view-tab" id="tab-locations" onclick="showTab('locations')">Locations</button>
-        <button class="cal-view-tab" id="tab-app" onclick="showTab('app')">Application</button>
-      </div>
-
-      <!-- Users Tab -->
-      <div id="tab-users-content">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-          <h2 style="font-size:16px;font-weight:700">Team Members</h2>
-          <button class="btn btn-primary btn-sm" onclick="openCreateUser()">+ Add User</button>
-        </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table id="usersTable">
-              <thead><tr>
-                <th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th>
-              </tr></thead>
-              <tbody id="usersBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Locations Tab -->
-      <div id="tab-locations-content" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-          <h2 style="font-size:16px;font-weight:700">Locations</h2>
-          <button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add Location</button>
-        </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Actions</th></tr></thead>
-              <tbody id="locsBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- App Tab -->
-      <div id="tab-app-content" style="display:none">
-        <div style="display:grid;gap:16px;max-width:560px">
-          <div class="card">
-            <div class="card-header"><h3 class="card-title">Registration</h3></div>
-            <div class="card-body">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-                <div>
-                  <div style="font-size:13px;font-weight:600">Allow public sign-up</div>
-                  <div style="font-size:12px;color:var(--text-3);margin-top:2px">When disabled, only admins can create accounts</div>
-                </div>
-                <label class="toggle">
-                  <input type="checkbox" id="allowSignupToggle" onchange="setAllowSignup(this.checked)">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3 class="card-title">Version</h3></div>
-            <div class="card-body">
-              <div style="font-size:13px;color:var(--text-3)" id="versionInfo">Loading…</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+  <div class="app-body" style="flex-direction:column;overflow:hidden">
+    <div class="settings-tabs-wrap">
+      <div class="settings-tabs" id="settingsTabs"></div>
+    </div>
+    <div style="flex:1;overflow-y:auto" id="settingsPanelsWrap">
+      <!-- Panels injected by JS -->
+    </div>
   </div>
 </div>
 
-<!-- User Modal -->
-<div class="modal-overlay" id="userModal">
+<!-- Invite User Modal -->
+<div class="modal-overlay" id="inviteModal">
   <div class="modal">
     <div class="modal-header">
-      <h3 class="modal-title" id="userModalTitle">Add User</h3>
-      <button class="modal-close" onclick="closeUserModal()">✕</button>
+      <h3 class="modal-title" id="inviteModalTitle">Create User</h3>
+      <button class="modal-close" onclick="closeInviteModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Full name</label>
-        <input type="text" class="form-input" id="uName">
+      <div class="form-group"><label class="form-label">Full name</label><input type="text" class="form-input" id="iName"></div>
+      <div class="form-group"><label class="form-label">Email address</label><input type="email" class="form-input" id="iEmail"></div>
+      <div class="form-group"><label class="form-label">Role</label>
+        <select class="form-select" id="iRole"><option value="member">Member</option><option value="admin">Admin</option></select>
+      </div>
+      <div id="inviteResult" style="display:none;padding:12px 14px;border-radius:var(--r-md);font-size:13px;margin-top:4px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeInviteModal()">Close</button>
+      <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInvite()">Create account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="editUserModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Edit User</h3>
+      <button class="modal-close" onclick="document.getElementById('editUserModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Full name</label><input type="text" class="form-input" id="euName"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="euEmail"></div>
+      <div class="form-group"><label class="form-label">Role</label>
+        <select class="form-select" id="euRole"><option value="member">Member</option><option value="admin">Admin</option></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-input" id="uEmail">
-      </div>
-      <div class="form-group" id="uPasswordGroup">
-        <label class="form-label">Password</label>
-        <input type="password" class="form-input" id="uPassword" placeholder="••••••••">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Role</label>
-        <select class="form-select" id="uRole">
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-      <div class="form-group" id="uStatusGroup" style="display:none">
         <div style="display:flex;align-items:center;gap:10px">
-          <label class="toggle"><input type="checkbox" id="uActive" checked><span class="toggle-slider"></span></label>
+          <label class="toggle"><input type="checkbox" id="euActive" checked><span class="toggle-slider"></span></label>
           <span class="form-label" style="margin:0">Account active</span>
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
-      <button class="btn btn-primary" id="userModalSave" onclick="saveUser()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Reset Password Modal -->
-<div class="modal-overlay" id="resetPwModal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 class="modal-title">Reset Password</h3>
-      <button class="modal-close" onclick="document.getElementById('resetPwModal').classList.remove('open')">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:12px" id="resetPwFor"></p>
-      <div class="form-group">
-        <label class="form-label">New password</label>
-        <input type="password" class="form-input" id="resetPwVal" placeholder="••••••••">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="document.getElementById('resetPwModal').classList.remove('open')">Cancel</button>
-      <button class="btn btn-primary" onclick="doResetPw()">Set password</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('editUserModal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditUser()">Save</button>
     </div>
   </div>
 </div>
@@ -164,18 +143,9 @@
       <button class="modal-close" onclick="closeLocModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Name</label>
-        <input type="text" class="form-input" id="lName" placeholder="e.g. Head Office">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Address (optional)</label>
-        <input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Colour</label>
-        <div id="locColourPicker"></div>
-      </div>
+      <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="lName" placeholder="e.g. Head Office"></div>
+      <div class="form-group"><label class="form-label">Address (optional)</label><input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London"></div>
+      <div class="form-group"><label class="form-label">Colour</label><div id="locColourPicker"></div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeLocModal()">Cancel</button>
@@ -188,177 +158,433 @@
 <script>
 'use strict'
 
-let cfg = null
-let users = [], locations = []
-let editingUserId = null, editingLocId = null
-let resetPwUserId = null
-let locColour = '#4f46e5'
+let cfg = null, users = [], locations = []
+let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
 
 async function init() {
   cfg = await loadConfig()
-  if (!cfg || cfg.user.role !== 'admin') { window.location.href = '/'; return }
+  if (!cfg) return
   renderShell(cfg, 'settings')
-  await Promise.all([loadUsers(), loadLocations()])
-  loadAppConfig()
 
-  // Hash-based tab switching
+  const isAdmin = cfg.user.role === 'admin'
+
+  const ALL_TABS = [
+    { id: 'appearance', label: 'Appearance', adminOnly: false,
+      icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
+    { id: 'ical', label: 'Calendar Feed', adminOnly: false,
+      icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
+    { id: 'account', label: 'Account', adminOnly: false,
+      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+    { id: 'team', label: 'Team', adminOnly: true,
+      icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
+    { id: 'locations', label: 'Locations', adminOnly: true,
+      icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
+    { id: 'security', label: 'Security', adminOnly: true,
+      icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+    { id: 'email', label: 'Email', adminOnly: true,
+      icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
+    { id: 'application', label: 'Application', adminOnly: true,
+      icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+    { id: 'audit', label: 'Audit Log', adminOnly: true,
+      icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
+  ]
+
+  const tabs = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
+
+  // Render tab bar
+  const tabBar = document.getElementById('settingsTabs')
+  tabBar.innerHTML = tabs.map(t => `
+    <button class="settings-tab" id="tab-btn-${t.id}" onclick="showTab('${t.id}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${t.icon}</svg>
+      <span>${t.label}</span>
+    </button>`).join('')
+
+  // Render panels container
+  const wrap = document.getElementById('settingsPanelsWrap')
+  wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
+
+  // Load data then populate
+  if (isAdmin) await Promise.all([loadUsers(), loadLocations()])
+  // Apply password policy to client-side validator
+  try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
+  await Promise.all([
+    renderAppearancePanel(),
+    renderIcalPanel(),
+    renderAccountPanel(),
+    isAdmin ? renderTeamPanel() : Promise.resolve(),
+    isAdmin ? renderLocationsPanel() : Promise.resolve(),
+    isAdmin ? renderSecurityPanel() : Promise.resolve(),
+    isAdmin ? renderEmailPanel() : Promise.resolve(),
+    isAdmin ? renderApplicationPanel() : Promise.resolve(),
+    isAdmin ? renderAuditPanel() : Promise.resolve(),
+  ])
+
+  // Show first tab (or hash)
   const hash = window.location.hash.slice(1)
-  if (['users','locations','app'].includes(hash)) showTab(hash)
+  const validTab = tabs.find(t => t.id === hash)
+  showTab(validTab ? hash : tabs[0].id)
 }
 
-async function loadUsers() {
-  users = await api('/api/users')
-  renderUsersTable()
+function showTab(id) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'))
+  const panel = document.getElementById('panel-' + id)
+  const btn   = document.getElementById('tab-btn-' + id)
+  if (panel) panel.classList.add('active')
+  if (btn)   btn.classList.add('active')
+  window.location.hash = id
 }
 
-async function loadLocations() {
-  locations = await api('/api/locations')
-  renderLocationsTable()
-}
+async function loadUsers() { users = await api('/api/users') }
+async function loadLocations() { locations = await api('/api/locations') }
 
-async function loadAppConfig() {
-  const c = await api('/api/config')
-  document.getElementById('allowSignupToggle').checked = c.allowSignup !== false
-  document.getElementById('versionInfo').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <div><span style="font-weight:600">Version:</span> <code style="font-family:var(--mono);background:var(--bg);padding:2px 6px;border-radius:4px;font-size:12px">${c.version}</code></div>
-      <div><span style="font-weight:600">Environment:</span> <span class="badge badge-${c.appEnv==='production'?'red':c.appEnv==='staging'?'orange':'green'}">${c.appEnv}</span></div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:4px">Database: SQLite · Node.js/Express</div>
+// ── Appearance panel ───────────────────────────────────────────────────────────
+async function renderAppearancePanel() {
+  const el = document.getElementById('panel-appearance')
+  const currentTheme = localStorage.getItem('fs-theme') || 'system'
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Appearance</h2>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Theme</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+          Choose how ForgeShift looks. System mode follows your OS light/dark preference automatically.
+        </p>
+        <div class="theme-grid" id="themeGrid">
+          ${[
+            { id:'system', label:'System',    emoji:'🖥️', bg:'linear-gradient(135deg,#fff 50%,#1e293b 50%)', border:'var(--border)' },
+            { id:'light',  label:'Light',     emoji:'☀️', bg:'#f3f4f6',  border:'#e5e7eb' },
+            { id:'dark',   label:'Dark',      emoji:'🌙', bg:'#0f172a',  border:'#1e293b' },
+            { id:'oled',   label:'OLED Black',emoji:'⬛', bg:'#000000',  border:'#0d0d0d' },
+          ].map(t => `
+            <div class="theme-option${currentTheme===t.id?' active':''}" id="themeOpt-${t.id}" onclick="pickTheme('${t.id}')">
+              <div class="theme-swatch" style="background:${t.bg};border-color:${t.border}"></div>
+              <span>${t.emoji} ${t.label}</span>
+            </div>`).join('')}
+        </div>
+        <p style="font-size:12px;color:var(--text-3);margin-top:12px">
+          Current: <strong id="currentThemeName">${currentTheme}</strong>
+        </p>
+      </div>
     </div>`
 }
 
-function renderUsersTable() {
-  const tbody = document.getElementById('usersBody')
-  if (!users.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:32px">No users found</td></tr>`; return }
-  tbody.innerHTML = users.map(u => `
-    <tr>
-      <td>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="avatar" style="background:${u.color}">${u.initials}</div>
-          <span style="font-weight:600">${u.name}</span>
-          ${u.id === cfg.user.id ? '<span class="badge badge-blue" style="font-size:10px">You</span>' : ''}
+function pickTheme(theme) {
+  // Apply immediately
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
+    if (!prefersDark) document.documentElement.removeAttribute('data-theme')
+  } else if (theme === 'light') {
+    document.documentElement.removeAttribute('data-theme')
+  } else {
+    document.documentElement.setAttribute('data-theme', theme)
+  }
+  localStorage.setItem('fs-theme', theme)
+  // Update UI
+  document.querySelectorAll('.theme-option').forEach(el => el.classList.remove('active'))
+  document.getElementById('themeOpt-' + theme)?.classList.add('active')
+  document.getElementById('currentThemeName').textContent = theme
+  toast('Theme set to ' + theme, 'success', 1500)
+}
+
+// ── iCal panel ─────────────────────────────────────────────────────────────────
+async function renderIcalPanel() {
+  const el = document.getElementById('panel-ical')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Calendar Feed (iCal)</h2>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Your subscription URL</h3></div>
+      <div class="card-body" id="icalPanelBody">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+          Subscribe to your shift rota in any calendar app. The URL is unique to your account and updates live.
+        </p>
+        <div id="icalLoading" style="color:var(--text-3);font-size:13px">Loading…</div>
+        <div id="icalContent" style="display:none">
+          <div class="form-group">
+            <label class="form-label">Feed URL</label>
+            <div class="copy-url-row">
+              <input type="text" class="form-input" id="icalUrl" readonly>
+              <button class="btn btn-secondary btn-sm" onclick="copyIcal()">Copy</button>
+            </div>
+            <p class="form-hint">Paste this into Google Calendar, Apple Calendar, Outlook or any iCal-compatible app.</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <a id="icalDownload" href="#" class="btn btn-secondary btn-sm" download>⬇ Download .ics</a>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="regenerateIcal()">🔄 Regenerate token</button>
+          </div>
+          <div style="margin-top:16px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+            <p style="font-size:12px;color:var(--text-3);margin:0">
+              <strong style="color:var(--text-2)">How to subscribe:</strong><br>
+              Google Calendar: Other calendars → + → From URL<br>
+              Apple Calendar: File → New Calendar Subscription<br>
+              Outlook: Add calendar → Subscribe from web
+            </p>
+          </div>
         </div>
-      </td>
-      <td style="color:var(--text-3)">${u.email}</td>
-      <td><span class="badge ${u.role==='admin'?'badge-blue':'badge-gray'}">${u.role}</span></td>
-      <td><span class="badge ${u.is_active?'badge-green':'badge-red'}">${u.is_active?'Active':'Inactive'}</span></td>
-      <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')" title="Edit">Edit</button>
-          <button class="btn btn-ghost btn-sm" onclick="openResetPw('${u.id}')" title="Reset password">Reset PW</button>
-          ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}')" title="Delete">Delete</button>` : ''}
+      </div>
+    </div>`
+  await loadIcal()
+}
+
+async function loadIcal() {
+  try {
+    const data = await api('/api/ical/token')
+    document.getElementById('icalLoading').style.display = 'none'
+    document.getElementById('icalContent').style.display = 'block'
+    document.getElementById('icalUrl').value = data.feedUrl
+    document.getElementById('icalDownload').href = data.feedUrl
+  } catch {
+    document.getElementById('icalLoading').textContent = 'Failed to load iCal token'
+  }
+}
+
+function copyIcal() {
+  navigator.clipboard.writeText(document.getElementById('icalUrl').value).then(() => toast('URL copied!', 'success'))
+}
+async function regenerateIcal() {
+  if (!confirm('Regenerate iCal token? Your current calendar subscription will stop working and you will need to re-subscribe.')) return
+  await api('/api/ical/token', { method: 'DELETE' })
+  await loadIcal()
+  toast('Token regenerated', 'success')
+}
+
+// ── Account panel ──────────────────────────────────────────────────────────────
+async function renderAccountPanel() {
+  const u = cfg.user
+  const el = document.getElementById('panel-account')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">My Account</h2>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Profile</h3></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+          <div class="avatar avatar-xl" id="settingsAvatar" style="background:${u.color}">${u.initials}</div>
+          <div>
+            <div style="font-size:16px;font-weight:800">${u.name}</div>
+            <div style="font-size:13px;color:var(--text-3)">${u.email}</div>
+            <span class="badge badge-${u.role==='admin'?'blue':'gray'}" style="margin-top:4px">${u.role}</span>
+          </div>
         </div>
-      </td>
-    </tr>`).join('')
-}
-
-function renderLocationsTable() {
-  const tbody = document.getElementById('locsBody')
-  if (!locations.length) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:32px">No locations yet</td></tr>`; return }
-  tbody.innerHTML = locations.map(l => `
-    <tr>
-      <td style="font-weight:600">${l.name}</td>
-      <td style="color:var(--text-3)">${l.address||'—'}</td>
-      <td><div style="width:20px;height:20px;border-radius:50%;background:${l.color}"></div></td>
-      <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}')">Delete</button>
+        <div class="form-group"><label class="form-label">Display name</label><input type="text" class="form-input" id="profileName" value="${u.name}"></div>
+        <div class="form-group"><label class="form-label">Email address</label><input type="email" class="form-input" id="profileEmail" value="${u.email}"></div>
+        <div class="form-group"><label class="form-label">Accent colour</label><div id="profileColourPicker"></div></div>
+        <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save changes</button>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Change Password</h3></div>
+      <div class="card-body">
+        <div class="form-group"><label class="form-label">Current password</label><input type="password" class="form-input" id="curPw" placeholder="••••••••"></div>
+        <div class="form-group">
+          <label class="form-label">New password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="newPw" placeholder="••••••••" style="padding-right:40px">
+            <button type="button" onclick="(function(){var i=document.getElementById('newPw');i.type=i.type==='text'?'password':'text'})()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div id="changePwIndicator" style="margin-top:6px"></div>
         </div>
-      </td>
-    </tr>`).join('')
+        <div class="form-group"><label class="form-label">Confirm new password</label><input type="password" class="form-input" id="newPw2" placeholder="••••••••"></div>
+        <button class="btn btn-primary btn-sm" onclick="changePassword()">Update password</button>
+      </div>
+    </div>`
+
+  let profileColour = u.color || '#4f46e5'
+  renderColourPicker(document.getElementById('profileColourPicker'), profileColour, v => { profileColour = v; window._profileColour = v })
+  window._profileColour = profileColour
+
+  // Wire up password indicator on the account panel
+  const changePwInput = document.getElementById('newPw')
+  if (changePwInput) {
+    const ind = createPasswordIndicator()
+    document.getElementById('changePwIndicator').appendChild(ind)
+    changePwInput.addEventListener('input', () => updatePasswordIndicator(ind, changePwInput.value))
+  }
 }
 
-function showTab(tab) {
-  ['users','locations','app'].forEach(t => {
-    document.getElementById(`tab-${t}-content`).style.display = t === tab ? 'block' : 'none'
-    const btn = document.getElementById(`tab-${t}`)
-    if (btn) btn.classList.toggle('active', t === tab)
-  })
-  window.location.hash = tab
+async function saveProfile() {
+  const name  = document.getElementById('profileName').value.trim()
+  const email = document.getElementById('profileEmail').value.trim()
+  if (!name) { toast('Name is required', 'error'); return }
+  try {
+    const r = await api('/api/auth/profile', { method: 'PATCH', body: { name, email, color: window._profileColour } })
+    document.getElementById('settingsAvatar').style.background = window._profileColour
+    document.getElementById('settingsAvatar').textContent = r.user.initials
+    _config = null
+    toast('Profile saved', 'success')
+  } catch (err) { toast(err.message, 'error') }
 }
 
-// ── User Modal ─────────────────────────────────────────────────────────────────
-function openCreateUser() {
-  editingUserId = null
-  document.getElementById('userModalTitle').textContent = 'Add User'
-  document.getElementById('uName').value = ''
-  document.getElementById('uEmail').value = ''
-  document.getElementById('uPassword').value = ''
-  document.getElementById('uRole').value = 'member'
-  document.getElementById('uActive').checked = true
-  document.getElementById('uPasswordGroup').style.display = 'block'
-  document.getElementById('uStatusGroup').style.display = 'none'
-  document.getElementById('userModal').classList.add('open')
+async function changePassword() {
+  const cur = document.getElementById('curPw').value
+  const np  = document.getElementById('newPw').value
+  const np2 = document.getElementById('newPw2').value
+  if (!cur || !np)  { toast('All fields required', 'error'); return }
+  if (np !== np2)   { toast('Passwords do not match', 'error'); return }
+  try {
+    await api('/api/auth/profile', { method: 'PATCH', body: { currentPassword: cur, newPassword: np } })
+    document.getElementById('curPw').value = ''
+    document.getElementById('newPw').value = ''
+    document.getElementById('newPw2').value = ''
+    toast('Password updated', 'success')
+  } catch (err) { toast(err.message, 'error') }
 }
 
+// ── Team panel ─────────────────────────────────────────────────────────────────
+async function renderTeamPanel() {
+  const el = document.getElementById('panel-team')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Team Members</h2>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-primary btn-sm" onclick="openInviteModal()">+ Create user</button>
+    </div>
+    <div class="card" id="teamCard">
+      <div class="card-body" id="teamList">Loading…</div>
+    </div>`
+  renderTeamList()
+}
+
+function renderTeamList() {
+  const el = document.getElementById('teamList')
+  if (!el) return
+  if (!users.length) { el.innerHTML = '<p style="color:var(--text-3);font-size:13px">No users yet.</p>'; return }
+  el.innerHTML = users.map(u => `
+    <div class="member-row">
+      <div class="member-info">
+        <div class="avatar" style="background:${u.color}">${u.initials}</div>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
+          <div style="font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span class="badge badge-${u.role==='admin'?'blue':'gray'}">${u.role}</span>
+        <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
+      </div>
+      <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="getResetLink('${u.id}','${u.name}')">Reset link</button>
+        ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}','${u.name}')">Delete</button>` : ''}
+      </div>
+      <div id="resetLinkBox-${u.id}" class="reset-link-box" style="width:100%"></div>
+    </div>`).join('')
+}
+
+// ── Invite modal ───────────────────────────────────────────────────────────────
+function openInviteModal() {
+  document.getElementById('iName').value = ''
+  document.getElementById('iEmail').value = ''
+  document.getElementById('iRole').value = 'member'
+  document.getElementById('inviteResult').style.cssText = 'display:none!important'
+  document.getElementById('inviteSubmitBtn').style.display = 'inline-flex'
+  document.getElementById('inviteModal').classList.add('open')
+}
+function closeInviteModal() {
+  document.getElementById('inviteModal').classList.remove('open')
+  loadUsers().then(renderTeamList)
+}
+async function doInvite() {
+  const name  = document.getElementById('iName').value.trim()
+  const email = document.getElementById('iEmail').value.trim()
+  const role  = document.getElementById('iRole').value
+  if (!name || !email) { toast('Name and email are required', 'error'); return }
+  try {
+    const r = await api('/api/auth/invite', { method: 'POST', body: { name, email, role } })
+    const resultEl = document.getElementById('inviteResult')
+    if (r.emailSent) {
+      resultEl.style.cssText = 'display:block;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#065f46'
+      resultEl.innerHTML = `✓ Account created for <strong>${name}</strong>. An invitation email has been sent to <strong>${email}</strong>.`
+    } else {
+      resultEl.style.cssText = 'display:block;background:var(--brand-light);border:1px solid rgba(79,70,229,.3);color:var(--brand)'
+      resultEl.innerHTML = `✓ Account created. <strong>SMTP not configured</strong> — share this temporary password with the user (shown once only):<br>
+        <code style="font-size:13px;font-family:var(--mono);display:block;margin-top:8px;padding:8px;background:var(--surface);border-radius:4px;word-break:break-all;color:var(--text)">${r.tempPassword}</code>`
+    }
+    document.getElementById('inviteSubmitBtn').style.display = 'none'
+    toast('User created', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Edit user modal ────────────────────────────────────────────────────────────
 function openEditUser(id) {
   const u = users.find(x => x.id === id); if (!u) return
   editingUserId = id
-  document.getElementById('userModalTitle').textContent = 'Edit User'
-  document.getElementById('uName').value = u.name
-  document.getElementById('uEmail').value = u.email
-  document.getElementById('uPassword').value = ''
-  document.getElementById('uRole').value = u.role
-  document.getElementById('uActive').checked = !!u.is_active
-  document.getElementById('uPasswordGroup').style.display = 'none'
-  document.getElementById('uStatusGroup').style.display = 'block'
-  document.getElementById('userModal').classList.add('open')
+  document.getElementById('euName').value   = u.name
+  document.getElementById('euEmail').value  = u.email
+  document.getElementById('euRole').value   = u.role
+  document.getElementById('euActive').checked = !!u.is_active
+  document.getElementById('editUserModal').classList.add('open')
 }
-
-function closeUserModal() { document.getElementById('userModal').classList.remove('open') }
-
-async function saveUser() {
-  const name  = document.getElementById('uName').value.trim()
-  const email = document.getElementById('uEmail').value.trim()
-  const password = document.getElementById('uPassword').value
-  const role  = document.getElementById('uRole').value
-  const is_active = document.getElementById('uActive').checked
-
+async function saveEditUser() {
   try {
-    if (editingUserId) {
-      const body = { name, email, role, is_active }
-      await api(`/api/users/${editingUserId}`, { method: 'PATCH', body })
-      toast('User updated', 'success')
-    } else {
-      if (!password) { toast('Password is required', 'error'); return }
-      await api('/api/users', { method: 'POST', body: { name, email, password, role } })
-      toast('User created', 'success')
-    }
-    closeUserModal()
-    await loadUsers()
+    await api(`/api/users/${editingUserId}`, { method: 'PATCH', body: {
+      name:      document.getElementById('euName').value.trim(),
+      email:     document.getElementById('euEmail').value.trim(),
+      role:      document.getElementById('euRole').value,
+      is_active: document.getElementById('euActive').checked,
+    }})
+    document.getElementById('editUserModal').classList.remove('open')
+    await loadUsers(); renderTeamList()
+    toast('User updated', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
 
-async function deleteUser(id) {
-  const u = users.find(x => x.id === id)
-  if (!confirm(`Delete user "${u?.name}"? This cannot be undone.`)) return
+async function getResetLink(id, name) {
+  try {
+    const r = await api(`/api/auth/admin/reset-link/${id}`)
+    const box = document.getElementById('resetLinkBox-' + id)
+    box.style.display = 'block'
+    box.innerHTML = `
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--brand)">🔗 Reset link for ${name} — expires in 15 minutes</div>
+      <div style="display:flex;gap:6px">
+        <input type="text" class="form-input" value="${r.resetUrl}" readonly id="rl-${id}" style="font-size:11px;font-family:var(--mono)">
+        <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('rl-${id}').value).then(()=>toast('Copied!','success'))">Copy</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">Share this link securely with the user. It can only be used once.</div>`
+    toast('Reset link generated', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return
   try {
     await api(`/api/users/${id}`, { method: 'DELETE' })
+    await loadUsers(); renderTeamList()
     toast('User deleted', 'success')
-    await loadUsers()
   } catch (err) { toast(err.message, 'error') }
 }
 
-function openResetPw(id) {
-  resetPwUserId = id
-  const u = users.find(x => x.id === id)
-  document.getElementById('resetPwFor').textContent = `Set a new password for ${u?.name}`
-  document.getElementById('resetPwVal').value = ''
-  document.getElementById('resetPwModal').classList.add('open')
+// ── Locations panel ────────────────────────────────────────────────────────────
+async function renderLocationsPanel() {
+  const el = document.getElementById('panel-locations')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Locations</h2>
+    <div style="margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add location</button></div>
+    <div class="card">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Actions</th></tr></thead>
+        <tbody id="locsBody"></tbody>
+      </table></div>
+    </div>`
+  renderLocsTable()
 }
 
-async function doResetPw() {
-  const pw = document.getElementById('resetPwVal').value
-  if (!pw) { toast('Password is required', 'error'); return }
-  try {
-    await api(`/api/users/${resetPwUserId}/reset-password`, { method: 'POST', body: { password: pw } })
-    toast('Password reset', 'success')
-    document.getElementById('resetPwModal').classList.remove('open')
-  } catch (err) { toast(err.message, 'error') }
+function renderLocsTable() {
+  const tbody = document.getElementById('locsBody')
+  if (!tbody) return
+  if (!locations.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">No locations yet</td></tr>'; return }
+  tbody.innerHTML = locations.map(l => `<tr>
+    <td style="font-weight:600">${l.name}</td>
+    <td style="color:var(--text-3)">${l.address||'—'}</td>
+    <td><div style="width:20px;height:20px;border-radius:50%;background:${l.color};border:1px solid var(--border)"></div></td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${l.name}')">Delete</button>
+    </div></td>
+  </tr>`).join('')
 }
 
-// ── Location Modal ─────────────────────────────────────────────────────────────
 function openCreateLoc() {
   editingLocId = null; locColour = '#4f46e5'
   document.getElementById('locModalTitle').textContent = 'Add Location'
@@ -367,7 +593,6 @@ function openCreateLoc() {
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
 }
-
 function openEditLoc(id) {
   const l = locations.find(x => x.id === id); if (!l) return
   editingLocId = id; locColour = l.color || '#4f46e5'
@@ -377,39 +602,278 @@ function openEditLoc(id) {
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
 }
-
 function closeLocModal() { document.getElementById('locModal').classList.remove('open') }
-
 function setupLocColour() {
   const el = document.getElementById('locColourPicker'); el.innerHTML = ''
   renderColourPicker(el, locColour, v => { locColour = v })
 }
-
 async function saveLoc() {
   const name = document.getElementById('lName').value.trim()
-  if (!name) { toast('Name is required', 'error'); return }
+  if (!name) { toast('Name required', 'error'); return }
   const body = { name, address: document.getElementById('lAddress').value.trim() || null, color: locColour }
   try {
-    if (editingLocId) {
-      await api(`/api/locations/${editingLocId}`, { method: 'PUT', body })
-      toast('Location updated', 'success')
-    } else {
-      await api('/api/locations', { method: 'POST', body })
-      toast('Location added', 'success')
-    }
+    if (editingLocId) await api(`/api/locations/${editingLocId}`, { method: 'PUT', body })
+    else await api('/api/locations', { method: 'POST', body })
     closeLocModal()
-    await loadLocations()
+    await loadLocations(); renderLocsTable()
+    toast('Location saved', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+async function deleteLoc(id, name) {
+  if (!confirm(`Delete location "${name}"?`)) return
+  try {
+    await api(`/api/locations/${id}`, { method: 'DELETE' })
+    await loadLocations(); renderLocsTable()
+    toast('Location deleted', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
 
-async function deleteLoc(id) {
-  const l = locations.find(x => x.id === id)
-  if (!confirm(`Delete location "${l?.name}"?`)) return
+// ── Security panel ─────────────────────────────────────────────────────────────
+async function renderSecurityPanel() {
+  const c = await api('/api/config')
+  const pol = c.passwordPolicy || {}
+  const el = document.getElementById('panel-security')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Security</h2>
+    <div class="card section-card">
+      <div class="card-header">
+        <h3 class="card-title">Password Policy</h3>
+        <button class="btn btn-primary btn-sm" onclick="savePasswordPolicy()">Save</button>
+      </div>
+      <div class="card-body">
+        <div class="policy-row">
+          <div class="pref-info"><strong>Minimum length</strong><span>Minimum number of characters required</span></div>
+          <input type="number" class="form-input" id="polMinLen" value="${pol.minLength||8}" min="6" max="128" style="width:70px;text-align:center">
+        </div>
+        ${[
+          ['polUpper',   'requireUpper',   'Require uppercase letter',   'At least one A–Z'],
+          ['polLower',   'requireLower',   'Require lowercase letter',   'At least one a–z'],
+          ['polNumber',  'requireNumber',  'Require number',             'At least one 0–9'],
+          ['polSpecial', 'requireSpecial', 'Require special character',  'e.g. !@#$%^&*'],
+          ['polNoSeq',   'noSequential',   'No sequential characters',   'Blocks aaa, 123, abc etc.'],
+        ].map(([id,key,label,desc]) => `
+        <div class="policy-row">
+          <div class="pref-info"><strong>${label}</strong><span>${desc}</span></div>
+          <label class="toggle"><input type="checkbox" id="${id}" ${pol[key]?'checked':''}><span class="toggle-slider"></span></label>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Session</h3></div>
+      <div class="card-body">
+        <div class="policy-row">
+          <div class="pref-info"><strong>HTTPS-only cookies</strong><span>Set Secure flag on session cookie — only enable when running behind HTTPS</span></div>
+          <label class="toggle"><input type="checkbox" id="cookieSecureToggle" ${c.cookieSecure?'checked':''} onchange="toggleCookieSecure(this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>`
+}
+
+async function savePasswordPolicy() {
+  const body = {
+    minLength:      parseInt(document.getElementById('polMinLen').value) || 8,
+    requireUpper:   document.getElementById('polUpper').checked,
+    requireLower:   document.getElementById('polLower').checked,
+    requireNumber:  document.getElementById('polNumber').checked,
+    requireSpecial: document.getElementById('polSpecial').checked,
+    noSequential:   document.getElementById('polNoSeq').checked,
+  }
   try {
-    await api(`/api/locations/${id}`, { method: 'DELETE' })
-    toast('Location deleted', 'success')
-    await loadLocations()
+    await api('/api/config/password-policy', { method: 'PATCH', body })
+    toast('Password policy saved', 'success')
   } catch (err) { toast(err.message, 'error') }
+}
+
+async function toggleCookieSecure(val) {
+  try {
+    await api('/api/config', { method: 'PATCH', body: { cookieSecure: val } })
+    toast('Setting saved', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Email / SMTP panel ─────────────────────────────────────────────────────────
+async function renderEmailPanel() {
+  const el = document.getElementById('panel-email')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Email / SMTP</h2>
+
+    <!-- Status bar -->
+    <div id="smtpStatusBar" style="display:none;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px"></div>
+
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">SMTP Configuration</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+          Configure an outgoing mail server to enable password reset emails and user invitations.
+          Credentials are stored in <code style="font-size:11px">.runtime-overrides.json</code> on the server and are never committed to git.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">SMTP Host</label>
+            <input class="form-input" id="smtpHost" placeholder="smtp.gmail.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Port</label>
+            <input class="form-input" id="smtpPort" type="number" placeholder="587" value="587">
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:22px">
+            <input type="checkbox" id="smtpSecure" style="width:16px;height:16px;accent-color:var(--brand);cursor:pointer">
+            <label for="smtpSecure" style="font-size:13px;font-weight:500;cursor:pointer">TLS (port 465)</label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username / Email</label>
+            <input class="form-input" id="smtpUser" type="email" placeholder="noreply@yourcompany.com" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div style="position:relative">
+              <input class="form-input" id="smtpPass" type="password" placeholder="App password or SMTP password" autocomplete="new-password" style="padding-right:40px">
+              <button type="button" onclick="toggleSmtpPw()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px" title="Show/hide">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">From Name</label>
+            <input class="form-input" id="smtpFromName" placeholder="ForgeShift">
+          </div>
+          <div class="form-group">
+            <label class="form-label">From Address</label>
+            <input class="form-input" id="smtpFromAddr" type="email" placeholder="noreply@yourcompany.com">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="saveSmtp()">Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="testSmtp()">Send test email</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);margin-left:auto" onclick="clearSmtp()">Clear config</button>
+        </div>
+        <div id="smtpMsg" style="display:none;margin-top:12px;font-size:13px;padding:10px 12px;border-radius:var(--r-md)"></div>
+      </div>
+    </div>
+
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Quick-start guides</h3></div>
+      <div class="card-body">
+        <div style="display:grid;gap:10px;font-size:12px;color:var(--text-3)">
+          <div style="padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+            <strong style="color:var(--text-2);display:block;margin-bottom:4px">Gmail</strong>
+            Host: <code>smtp.gmail.com</code> · Port: <code>587</code> · Use an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a>, not your main password.
+          </div>
+          <div style="padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+            <strong style="color:var(--text-2);display:block;margin-bottom:4px">Outlook / Microsoft 365</strong>
+            Host: <code>smtp.office365.com</code> · Port: <code>587</code> · Use your full email as username.
+          </div>
+          <div style="padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+            <strong style="color:var(--text-2);display:block;margin-bottom:4px">Brevo / Mailgun / Postmark / any transactional provider</strong>
+            Use the SMTP credentials from your provider dashboard. Port <code>587</code> with STARTTLS is standard.
+          </div>
+        </div>
+      </div>
+    </div>`
+
+  // Load current config
+  try {
+    const cfg = await api('/api/config/email')
+    document.getElementById('smtpHost').value     = cfg.smtpHost
+    document.getElementById('smtpPort').value     = cfg.smtpPort || '587'
+    document.getElementById('smtpSecure').checked = cfg.smtpSecure
+    document.getElementById('smtpUser').value     = cfg.smtpUser
+    document.getElementById('smtpPass').value     = cfg.hasPassword ? '••••••••' : ''
+    document.getElementById('smtpFromName').value = cfg.smtpFromName
+    document.getElementById('smtpFromAddr').value = cfg.smtpFromAddr
+
+    const bar = document.getElementById('smtpStatusBar')
+    bar.style.display = 'flex'
+    if (cfg.enabled) {
+      bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#065f46'
+      bar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> SMTP configured — password reset emails and invitations are active.'
+    } else {
+      bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3)'
+      bar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> No SMTP configured — password reset links are shown on-screen via admin panel instead of being emailed.'
+    }
+  } catch {}
+}
+
+function toggleSmtpPw() {
+  const inp = document.getElementById('smtpPass')
+  inp.type = inp.type === 'text' ? 'password' : 'text'
+}
+
+function smtpMsg(text, ok) {
+  const el = document.getElementById('smtpMsg')
+  el.style.cssText = `display:block;font-size:13px;padding:10px 12px;border-radius:var(--r-md);margin-top:12px;` +
+    (ok ? 'background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#065f46'
+        : 'background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);color:var(--red)')
+  el.textContent = text
+  setTimeout(() => { el.style.display = 'none' }, 6000)
+}
+
+async function saveSmtp() {
+  const pass = document.getElementById('smtpPass').value
+  try {
+    await api('/api/config/email', { method: 'PATCH', body: {
+      smtpHost:     document.getElementById('smtpHost').value.trim(),
+      smtpPort:     document.getElementById('smtpPort').value,
+      smtpSecure:   document.getElementById('smtpSecure').checked,
+      smtpUser:     document.getElementById('smtpUser').value.trim(),
+      smtpPass:     pass === '••••••••' ? undefined : pass,
+      smtpFromName: document.getElementById('smtpFromName').value.trim(),
+      smtpFromAddr: document.getElementById('smtpFromAddr').value.trim(),
+    }})
+    smtpMsg('✓ SMTP configuration saved.', true)
+    toast('SMTP saved', 'success')
+    // Refresh the status bar
+    renderEmailPanel()
+  } catch (err) { smtpMsg(err.message, false) }
+}
+
+async function testSmtp() {
+  smtpMsg('Sending test email…', true)
+  try {
+    const r = await api('/api/config/email/test', { method: 'POST' })
+    smtpMsg(`✓ Test email sent to ${r.sentTo}`, true)
+    toast('Test email sent!', 'success')
+  } catch (err) { smtpMsg(`✗ ${err.message}`, false) }
+}
+
+async function clearSmtp() {
+  if (!confirm('Clear all SMTP configuration? Password reset emails will stop working.')) return
+  await api('/api/config/email', { method: 'PATCH', body: { smtpHost: '', smtpUser: '', smtpPass: '', smtpFromName: '', smtpFromAddr: '' }})
+  toast('SMTP configuration cleared', 'success')
+  renderEmailPanel()
+}
+
+// ── Application panel ──────────────────────────────────────────────────────────
+async function renderApplicationPanel() {
+  const c = await api('/api/config')
+  const el = document.getElementById('panel-application')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Application</h2>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Registration</h3></div>
+      <div class="card-body">
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Allow public sign-up</strong>
+            <span>When disabled, only admins can create accounts. All sign-up links are hidden from the UI.</span>
+          </div>
+          <label class="toggle"><input type="checkbox" id="allowSignupToggle" ${c.allowSignup!==false?'checked':''} onchange="setAllowSignup(this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Build Information</h3></div>
+      <div class="card-body">
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr><td style="color:var(--text-3);padding:8px 0;width:140px;border-bottom:1px solid var(--border)">Version</td>
+              <td style="padding:8px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 6px;border-radius:4px">${c.version}</code></td></tr>
+          <tr><td style="color:var(--text-3);padding:8px 0;border-bottom:1px solid var(--border)">Environment</td>
+              <td style="padding:8px 0;border-bottom:1px solid var(--border)"><span class="badge badge-${c.appEnv==='production'?'red':c.appEnv==='staging'?'orange':'green'}">${c.appEnv}</span></td></tr>
+          <tr><td style="color:var(--text-3);padding:8px 0">Stack</td>
+              <td style="padding:8px 0;color:var(--text-3)">Node.js / Express / SQLite</td></tr>
+        </table>
+      </div>
+    </div>`
 }
 
 async function setAllowSignup(val) {
@@ -419,11 +883,56 @@ async function setAllowSignup(val) {
   } catch (err) { toast(err.message, 'error') }
 }
 
+// ── Audit log panel ────────────────────────────────────────────────────────────
+async function renderAuditPanel() {
+  const el = document.getElementById('panel-audit')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Audit Log</h2>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Subject</th></tr></thead>
+          <tbody id="auditBody"><tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px" id="auditPager"></div>
+    </div>`
+  await loadAudit(0)
+}
+
+let auditOffset = 0
+async function loadAudit(offset) {
+  auditOffset = offset
+  try {
+    const data = await api(`/api/audit?limit=30&offset=${offset}`)
+    const tbody = document.getElementById('auditBody')
+    if (!data.entries.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">No audit entries yet</td></tr>'; return
+    }
+    tbody.innerHTML = data.entries.map(e => {
+      const dt = new Date(e.created_at)
+      const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+      return `<tr>
+        <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${ts}</td>
+        <td>${e.actor_name ? `<div style="display:flex;align-items:center;gap:6px"><div class="avatar" style="width:20px;height:20px;font-size:9px;background:${e.actor_color||'#4f46e5'}">${e.actor_initials||'?'}</div><span style="font-size:12px">${e.actor_name}</span></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td><code style="font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px">${e.action}</code></td>
+        <td style="font-size:12px;color:var(--text-3)">${e.entity_name||e.entity_id||'—'}</td>
+      </tr>`
+    }).join('')
+    // Pager
+    const pager = document.getElementById('auditPager')
+    pager.innerHTML = `
+      <button class="btn btn-secondary btn-sm" onclick="loadAudit(${Math.max(0,offset-30)})" ${offset===0?'disabled':''}>← Prev</button>
+      <span style="font-size:12px;color:var(--text-3);align-self:center">${offset+1}–${Math.min(offset+30,data.total)} of ${data.total}</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadAudit(${offset+30})" ${offset+30>=data.total?'disabled':''}>Next →</button>`
+  } catch (err) {
+    document.getElementById('auditBody').innerHTML = `<tr><td colspan="4" style="color:var(--red);padding:24px;text-align:center">${err.message}</td></tr>`
+  }
+}
+
 // Close modals on overlay click
-['userModal','locModal','resetPwModal'].forEach(id => {
-  document.getElementById(id).addEventListener('click', e => {
-    if (e.target === document.getElementById(id)) document.getElementById(id).classList.remove('open')
-  })
+['inviteModal','editUserModal','locModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) document.getElementById(id).classList.remove('open') })
 })
 
 init()

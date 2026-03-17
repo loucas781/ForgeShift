@@ -14,22 +14,40 @@ async function loadConfig() {
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 function applyTheme(theme) {
-  if (theme === 'light') {
+  localStorage.setItem('fs-theme', theme)
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
+    if (!prefersDark) document.documentElement.removeAttribute('data-theme')
+  } else if (theme === 'light') {
     document.documentElement.removeAttribute('data-theme')
   } else {
     document.documentElement.setAttribute('data-theme', theme)
   }
-  localStorage.setItem('fs-theme', theme)
 }
 
 function getTheme() {
-  return localStorage.getItem('fs-theme') || 'light'
+  return localStorage.getItem('fs-theme') || 'system'
 }
 
-// Apply theme immediately (inline so no flash)
+// Apply theme immediately (called inline on every page — no flash)
 ;(function() {
-  const t = localStorage.getItem('fs-theme') || 'light'
-  if (t !== 'light') document.documentElement.setAttribute('data-theme', t)
+  const t = localStorage.getItem('fs-theme') || 'system'
+  if (t === 'system') {
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.setAttribute('data-theme', 'dark')
+  } else if (t === 'light') {
+    document.documentElement.removeAttribute('data-theme')
+  } else {
+    document.documentElement.setAttribute('data-theme', t)
+  }
+  // Watch for OS-level changes when in system mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if ((localStorage.getItem('fs-theme') || 'system') === 'system') {
+      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '')
+      if (!e.matches) document.documentElement.removeAttribute('data-theme')
+    }
+  })
 })()
 
 // ── Toast notifications ────────────────────────────────────────────────────────
@@ -118,9 +136,10 @@ function renderShell(cfg, activePage) {
           My Profile
         </a>
         <div class="dropdown-sep"></div>
-        <button class="dropdown-item" onclick="setTheme('light')">☀️ Light mode</button>
-        <button class="dropdown-item" onclick="setTheme('dark')">🌙 Dark mode</button>
-        <button class="dropdown-item" onclick="setTheme('oled')">⬛ OLED Black</button>
+        <button class="dropdown-item" id="themeItemSystem" onclick="setTheme('system')">🖥️ System <span id="themeCheck-system" style="margin-left:auto;display:none">✓</span></button>
+        <button class="dropdown-item" id="themeItemLight"  onclick="setTheme('light')">☀️ Light  <span id="themeCheck-light"  style="margin-left:auto;display:none">✓</span></button>
+        <button class="dropdown-item" id="themeItemDark"   onclick="setTheme('dark')">🌙 Dark   <span id="themeCheck-dark"   style="margin-left:auto;display:none">✓</span></button>
+        <button class="dropdown-item" id="themeItemOled"   onclick="setTheme('oled')">⬛ OLED Black <span id="themeCheck-oled" style="margin-left:auto;display:none">✓</span></button>
         <div class="dropdown-sep"></div>
         <button class="dropdown-item danger" onclick="doLogout()">
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
@@ -160,6 +179,13 @@ function renderShell(cfg, activePage) {
     `
   }
 
+  // Set initial theme checkmark
+  const currentTheme = getTheme()
+  ;['system','light','dark','oled'].forEach(id => {
+    const el = document.getElementById('themeCheck-' + id)
+    if (el) el.style.display = id === currentTheme ? 'inline' : 'none'
+  })
+
   // Mobile overlay
   const overlay = document.getElementById('sidebarOverlay')
   const menuBtn = document.getElementById('menuToggle')
@@ -191,7 +217,12 @@ function toggleUserMenu() {
 function setTheme(t) {
   applyTheme(t)
   document.getElementById('userMenu')?.classList.remove('open')
-  toast(`Theme set to ${t}`, 'success', 1800)
+  // Update checkmark indicators
+  ;['system','light','dark','oled'].forEach(id => {
+    const el = document.getElementById('themeCheck-' + id)
+    if (el) el.style.display = id === t ? 'inline' : 'none'
+  })
+  toast(`Theme: ${t}`, 'success', 1500)
 }
 
 async function doLogout() {
