@@ -46,6 +46,8 @@ function migrate() {
       avatar      TEXT,
       role        TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member')),
       is_active   INTEGER NOT NULL DEFAULT 1,
+      totp_secret TEXT,
+      totp_enabled INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -159,8 +161,22 @@ function migrate() {
   console.log('✓ SQLite schema ready')
 }
 
+function migrateAdditive() {
+  // Additive migrations — safe to run on existing databases
+  const cols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name)
+  if (!cols.includes('totp_secret')) {
+    db.exec("ALTER TABLE users ADD COLUMN totp_secret TEXT")
+    console.log('✓ Added totp_secret column')
+  }
+  if (!cols.includes('totp_enabled')) {
+    db.exec("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
+    console.log('✓ Added totp_enabled column')
+  }
+}
+
 try {
   migrate()
+  migrateAdditive()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)

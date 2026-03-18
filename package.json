@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "otplib": "^12.0.1",
     "better-sqlite3": "^9.4.3",
     "cookie-parser": "^1.4.6",
     "express": "^4.18.3",

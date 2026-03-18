@@ -8,6 +8,7 @@ const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit   = require('../audit')
 const emailSvc = require('../email')
+const { authenticator } = require('otplib')
 const fs      = require('fs')
 const path    = require('path')
 
@@ -253,6 +254,64 @@ router.post('/invite', requireAuth, async (req, res) => {
     audit(req.user.id, 'user.invite', 'user', id, name.trim(), { by: req.user.name })
     res.json({ ok: true, emailSent, tempPassword: emailSent ? null : tempPassword })
   } catch (err) { console.error('invite:', err.message); res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── GET /api/auth/2fa/status ──────────────────────────────────────────────────
+router.get('/2fa/status', requireAuth, (req, res) => {
+  try {
+    const user = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.id)
+    res.json({ enabled: !!(user?.totp_enabled) })
+  } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── POST /api/auth/2fa/setup — generate pending TOTP secret ──────────────────
+router.post('/2fa/setup', requireAuth, (req, res) => {
+  try {
+    const secret  = authenticator.generateSecret()
+    const appName = process.env.APP_NAME || 'ForgeShift'
+    const user    = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.id)
+    const otpauth = authenticator.keyuri(user.email, appName, secret)
+    // Store pending secret (not yet confirmed — totp_enabled remains 0)
+    db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(secret, req.user.id)
+    res.json({ secret, otpauth })
+  } catch (err) {
+    console.error('2fa setup:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/2fa/verify — confirm code and enable 2FA ──────────────────
+router.post('/2fa/verify', requireAuth, (req, res) => {
+  const { secret, code } = req.body
+  if (!secret || !code) return res.status(400).json({ error: 'Secret and code required' })
+  try {
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code — try again' })
+    db.prepare('UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE id = ?').run(secret, req.user.id)
+    audit(req.user.id, 'user.2fa_enabled', 'user', req.user.id, req.user.name)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('2fa verify:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/2fa/disable — verify code then disable 2FA ────────────────
+router.post('/2fa/disable', requireAuth, (req, res) => {
+  const { code } = req.body
+  if (!code) return res.status(400).json({ error: 'Code required' })
+  try {
+    const user = db.prepare('SELECT totp_secret FROM users WHERE id = ?').get(req.user.id)
+    if (!user?.totp_secret) return res.status(400).json({ error: '2FA is not set up' })
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret: user.totp_secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code' })
+    db.prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?').run(req.user.id)
+    audit(req.user.id, 'user.2fa_disabled', 'user', req.user.id, req.user.name)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('2fa disable:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
 })
 
 module.exports = router

@@ -113,6 +113,10 @@ html, body {
   transition: background var(--t-base), color var(--t-base);
 }
 
+/* Ensure page containers always use theme background */
+.app-shell, .app-body { background: var(--bg); }
+.page-content { background: var(--bg); }
+
 a { color: var(--brand); text-decoration: none; }
 a:hover { text-decoration: underline; }
 h1 { font-size: 22px; font-weight: 700; }
@@ -261,12 +265,13 @@ h4 { font-size: 13px; font-weight: 600; }
 }
 .sidebar-overlay.open { display: block; }
 
-/* ── Mobile sidebar toggle ────────────────────────────────── */
+/* ── Mobile sidebar toggle — hidden on desktop, shown on mobile via media query */
 .topbar-menu-btn {
   display: none; align-items: center; justify-content: center;
   width: 36px; height: 36px; border: none; background: transparent;
   color: rgba(255,255,255,.8); cursor: pointer; border-radius: var(--r-md);
   transition: background var(--t-fast);
+  flex-shrink: 0;
 }
 .topbar-menu-btn:hover { background: rgba(255,255,255,.1); }
 
@@ -687,12 +692,23 @@ tr:hover td { background: var(--surface-2); }
   .modal { max-width: 100%; margin: 0; border-radius: var(--r-xl) var(--r-xl) 0 0; align-self: flex-end; }
   .modal-overlay { align-items: flex-end; padding: 0; }
   .page-header { flex-direction: column; align-items: flex-start; }
-  /* Settings tabs: icon-only on small screens */
-  .settings-tab span { display: none; }
+  /* Settings tabs: scroll horizontally on small screens, labels remain visible */
+  .settings-tab { padding: 10px 10px; font-size: 12px; }
 }
 
 @media (max-width: 480px) {
-  .cal-month .cal-shift-chip { display: none; }
-  .cal-month .cal-cell { min-height: 52px; }
+  /* Compact shift chips on small screens — show colour bar + short name */
+  .cal-month .cal-shift-chip {
+    font-size: 9px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    line-height: 1.4;
+  }
+  .cal-month .cal-cell { min-height: 64px; padding: 4px; }
+  .cal-month .cal-cell-date { font-size: 11px; width: 20px; height: 20px; }
   .day-editor-grid { grid-template-columns: 1fr; }
 }

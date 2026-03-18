@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/js/password-policy.js"></script>
   <script>
     // Apply theme immediately to avoid flash
@@ -57,6 +58,12 @@
     .backup-result-err { padding: 12px 16px; background: rgba(222,53,11,.06); border: 1px solid rgba(222,53,11,.25); border-radius: var(--r-lg); font-size: 13px; color: var(--red,#de350b); }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { animation: spin 1s linear infinite; display: inline-block; }
+    /* 2FA */
+    .twofa-status { display:flex; align-items:center; gap:12px; padding:14px 16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); margin-bottom:16px; }
+    .twofa-enabled  { color: var(--green); }
+    .twofa-disabled { color: var(--text-3); }
+    .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
+    .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
     .settings-panel { display:none; padding:24px; max-width:700px; }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
@@ -85,12 +92,9 @@
     .policy-row:last-child { border-bottom:none; }
     .copy-url-row { display:flex; gap:8px; }
     .copy-url-row input { flex:1; font-size:11px; font-family:var(--mono); }
-    .reset-link-box { background:var(--brand-light); border:1px solid var(--brand); border-radius:var(--r-md); padding:12px 14px; margin-top:10px; display:none; }
-    .reset-link-box a { font-size:11px; word-break:break-all; font-family:var(--mono); }
-    .reset-link-expiry { font-size:11px; color:var(--text-3); margin-top:4px; }
     @media(max-width:600px){
-      .settings-tabs { gap:0; }
-      .settings-tab span { display:none; }
+      .settings-tabs { gap:0; padding: 0 8px; }
+      .settings-tab { padding: 10px 10px; font-size: 12px; }
       .member-actions { padding-left:0; }
     }
   </style>
@@ -219,8 +223,7 @@ async function init() {
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
     { id: 'ical', label: 'Calendar Feed', adminOnly: false,
       icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
-    { id: 'account', label: 'Account', adminOnly: false,
-      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+
     { id: 'team', label: 'Team', adminOnly: true,
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
     { id: 'locations', label: 'Locations', adminOnly: true,
@@ -229,8 +232,6 @@ async function init() {
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
     { id: 'email', label: 'Email', adminOnly: true,
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
-    { id: 'application', label: 'Application', adminOnly: true,
-      icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
     { id: 'audit', label: 'Audit Log', adminOnly: true,
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
     { id: 'backup', label: 'Backup', adminOnly: true,
@@ -264,12 +265,10 @@ async function init() {
   await Promise.all([
     renderAppearancePanel(),
     renderIcalPanel(),
-    renderAccountPanel(),
     isAdmin ? renderTeamPanel() : Promise.resolve(),
     isAdmin ? renderLocationsPanel() : Promise.resolve(),
     isAdmin ? renderSecurityPanel() : Promise.resolve(),
     isAdmin ? renderEmailPanel() : Promise.resolve(),
-    isAdmin ? renderApplicationPanel() : Promise.resolve(),
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
     isAdmin ? renderBuildInfoPanel() : Promise.resolve(),
@@ -407,59 +406,6 @@ async function regenerateIcal() {
 }
 
 // ── Account panel ──────────────────────────────────────────────────────────────
-async function renderAccountPanel() {
-  const u = cfg.user
-  const el = document.getElementById('panel-account')
-  el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">My Account</h2>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Profile</h3></div>
-      <div class="card-body">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
-          <div class="avatar avatar-xl" id="settingsAvatar" style="background:${u.color}">${u.initials}</div>
-          <div>
-            <div style="font-size:16px;font-weight:800">${u.name}</div>
-            <div style="font-size:13px;color:var(--text-3)">${u.email}</div>
-            <span class="badge badge-${u.role==='admin'?'blue':'gray'}" style="margin-top:4px">${u.role}</span>
-          </div>
-        </div>
-        <div class="form-group"><label class="form-label">Display name</label><input type="text" class="form-input" id="profileName" value="${u.name}"></div>
-        <div class="form-group"><label class="form-label">Email address</label><input type="email" class="form-input" id="profileEmail" value="${u.email}"></div>
-        <div class="form-group"><label class="form-label">Accent colour</label><div id="profileColourPicker"></div></div>
-        <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save changes</button>
-      </div>
-    </div>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Change Password</h3></div>
-      <div class="card-body">
-        <div class="form-group"><label class="form-label">Current password</label><input type="password" class="form-input" id="curPw" placeholder="••••••••"></div>
-        <div class="form-group">
-          <label class="form-label">New password</label>
-          <div style="position:relative">
-            <input type="password" class="form-input" id="newPw" placeholder="••••••••" style="padding-right:40px">
-            <button type="button" onclick="(function(){var i=document.getElementById('newPw');i.type=i.type==='text'?'password':'text'})()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-          </div>
-          <div id="changePwIndicator" style="margin-top:6px"></div>
-        </div>
-        <div class="form-group"><label class="form-label">Confirm new password</label><input type="password" class="form-input" id="newPw2" placeholder="••••••••"></div>
-        <button class="btn btn-primary btn-sm" onclick="changePassword()">Update password</button>
-      </div>
-    </div>`
-
-  let profileColour = u.color || '#4f46e5'
-  renderColourPicker(document.getElementById('profileColourPicker'), profileColour, v => { profileColour = v; window._profileColour = v })
-  window._profileColour = profileColour
-
-  // Wire up password indicator on the account panel
-  const changePwInput = document.getElementById('newPw')
-  if (changePwInput) {
-    const ind = createPasswordIndicator()
-    document.getElementById('changePwIndicator').appendChild(ind)
-    changePwInput.addEventListener('input', () => updatePasswordIndicator(ind, changePwInput.value))
-  }
-}
 
 async function saveProfile() {
   const name  = document.getElementById('profileName').value.trim()
@@ -525,7 +471,6 @@ function renderTeamList() {
         <button class="btn btn-ghost btn-sm" onclick="getResetLink('${u.id}','${u.name}')">Reset link</button>
         ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}','${u.name}')">Delete</button>` : ''}
       </div>
-      <div id="resetLinkBox-${u.id}" class="reset-link-box" style="width:100%"></div>
     </div>`).join('')
 }
 
@@ -609,19 +554,53 @@ async function saveEditUser() {
 }
 
 async function getResetLink(id, name) {
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+  const existing = document.getElementById('reset-link-modal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.className = 'modal-overlay'
+  modal.id = 'reset-link-modal'
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(9,30,66,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px'
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--r-xl);padding:24px;width:100%;max-width:440px;box-shadow:0 24px 80px rgba(9,30,66,.3)">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Password Reset Link</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">Generating a secure reset link for <strong>${escHtml(name)}</strong>. The link expires in <strong>15 minutes</strong>.</div>
+      <div id="reset-link-result" style="margin:14px 0;font-size:13px;color:var(--text-2)">
+        <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
+          <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
+          Generating…
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary" id="reset-link-close">Close</button>
+        <button class="btn btn-primary" id="reset-link-copy" style="display:none">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy Link
+        </button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  document.getElementById('reset-link-close').addEventListener('click', () => modal.remove())
   try {
     const r = await api(`/api/auth/admin/reset-link/${id}`)
-    const box = document.getElementById('resetLinkBox-' + id)
-    box.style.display = 'block'
-    box.innerHTML = `
-      <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--brand)">🔗 Reset link for ${name} — expires in 15 minutes</div>
-      <div style="display:flex;gap:6px">
-        <input type="text" class="form-input" value="${r.resetUrl}" readonly id="rl-${id}" style="font-size:11px;font-family:var(--mono)">
-        <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('rl-${id}').value).then(()=>toast('Copied!','success'))">Copy</button>
-      </div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:4px">Share this link securely with the user. It can only be used once.</div>`
-    toast('Reset link generated', 'success')
-  } catch (err) { toast(err.message, 'error') }
+    const resultEl = document.getElementById('reset-link-result')
+    resultEl.innerHTML = `
+      <div style="background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-md);padding:10px;word-break:break-all;font-family:var(--mono);font-size:11px;user-select:all;margin-bottom:8px">${escHtml(r.resetUrl)}</div>
+      <div style="font-size:12px;color:var(--orange)">⚠ Share this link securely — it expires in 15 minutes and can only be used once.</div>`
+    const copyBtn = document.getElementById('reset-link-copy')
+    copyBtn.style.display = 'flex'
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(r.resetUrl).then(() => {
+        copyBtn.textContent = '✓ Copied!'
+        setTimeout(() => {
+          copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy Link`
+        }, 2000)
+      })
+    })
+  } catch (err) {
+    document.getElementById('reset-link-result').innerHTML = `<span style="color:var(--red)">${escHtml(err.message)}</span>`
+  }
 }
 
 async function deleteUser(id, name) {
@@ -713,6 +692,7 @@ async function renderSecurityPanel() {
   const el = document.getElementById('panel-security')
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Security</h2>
+
     <div class="card section-card">
       <div class="card-header">
         <h3 class="card-title">Password Policy</h3>
@@ -736,6 +716,7 @@ async function renderSecurityPanel() {
         </div>`).join('')}
       </div>
     </div>
+
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Session</h3></div>
       <div class="card-body">
@@ -744,9 +725,138 @@ async function renderSecurityPanel() {
           <label class="toggle"><input type="checkbox" id="cookieSecureToggle" ${c.cookieSecure?'checked':''} onchange="toggleCookieSecure(this.checked)"><span class="toggle-slider"></span></label>
         </div>
       </div>
+    </div>
+
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Two-Factor Authentication (2FA)</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
+          Add an extra layer of security to your account. Once enabled, you will need your authenticator app each time you sign in.
+        </p>
+        <div id="twofa-area">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:13px">
+            <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
+            Loading…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Passkeys</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:12px;line-height:1.6">
+          Passkeys let you sign in with Face ID, Touch ID or a device PIN — no password needed.
+        </p>
+        <div style="padding:12px 14px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--orange)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
+            Passkey support (WebAuthn) requires the app to be served over HTTPS with a consistent domain name.
+            It will be available once you have deployed to staging or production behind your Nginx proxy.
+          </p>
+        </div>
+      </div>
     </div>`
+
+  renderTwoFA()
 }
 
+async function renderTwoFA() {
+  const area = document.getElementById('twofa-area')
+  if (!area) return
+  let twofaSetupData = null
+  function twEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+  try {
+    const status = await api('/api/auth/2fa/status')
+    if (status.enabled) {
+      area.innerHTML = `
+        <div class="twofa-status">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="var(--green)" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div>
+            <div style="font-weight:600;font-size:14px;" class="twofa-enabled">Two-factor authentication is enabled</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px">Your account is protected with an authenticator app.</div>
+          </div>
+        </div>
+        <button class="btn btn-danger btn-sm" id="disable-2fa-btn">Disable 2FA</button>`
+      document.getElementById('disable-2fa-btn').addEventListener('click', () => {
+        area.innerHTML = `
+          <div style="padding:16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);margin-bottom:12px">
+            <p style="font-size:13px;font-weight:600;margin:0 0 12px">Enter your current 6-digit authenticator code to confirm.</p>
+            <input class="form-input" type="text" inputmode="numeric" id="disable-2fa-code" placeholder="000000" maxlength="6" style="max-width:160px;margin-bottom:10px;font-family:var(--mono);letter-spacing:.1em" />
+            <div id="disable-2fa-err" style="color:var(--red);font-size:13px;display:none;margin-bottom:10px"></div>
+            <div style="display:flex;gap:10px">
+              <button class="btn btn-danger btn-sm" id="confirm-disable-2fa">Disable 2FA</button>
+              <button class="btn btn-secondary btn-sm" id="cancel-disable-2fa">Cancel</button>
+            </div>
+          </div>`
+        document.getElementById('cancel-disable-2fa').addEventListener('click', renderTwoFA)
+        document.getElementById('confirm-disable-2fa').addEventListener('click', async () => {
+          const code = document.getElementById('disable-2fa-code').value.trim()
+          const errEl = document.getElementById('disable-2fa-err')
+          errEl.style.display = 'none'
+          try {
+            await api('/api/auth/2fa/disable', { method: 'POST', body: { code } })
+            toast('2FA disabled', 'success')
+            renderTwoFA()
+          } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block' }
+        })
+      })
+    } else {
+      area.innerHTML = `
+        <div class="twofa-status">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="var(--text-3)" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <div>
+            <div style="font-weight:600;font-size:14px" class="twofa-disabled">Two-factor authentication is off</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px">Enable it to protect your account with an authenticator app.</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="enable-2fa-btn">Set up 2FA</button>`
+      document.getElementById('enable-2fa-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('enable-2fa-btn')
+        btn.disabled = true; btn.textContent = 'Generating…'
+        try {
+          twofaSetupData = await api('/api/auth/2fa/setup', { method: 'POST', body: {} })
+          const isDark = document.documentElement.dataset.theme === 'dark' || document.documentElement.dataset.theme === 'oled'
+          area.innerHTML = `
+            <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
+              Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc.), then enter the 6-digit code to verify.
+            </p>
+            <div class="qr-wrap">
+              <div id="qr-canvas"></div>
+              <p style="font-size:12px;color:var(--text-3);margin:0">Or enter this key manually:</p>
+              <code style="font-size:13px;letter-spacing:.1em;color:var(--text-2);word-break:break-all">${twEsc(twofaSetupData.secret)}</code>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Verification code</label>
+              <input class="form-input" type="text" inputmode="numeric" id="verify-2fa-code" placeholder="000000" maxlength="6" style="max-width:160px;font-family:var(--mono);letter-spacing:.1em" />
+            </div>
+            <div id="verify-2fa-err" style="color:var(--red);font-size:13px;display:none;margin-bottom:10px"></div>
+            <div style="display:flex;gap:10px">
+              <button class="btn btn-primary btn-sm" id="verify-2fa-btn">Verify &amp; Enable</button>
+              <button class="btn btn-secondary btn-sm" id="cancel-2fa-setup">Cancel</button>
+            </div>`
+          new QRCode(document.getElementById('qr-canvas'), {
+            text: twofaSetupData.otpauth,
+            width: 160, height: 160,
+            colorDark:  isDark ? '#c7d1e0' : '#111827',
+            colorLight: 'transparent',
+          })
+          document.getElementById('cancel-2fa-setup').addEventListener('click', renderTwoFA)
+          document.getElementById('verify-2fa-btn').addEventListener('click', async () => {
+            const code  = document.getElementById('verify-2fa-code').value.trim()
+            const errEl = document.getElementById('verify-2fa-err')
+            errEl.style.display = 'none'
+            try {
+              await api('/api/auth/2fa/verify', { method: 'POST', body: { secret: twofaSetupData.secret, code } })
+              toast('2FA enabled — your account is now protected', 'success')
+              renderTwoFA()
+            } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block' }
+          })
+        } catch (e) { toast(e.message, 'error'); btn.disabled = false; btn.textContent = 'Set up 2FA' }
+      })
+    }
+  } catch { area.innerHTML = `<p style="font-size:13px;color:var(--text-3)">Could not load 2FA status.</p>` }
+}
 async function savePasswordPolicy() {
   const body = {
     minLength:      parseInt(document.getElementById('polMinLen').value) || 8,
@@ -830,6 +940,19 @@ async function renderEmailPanel() {
     </div>
 
     <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Registration</h3></div>
+      <div class="card-body">
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Allow public sign-up</strong>
+            <span>When disabled, only admins can create accounts. All sign-up links are hidden from the UI.</span>
+          </div>
+          <label class="toggle"><input type="checkbox" id="allowSignupToggle" onchange="setAllowSignup(this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Quick-start guides</h3></div>
       <div class="card-body">
         <div style="display:grid;gap:10px;font-size:12px;color:var(--text-3)">
@@ -869,6 +992,13 @@ async function renderEmailPanel() {
       bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3)'
       bar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> No SMTP configured — password reset links are shown on-screen via admin panel instead of being emailed.'
     }
+  } catch {}
+
+  // Load signup toggle state
+  try {
+    const appCfg = await api('/api/config')
+    const signupToggle = document.getElementById('allowSignupToggle')
+    if (signupToggle) signupToggle.checked = appCfg.allowSignup !== false
   } catch {}
 }
 
@@ -922,24 +1052,6 @@ async function clearSmtp() {
 }
 
 // ── Application panel ──────────────────────────────────────────────────────────
-async function renderApplicationPanel() {
-  const c = await api('/api/config')
-  const el = document.getElementById('panel-application')
-  el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Application</h2>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Registration</h3></div>
-      <div class="card-body">
-        <div class="pref-row">
-          <div class="pref-info">
-            <strong>Allow public sign-up</strong>
-            <span>When disabled, only admins can create accounts. All sign-up links are hidden from the UI.</span>
-          </div>
-          <label class="toggle"><input type="checkbox" id="allowSignupToggle" ${c.allowSignup!==false?'checked':''} onchange="setAllowSignup(this.checked)"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-    </div>`
-}
 
 async function setAllowSignup(val) {
   try {
