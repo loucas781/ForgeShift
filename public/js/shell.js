@@ -119,47 +119,48 @@ function renderShell(cfg, activePage) {
         <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/><path d="M3 8a2 2 0 012-2h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
         Templates
       </a>
-      ${cfg.user.role === 'admin' ? `<a href="/settings.html" class="topbar-nav-btn${activePage==='settings'?' active':''}">
-        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
-        Settings
-      </a>` : ''}
     </nav>
     <div class="topbar-spacer"></div>
 
-    <!-- Standalone theme picker button -->
+    ${cfg.user.role === 'admin' ? `
+    <!-- Settings icon button (admin only) -->
+    <a href="/settings.html" class="topbar-icon-btn${activePage==='settings'?' active-icon':''}" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+    </a>` : ''}
+
+    <!-- Theme picker button -->
     <div class="dropdown-wrapper" id="themeDropdown">
       <button class="topbar-icon-btn" id="themeBtn" onclick="toggleThemeMenu(event)" aria-label="Change theme" title="Change theme">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
           <rect x="2" y="3" width="20" height="14" rx="2"/>
           <path d="M8 21h8M12 17v4"/>
         </svg>
       </button>
-      <div class="dropdown-menu" id="themeMenu" style="min-width:190px">
-        <div style="padding:6px 12px 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)">Appearance</div>
+      <div class="dropdown-menu" id="themeMenu" style="min-width:200px;right:0">
         <button class="theme-option" id="themeOpt-system" onclick="setTheme('system')">
           <span class="theme-option-icon">
-            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 1.5A4.5 4.5 0 018 13V3.5z"/></svg>
+            <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 1.5A4.5 4.5 0 018 13V3.5z"/></svg>
           </span>
           System
           <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
         </button>
         <button class="theme-option" id="themeOpt-light" onclick="setTheme('light')">
-          <span class="theme-option-icon">
-            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 11a3 3 0 100-6 3 3 0 000 6zm0 1.5a4.5 4.5 0 110-9 4.5 4.5 0 010 9zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM0 8a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5H.75A.75.75 0 010 8zm13 0a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0113 8z"/></svg>
+          <span class="theme-option-icon" style="background:#f3f4f6;border-color:#e5e7eb">
+            <svg viewBox="0 0 16 16" fill="#374151" width="11" height="11"><circle cx="8" cy="8" r="3.5"/><path stroke="#374151" stroke-width="1.5" stroke-linecap="round" d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.22 3.22l1.06 1.06M11.72 11.72l1.06 1.06M11.72 4.28l-1.06 1.06M4.28 11.72l-1.06 1.06" fill="none"/></svg>
           </span>
           Light
           <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
         </button>
         <button class="theme-option" id="themeOpt-dark" onclick="setTheme('dark')">
-          <span class="theme-option-icon">
-            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786z"/></svg>
+          <span class="theme-option-icon" style="background:#1e293b;border-color:#334155">
+            <svg viewBox="0 0 16 16" fill="#94a3b8" width="11" height="11"><path d="M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786z"/></svg>
           </span>
           Dark
           <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
         </button>
         <button class="theme-option" id="themeOpt-oled" onclick="setTheme('oled')">
-          <span class="theme-option-icon" style="background:#000;border-color:#333">
-            <svg viewBox="0 0 16 16" fill="white" width="10" height="10"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+          <span class="theme-option-icon" style="background:#000;border-color:#222">
+            <svg viewBox="0 0 16 16" fill="white" width="9" height="9"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
           </span>
           OLED Black
           <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
@@ -167,22 +168,28 @@ function renderShell(cfg, activePage) {
       </div>
     </div>
 
-    <!-- User menu — Profile + Sign out only -->
+    <!-- User menu -->
     <div class="dropdown-wrapper" id="userDropdown">
-      <button class="topbar-user-btn" onclick="toggleUserMenu(event)">
+      <button class="topbar-user-btn" onclick="toggleUserMenu(event)" aria-label="Account menu">
         ${avatarEl(cfg.user).outerHTML}
-        <span>${cfg.user.name.split(' ')[0]}</span>
-        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
       </button>
-      <div class="dropdown-menu" id="userMenu">
+      <div class="dropdown-menu" id="userMenu" style="min-width:220px">
+        <div class="dropdown-user-header">
+          <div class="dropdown-user-name">${cfg.user.name}</div>
+          <div class="dropdown-user-email">${cfg.user.email || ''}</div>
+        </div>
         <a href="/profile.html" class="dropdown-item">
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-          My Profile
+          Your Profile
         </a>
+        ${cfg.user.role === 'admin' ? `<a href="/settings.html" class="dropdown-item">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+          Settings
+        </a>` : ''}
         <div class="dropdown-sep"></div>
         <button class="dropdown-item danger" onclick="doLogout()">
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
-          Sign out
+          Sign Out
         </button>
       </div>
     </div>

@@ -83,6 +83,9 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
   --shadow-md: 0 3px 8px rgba(0,0,0,.4);
   --shadow-lg: 0 8px 24px rgba(0,0,0,.5);
+  /* Override light-only grays so settings panels don't flash white */
+  --gray-50:  #1e293b;
+  --gray-100: #162032;
 }
 
 /* ── OLED black theme ─────────────────────────────────────── */
@@ -100,6 +103,9 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,.8);
   --shadow-md: 0 3px 8px rgba(0,0,0,.8);
   --shadow-lg: 0 8px 24px rgba(0,0,0,.9);
+  /* Override light-only grays */
+  --gray-50:  #0d0d0d;
+  --gray-100: #111111;
 }
 
 html, body {
@@ -171,38 +177,42 @@ h4 { font-size: 13px; font-weight: 600; }
 
 /* Inline env badge in topbar (next to logo), ForgeTrack style */
 .env-topbar-badge {
-  font-size: 10px; font-weight: 700; padding: 2px 8px;
-  border-radius: 6px; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 11px; font-weight: 800; padding: 3px 10px;
+  border-radius: 20px; text-transform: uppercase; letter-spacing: .04em;
   flex-shrink: 0;
 }
-.env-topbar-badge.development { background: #065f46; color: #6ee7b7; }
-.env-topbar-badge.staging     { background: #78350f; color: #fcd34d; }
-.env-topbar-badge.production  { background: #7f1d1d; color: #fca5a5; }
+.env-topbar-badge.development { background: #6554c0; color: #fff; }
+.env-topbar-badge.staging     { background: var(--orange); color: #fff; }
+.env-topbar-badge.production  { background: var(--green); color: #fff; }
 
-/* Version string next to env badge */
+/* Version string next to env badge — monospace pill, ForgeTrack style */
 .version-badge {
-  font-size: 11px; font-weight: 500; color: rgba(255,255,255,.45);
-  letter-spacing: -.01em; flex-shrink: 0;
+  font-size: 12px; font-weight: 500; color: rgba(255,255,255,.55);
+  font-family: var(--mono); letter-spacing: -.01em; flex-shrink: 0;
+  background: rgba(255,255,255,.07); padding: 3px 10px; border-radius: 20px;
 }
 
 /* Fixed bottom-right corner env pill (ForgeTrack style) */
 .env-badge {
   position: fixed; bottom: 14px; right: 14px; z-index: 9000;
-  font-size: 10px; font-weight: 700; padding: 3px 10px;
-  border-radius: 10px; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 10px; font-weight: 800; padding: 3px 10px;
+  border-radius: 20px; text-transform: uppercase; letter-spacing: .04em;
   pointer-events: none;
 }
-.env-badge.development { background: #065f46; color: #6ee7b7; }
-.env-badge.staging     { background: #78350f; color: #fcd34d; }
-.env-badge.production  { background: #7f1d1d; color: #fca5a5; }
+.env-badge.development { background: #6554c0; color: #fff; }
+.env-badge.staging     { background: var(--orange); color: #fff; }
+.env-badge.production  { background: var(--green); color: #fff; }
 
 .topbar-user-btn {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 8px; border-radius: var(--r-md);
-  border: none; background: transparent; cursor: pointer;
-  color: rgba(255,255,255,.8); font-size: 13px; transition: background var(--t-fast);
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0;
+  border-radius: 50%; border: 2px solid rgba(255,255,255,.2);
+  background: transparent; cursor: pointer;
+  transition: border-color var(--t-fast);
+  overflow: hidden; flex-shrink: 0;
 }
-.topbar-user-btn:hover { background: rgba(255,255,255,.1); }
+.topbar-user-btn:hover { border-color: rgba(255,255,255,.5); }
+.topbar-user-btn .avatar { width: 30px; height: 30px; font-size: 11px; }
 
 /* Standalone icon button in topbar (theme picker, etc.) */
 .topbar-icon-btn {
@@ -214,25 +224,29 @@ h4 { font-size: 13px; font-weight: 600; }
 }
 .topbar-icon-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
 .topbar-icon-btn svg { width: 18px; height: 18px; }
+/* Active state for icon-only nav links (e.g. settings cog) */
+a.topbar-icon-btn.active-icon,
+a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,.15); }
 
 /* Theme dropdown — radio-style rows matching ForgeTrack */
 .theme-option {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: var(--r-md);
-  font-size: 13px; color: var(--text-2); cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: var(--r-md);
+  font-size: 14px; font-weight: 500; color: var(--text-2); cursor: pointer;
   border: none; background: transparent; width: 100%; text-align: left;
-  transition: background var(--t-fast);
+  transition: background var(--t-fast), color var(--t-fast);
 }
 .theme-option:hover { background: var(--bg); color: var(--text); }
-.theme-option.active { color: var(--brand); font-weight: 600; }
+.theme-option.active { color: var(--brand); }
 .theme-option-icon {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 2px solid var(--border); flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.15); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; background: var(--surface-2);
+  background: var(--surface-2);
 }
 .theme-option.active .theme-option-icon {
-  border-color: var(--brand); background: var(--brand-light);
+  border-color: var(--brand);
+  background: var(--brand);
 }
 .theme-option-check {
   margin-left: auto; color: var(--brand);
@@ -365,6 +379,11 @@ h4 { font-size: 13px; font-weight: 600; }
 [data-theme="dark"] .badge-orange { background: #451a03; color: #fcd34d; }
 [data-theme="dark"] .badge-red    { background: #450a0a; color: #fca5a5; }
 [data-theme="dark"] .badge-gray   { background: var(--gray-800); color: var(--gray-400); }
+[data-theme="oled"] .badge-blue   { background: #0d0b2e; color: #a5b4fc; }
+[data-theme="oled"] .badge-green  { background: #022c22; color: #6ee7b7; }
+[data-theme="oled"] .badge-orange { background: #1c0d00; color: #fcd34d; }
+[data-theme="oled"] .badge-red    { background: #1c0202; color: #fca5a5; }
+[data-theme="oled"] .badge-gray   { background: #1a1a1a; color: var(--gray-400); }
 
 /* ── Calendar ─────────────────────────────────────────────── */
 .cal-wrapper { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 0; }
@@ -601,6 +620,15 @@ tr:hover td { background: var(--surface-2); }
 .empty-state svg { width: 48px; height: 48px; opacity: .4; }
 .empty-state h3 { color: var(--text-2); font-size: 15px; }
 
+/* User dropdown header — name + email block */
+.dropdown-user-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.dropdown-user-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.dropdown-user-email { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
 /* ── Dropdown ─────────────────────────────────────────────── */
 .dropdown-wrapper { position: relative; }
 .dropdown-menu {
@@ -622,7 +650,13 @@ tr:hover td { background: var(--surface-2); }
 .dropdown-item.danger:hover { background: var(--red-light); }
 .dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
 
-/* ── Settings toggle ──────────────────────────────────────── */
+/* ── Semantic light colour dark overrides ─────────────────── */
+[data-theme="dark"],
+[data-theme="oled"] {
+  --red-light:    rgba(220, 38, 38, .15);
+  --green-light:  rgba(5, 150, 105, .15);
+  --orange-light: rgba(217, 119, 6, .15);
+}
 .toggle {
   position: relative; display: inline-block; width: 40px; height: 22px;
 }
@@ -638,6 +672,9 @@ tr:hover td { background: var(--surface-2); }
 }
 .toggle input:checked + .toggle-slider { background: var(--brand); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+/* ── Mobile nav dropdown — hidden globally, shown via JS toggle on mobile only */
+.mobile-nav-dropdown { display: none; }
 
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 768px) {

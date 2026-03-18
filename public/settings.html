@@ -92,8 +92,29 @@
     .policy-row:last-child { border-bottom:none; }
     .copy-url-row { display:flex; gap:8px; }
     .copy-url-row input { flex:1; font-size:11px; font-family:var(--mono); }
+    /* Mobile select — hidden on desktop, shown on mobile */
+    .settings-mobile-select {
+      display: none;
+    }
     @media(max-width:600px){
-      .settings-tabs { gap:0; padding: 0 8px; }
+      .settings-tabs { display: none; }
+      .settings-mobile-select {
+        display: block;
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 15px;
+        font-weight: 500;
+        font-family: var(--font);
+        color: var(--text);
+        background: var(--surface);
+        border: none;
+        border-bottom: 1px solid var(--border);
+        border-radius: 0;
+        outline: none;
+        cursor: pointer;
+        -webkit-appearance: auto;
+        appearance: auto;
+      }
       .settings-tab { padding: 10px 10px; font-size: 12px; }
       .member-actions { padding-left:0; }
     }
@@ -104,7 +125,10 @@
   <header class="topbar" id="topbar"></header>
   <div class="app-body" style="flex-direction:column;overflow:hidden">
     <div class="settings-tabs-wrap">
+      <!-- Desktop: horizontal tab bar -->
       <div class="settings-tabs" id="settingsTabs"></div>
+      <!-- Mobile: native select picker -->
+      <select class="settings-mobile-select" id="settingsMobileSelect" onchange="showTab(this.value)"></select>
     </div>
     <div style="flex:1;overflow-y:auto" id="settingsPanelsWrap">
       <!-- Panels injected by JS -->
@@ -252,6 +276,12 @@ async function init() {
       <span>${t.label}</span>
     </button>`).join('')
 
+  // Populate mobile select picker
+  const mobileSelect = document.getElementById('settingsMobileSelect')
+  if (mobileSelect) {
+    mobileSelect.innerHTML = tabs.map(t => `<option value="${t.id}">${t.label}</option>`).join('')
+  }
+
   // Render panels container
   const wrap = document.getElementById('settingsPanelsWrap')
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
@@ -288,6 +318,9 @@ function showTab(id) {
   const btn   = document.getElementById('tab-btn-' + id)
   if (panel) panel.classList.add('active')
   if (btn)   btn.classList.add('active')
+  // Keep mobile select in sync
+  const sel = document.getElementById('settingsMobileSelect')
+  if (sel) sel.value = id
   window.location.hash = id
 }
 
