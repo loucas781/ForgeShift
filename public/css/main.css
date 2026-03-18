@@ -410,12 +410,12 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 }
 .cal-today-btn:hover { background: var(--bg); }
 .cal-view-tabs { display: flex; gap: 2px; margin-left: auto; }
-.cal-view-tab {
-  padding: 5px 12px; border-radius: var(--r-md); font-size: 12px; font-weight: 600;
+.cal-view-tab { padding: 5px 12px; border-radius: var(--r-md); font-size: 12px; font-weight: 600;
   border: 1px solid var(--border); background: var(--surface); color: var(--text-3);
-  cursor: pointer; transition: all var(--t-fast);
+  cursor: pointer; transition: all var(--t-fast); display: flex; align-items: center; gap: 5px;
 }
 .cal-view-tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+.cal-view-tab-icon { display: none; }
 .cal-user-filter {
   padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--r-md);
   background: var(--surface); font-size: 12px; color: var(--text); font-family: inherit;
@@ -742,6 +742,7 @@ tr:hover td { background: var(--surface-2); }
   .page-content { padding: 16px; }
   .cal-toolbar { padding: 12px 16px 8px; }
   .cal-view-tabs .cal-view-tab span { display: none; }
+  .cal-view-tabs .cal-view-tab-icon { display: inline-block; }
   .cal-title { font-size: 14px; min-width: 120px; }
   .template-grid { grid-template-columns: 1fr; }
   .modal { max-width: 100%; margin: 0; border-radius: var(--r-xl) var(--r-xl) 0 0; align-self: flex-end; }
@@ -766,3 +767,97 @@ tr:hover td { background: var(--surface-2); }
   .cal-month .cal-cell { min-height: 64px; padding: 4px; }
   .cal-month .cal-cell-date { font-size: 11px; width: 20px; height: 20px; }
 }
+
+/* ── Holiday chips ─────────────────────────────────────────────────────────── */
+.cal-holiday-chip {
+  font-size: 10px; font-weight: 500; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 3px; padding: 1px 5px; margin-bottom: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%; cursor: default; line-height: 1.5;
+}
+.cal-holiday-chip.week-holiday {
+  margin-bottom: 4px; font-size: 11px;
+}
+
+/* ── Week number gutter ────────────────────────────────────────────────────── */
+.cal-month.has-weeknums {
+  grid-template-columns: 28px repeat(7, 1fr);
+}
+.cal-wknum-header {
+  background: var(--surface-2); border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.cal-wknum {
+  background: var(--surface-2); border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); display: flex; align-items: flex-start;
+  justify-content: center; padding-top: 6px;
+  font-size: 10px; font-weight: 600; color: var(--text-3); font-family: var(--mono);
+}
+
+/* ── Compact chips mode ────────────────────────────────────────────────────── */
+.cal-month.compact-chips .cal-shift-chip {
+  font-size: 9px; padding: 1px 4px; border-radius: 3px;
+}
+.cal-month.compact-chips .cal-holiday-chip {
+  font-size: 9px; padding: 1px 3px;
+}
+
+/* ── Copy/paste ────────────────────────────────────────────────────────────── */
+.cal-cell.can-paste,
+.cal-week-day-col.can-paste {
+  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
+  outline: 2px dashed color-mix(in srgb, var(--brand) 50%, transparent);
+  outline-offset: -2px;
+}
+.cal-paste-hint {
+  font-size: 10px; font-weight: 600; color: var(--brand);
+  background: var(--brand-light); border: 1px dashed var(--brand);
+  border-radius: 3px; padding: 2px 5px; margin-top: 2px;
+  cursor: pointer; text-align: center;
+  transition: background var(--t-fast);
+}
+.cal-paste-hint:hover { background: color-mix(in srgb, var(--brand) 18%, transparent); }
+.cal-copy-hint {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: auto; padding: 4px 10px;
+  background: var(--brand-light); border: 1px solid var(--brand);
+  border-radius: var(--r-md); font-size: 12px; font-weight: 500;
+  color: var(--brand); white-space: nowrap;
+}
+
+/* ── Right-click context menu ─────────────────────────────────────────────── */
+.cal-context-menu {
+  position: fixed; z-index: 9999;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: 0 8px 24px rgba(0,0,0,.15);
+  padding: 4px; min-width: 160px;
+  animation: ctx-in 80ms ease;
+}
+@keyframes ctx-in { from { opacity:0; transform:scale(.96) } to { opacity:1; transform:scale(1) } }
+.ctx-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 10px; border: none; background: none; cursor: pointer;
+  font-family: var(--font); font-size: 13px; font-weight: 500;
+  color: var(--text); border-radius: var(--r-md); text-align: left;
+  transition: background var(--t-fast);
+}
+.ctx-item:hover { background: var(--surface-2); }
+.ctx-item.ctx-danger { color: var(--red); }
+.ctx-item.ctx-danger:hover { background: var(--red-light); }
+.ctx-sep { height: 1px; background: var(--border); margin: 3px 6px; }
+
+/* ── brand-light variable fallback (if not defined in older builds) ────────── */
+:root { --brand-light: rgba(79,70,229,.1); }
+[data-theme="dark"]  { --brand-light: rgba(99,102,241,.15); }
+[data-theme="oled"]  { --brand-light: rgba(99,102,241,.12); }
+
+/* ── Preferences panel ─────────────────────────────────────────────────────── */
+.pref-choice-btn {
+  padding: 5px 14px; border-radius: var(--r-md); font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-3);
+  cursor: pointer; transition: all var(--t-fast); font-family: var(--font);
+}
+.pref-choice-btn:hover { border-color: var(--brand); color: var(--brand); }
+.pref-choice-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+.holiday-set-row:hover { background: var(--surface-2) !important; }

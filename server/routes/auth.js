@@ -314,4 +314,128 @@ router.post('/2fa/disable', requireAuth, (req, res) => {
   }
 })
 
+// ── GET /api/auth/sessions — return current session info ─────────────────────
+// ForgeShift uses stateless JWTs with one cookie per browser — there is no
+// server-side session store, so we return a single "current session" entry
+// derived from the decoded JWT payload, matching ForgeTrack's UI shape.
+router.get('/sessions', requireAuth, (req, res) => {
+  try {
+    const ua = req.headers['user-agent'] || ''
+    // Simple browser/OS detection from UA string
+    let browser = 'Unknown browser'
+    let os      = 'Unknown OS'
+    if (/Edg\//.test(ua))          browser = 'Edge'
+    else if (/Chrome\//.test(ua))  browser = 'Chrome'
+    else if (/Firefox\//.test(ua)) browser = 'Firefox'
+    else if (/Safari\//.test(ua))  browser = 'Safari'
+    else if (/OPR\//.test(ua))     browser = 'Opera'
+    if (/Windows/.test(ua))        os = 'Windows'
+    else if (/Macintosh/.test(ua)) os = 'macOS'
+    else if (/Linux/.test(ua))     os = 'Linux'
+    else if (/Android/.test(ua))   os = 'Android'
+    else if (/iPhone|iPad/.test(ua)) os = 'iOS'
+    res.json({
+      sessions: [{
+        id:        'current',
+        label:     `${browser} on ${os}`,
+        isCurrent: true,
+      }],
+      note: 'ForgeShift uses HTTP-only cookies — only one active session per browser is tracked.',
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/logout-all — clear cookie (only session this browser has) ──
+router.post('/logout-all', requireAuth, (req, res) => {
+  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+  audit(req.user.id, 'user.logout_all', 'user', req.user.id, req.user.name)
+  res.json({ ok: true })
+})
+
+// ── GET /api/auth/export — download a JSON export of the user's own data ──────
+router.get('/export', requireAuth, (req, res) => {
+  try {
+    const uid  = req.user.id
+    const user = db.prepare('SELECT id, name, email, initials, color, role, created_at FROM users WHERE id = ?').get(uid)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    const shifts    = db.prepare('SELECT * FROM shifts    WHERE user_id = ? ORDER BY date').all(uid)
+    const icalTokens = db.prepare('SELECT token_hash, created_at FROM ical_tokens WHERE user_id = ?').all(uid)
+    const payload = {
+      exported_at: new Date().toISOString(),
+      account: user,
+      shifts,
+      ical_tokens: icalTokens.map(t => ({ created_at: t.created_at, note: 'token hash stored, raw token not recoverable' })),
+    }
+    const filename = `forgeshift-export-${user.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Content-Type', 'application/json')
+    res.send(JSON.stringify(payload, null, 2))
+    audit(uid, 'user.data_export', 'user', uid, user.name)
+  } catch (err) {
+    console.error('export error:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── DELETE /api/auth/account — permanently delete current user's account ──────
+router.delete('/account', requireAuth, async (req, res) => {
+  try {
+    const { password } = req.body
+    if (!password) return res.status(400).json({ error: 'Password is required to delete your account.' })
+    const uid  = req.user.id
+    const user = db.prepare('SELECT id, name, password, role FROM users WHERE id = ?').get(uid)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    const ok = await comparePassword(password, user.password)
+    if (!ok) return res.status(401).json({ error: 'Incorrect password.' })
+    // Last-admin guard
+    if (user.role === 'admin') {
+      const adminCount = db.prepare("SELECT COUNT(*) as c FROM users WHERE role='admin'").get().c
+      if (adminCount <= 1) return res.status(400).json({ error: 'Cannot delete the only admin account. Promote another user to admin first.' })
+    }
+    // Delete associated data then the user
+    db.prepare('DELETE FROM shifts       WHERE user_id = ?').run(uid)
+    db.prepare('DELETE FROM ical_tokens  WHERE user_id = ?').run(uid)
+    db.prepare('DELETE FROM users        WHERE id      = ?').run(uid)
+    audit(null, 'user.self_deleted', 'user', uid, user.name)
+    res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('delete account:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── GET /api/auth/prefs — get current user's preferences ─────────────────────
+router.get('/prefs', requireAuth, (req, res) => {
+  try {
+    const row = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id)
+    let prefs = {}
+    try { prefs = JSON.parse(row?.prefs || '{}') } catch {}
+    res.json(prefs)
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── PATCH /api/auth/prefs — update current user's preferences ─────────────────
+router.patch('/prefs', requireAuth, (req, res) => {
+  try {
+    const row = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id)
+    let existing = {}
+    try { existing = JSON.parse(row?.prefs || '{}') } catch {}
+    // Merge incoming keys — only allow known preference keys
+    const ALLOWED = ['weekStartDay', 'defaultView', 'showWeekNumbers', 'holidays', 'defaultShiftStart', 'defaultShiftEnd', 'compactChips']
+    const incoming = req.body || {}
+    for (const k of ALLOWED) {
+      if (k in incoming) existing[k] = incoming[k]
+    }
+    db.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(existing), req.user.id)
+    res.json(existing)
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router

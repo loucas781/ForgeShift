@@ -39,8 +39,14 @@
             </select>
           </div>
           <div class="cal-view-tabs" style="margin-left:auto">
-            <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')"><span>Month</span></button>
-            <button class="cal-view-tab" id="tabWeek" onclick="setView('week')"><span>Week</span></button>
+            <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+              <span>Month</span>
+            </button>
+            <button class="cal-view-tab" id="tabWeek" onclick="setView('week')">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+              <span>Week</span>
+            </button>
           </div>
         </div>
         <!-- Grid -->
@@ -105,11 +111,12 @@
   </div>
 </div>
 
-<script src="/js/shell.js"></script>
+<script src="/js/prefs.js"></script>
 <script>
 'use strict'
 
 let cfg = null
+let prefs = null
 let view = 'month'
 let currentDate = new Date()
 let shifts = []
@@ -118,10 +125,19 @@ let users = []
 let editingShiftId = null
 let selectedColour = '#4f46e5'
 
+// Copy/paste state
+let copiedShift = null   // { location_id, start_time, end_time, notes, note_color, is_off }
+
+// Holiday map cache: { year: { 'YYYY-MM-DD': [{name, emoji}] } }
+let _holidayCache = {}
+
 async function init() {
   cfg = await loadConfig()
   if (!cfg) return
   renderShell(cfg, 'calendar')
+  prefs = await loadPrefs()
+
+  view = prefs.defaultView || 'month'
 
   if (cfg.user.role === 'admin') {
     document.getElementById('userFilterWrap').style.display = 'block'
@@ -133,6 +149,9 @@ async function init() {
 
   document.getElementById('prevBtn').addEventListener('click', prev)
   document.getElementById('nextBtn').addEventListener('click', next)
+
+  // Context menu: dismiss on outside click
+  document.addEventListener('click', () => dismissContextMenu())
 }
 
 async function loadLocations() {
@@ -148,7 +167,6 @@ async function loadLocations() {
 async function loadUsers() {
   if (cfg.user.role !== 'admin') { users = [cfg.user]; return }
   users = await api('/api/users')
-  // Populate the "assign user" field in the shift modal
   const msel = document.getElementById('modalUser')
   users.filter(u => u.is_active).forEach(u => {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
@@ -159,17 +177,12 @@ async function loadUsers() {
 let teams = []
 async function loadTeams() {
   if (cfg.user.role !== 'admin') return
-  try {
-    teams = await api('/api/teams')
-  } catch { teams = [] }
+  try { teams = await api('/api/teams') } catch { teams = [] }
   const sel = document.getElementById('teamFilter')
-  // Clear previous options except "My shifts"
   while (sel.options.length > 1) sel.remove(1)
-  // Add "All shifts" option
   const allOpt = document.createElement('option')
   allOpt.value = 'all'; allOpt.textContent = 'All shifts'
   sel.appendChild(allOpt)
-  // Add each team
   teams.forEach(t => {
     const o = document.createElement('option')
     o.value = 'team:' + t.id
@@ -178,45 +191,51 @@ async function loadTeams() {
   })
 }
 
+// ── Holiday map ────────────────────────────────────────────────────────────────
+function getHolidayMap(year) {
+  if (_holidayCache[year]) return _holidayCache[year]
+  const enabled = prefs?.holidays || []
+  _holidayCache[year] = buildHolidayMap(year, enabled)
+  return _holidayCache[year]
+}
+
+function invalidateHolidayCache() { _holidayCache = {} }
+
+// ── Data loading ───────────────────────────────────────────────────────────────
 async function loadShifts() {
+  const weekStart = prefs?.weekStartDay ?? 1
   let start, end
   if (view === 'month') {
     const year  = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const first = new Date(year, month, 1)
     const last  = new Date(year, month + 1, 0)
-    // Pad to Monday-first full weeks
-    const startOffset = (first.getDay() + 6) % 7
+    const startOffset = (first.getDay() - weekStart + 7) % 7
     start = new Date(year, month, 1 - startOffset)
-    const endOffset = (last.getDay() === 0) ? 0 : 7 - last.getDay()
-    end   = new Date(year, month, last.getDate() + endOffset)
+    const lastDay = last.getDay()
+    const endOffset = (weekStart + 6 - lastDay + 7) % 7
+    end = new Date(year, month, last.getDate() + endOffset)
   } else {
-    start = startOfWeek(currentDate, 1)
+    start = startOfWeek(currentDate, weekStart)
     end   = new Date(start); end.setDate(end.getDate() + 6)
   }
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
   if (cfg.user.role !== 'admin') {
-    // Non-admins only see their own shifts
     params.set('user_id', cfg.user.id)
-  } else if (filterVal === '' ) {
-    // "My shifts" — admin views only their own
+  } else if (filterVal === '') {
     params.set('user_id', cfg.user.id)
   } else if (filterVal === 'all') {
-    // All shifts — no user_id filter
+    // no filter
   } else if (filterVal.startsWith('team:')) {
     const teamId = filterVal.slice(5)
     const team = teams.find(t => t.id === teamId)
     if (team && team.members.length) {
-      // Fetch shifts for each team member in parallel then merge
-      const fetches = team.members
-        .filter(m => m.is_active)
-        .map(m => {
-          const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
-          return api('/api/shifts?' + p)
-        })
-      const results = await Promise.all(fetches)
-      shifts = results.flat()
+      const fetches = team.members.filter(m => m.is_active).map(m => {
+        const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
+        return api('/api/shifts?' + p)
+      })
+      shifts = (await Promise.all(fetches)).flat()
       return
     }
   }
@@ -228,16 +247,18 @@ async function renderView() {
   updateTitle()
   if (view === 'month') renderMonth()
   else renderWeek()
-  // Update tab styles
   document.getElementById('tabMonth').className = 'cal-view-tab' + (view==='month'?' active':'')
   document.getElementById('tabWeek').className  = 'cal-view-tab' + (view==='week'?' active':'')
+  // Update copy indicator
+  updatePasteHint()
 }
 
 function updateTitle() {
+  const weekStart = prefs?.weekStartDay ?? 1
   if (view === 'month') {
     document.getElementById('calTitle').textContent = MONTH_NAMES[currentDate.getMonth()] + ' ' + currentDate.getFullYear()
   } else {
-    const ws = startOfWeek(currentDate, 1)
+    const ws = startOfWeek(currentDate, weekStart)
     const we = new Date(ws); we.setDate(we.getDate() + 6)
     document.getElementById('calTitle').textContent =
       ws.getDate() + ' ' + MONTH_NAMES[ws.getMonth()].slice(0,3) + ' – ' +
@@ -245,61 +266,99 @@ function updateTitle() {
   }
 }
 
+// ── Month render ───────────────────────────────────────────────────────────────
 function renderMonth() {
-  const grid = document.getElementById('calGrid')
-  const today = toDateStr(new Date())
-  const year  = currentDate.getFullYear()
-  const month = currentDate.getMonth()
-  const first = new Date(year, month, 1)
-  const last  = new Date(year, month + 1, 0)
+  const grid       = document.getElementById('calGrid')
+  const today      = toDateStr(new Date())
+  const year       = currentDate.getFullYear()
+  const month      = currentDate.getMonth()
+  const first      = new Date(year, month, 1)
+  const last       = new Date(year, month + 1, 0)
+  const weekStart  = prefs?.weekStartDay ?? 1
+  const showWkNums = prefs?.showWeekNumbers ?? false
+  const compact    = prefs?.compactChips ?? false
+  const holidays   = getHolidayMap(year)
 
-  // Monday-first: Mon=0 ... Sun=6
-  const startOffset = (first.getDay() + 6) % 7
+  const startOffset = (first.getDay() - weekStart + 7) % 7
   const totalCells  = Math.ceil((startOffset + last.getDate()) / 7) * 7
 
-  // Build shift map: date -> [shifts]
   const shiftMap = {}
-  shifts.forEach(s => {
-    if (!shiftMap[s.date]) shiftMap[s.date] = []
-    shiftMap[s.date].push(s)
-  })
+  shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
-  const MON_ABBR = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-  let html = '<div class="cal-month">'
-  MON_ABBR.forEach(d => { html += '<div class="cal-day-header">' + d + '</div>' })
+  // Build ordered day abbreviations starting from weekStart
+  const allAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  const dayAbbrs = Array.from({length:7}, (_,i) => allAbbr[(weekStart + i) % 7])
+
+  let html = '<div class="cal-month' + (compact?' compact-chips':'') + (showWkNums?' has-weeknums':'') + '">'
+
+  // Week number header gutter
+  if (showWkNums) html += '<div class="cal-wknum-header"></div>'
+  dayAbbrs.forEach(d => { html += '<div class="cal-day-header">' + d + '</div>' })
 
   for (let i = 0; i < totalCells; i++) {
-    const d = new Date(year, month, 1 - startOffset + i)
+    const d  = new Date(year, month, 1 - startOffset + i)
     const ds = toDateStr(d)
     const isCurrentMonth = d.getMonth() === month
-    const isToday = ds === today
-    const dayShifts = shiftMap[ds] || []
+    const isToday        = ds === today
+    const dayShifts      = shiftMap[ds] || []
+    const dayHols        = holidays[ds] || []
 
-    html += '<div class="cal-cell' + (isCurrentMonth ? '' : ' other-month') + (isToday ? ' today' : '') + '" data-date="' + ds + '" onclick="openCreateModal(\'' + ds + '\')">' 
+    // Week number at start of each row
+    if (showWkNums && i % 7 === 0) {
+      html += '<div class="cal-wknum">' + _isoWeekNumber(d) + '</div>'
+    }
+
+    const hasPaste = copiedShift && dayShifts.length === 0
+
+    html += '<div class="cal-cell' +
+      (isCurrentMonth ? '' : ' other-month') +
+      (isToday ? ' today' : '') +
+      (hasPaste ? ' can-paste' : '') +
+      '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')">'
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
+
+    // Holiday chips
+    dayHols.forEach(h => {
+      html += '<div class="cal-holiday-chip" title="' + h.name + '">' + h.emoji + ' ' + h.name + '</div>'
+    })
+
+    // Shift chips
     dayShifts.forEach(s => {
       const color = s.location_color || s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift')
       const name  = cfg.user.role === 'admin' && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
-      html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + '" style="background:' + color + '" title="' + (s.user_name || '') + ': ' + label + '" onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')">' + name + label + '</div>'
+      html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') +
+        '" style="background:' + color + '"' +
+        ' title="' + (s.user_name || '') + ': ' + label + '"' +
+        ' onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')"' +
+        ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')">' +
+        name + label + '</div>'
     })
+
+    // Paste hint
+    if (hasPaste) {
+      html += '<div class="cal-paste-hint" onclick="event.stopPropagation();pasteShift(\'' + ds + '\')">📋 Paste</div>'
+    }
+
     html += '</div>'
   }
   html += '</div>'
   grid.innerHTML = html
 }
+
+// ── Week render ────────────────────────────────────────────────────────────────
 function renderWeek() {
-  const grid = document.getElementById('calGrid')
-  const today = toDateStr(new Date())
-  const ws    = startOfWeek(currentDate, 1)
+  const grid      = document.getElementById('calGrid')
+  const today     = toDateStr(new Date())
+  const weekStart = prefs?.weekStartDay ?? 1
+  const ws        = startOfWeek(currentDate, weekStart)
+  const year      = ws.getFullYear()
+  const holidays  = getHolidayMap(year)
+
   const shiftMap = {}
-  shifts.forEach(s => {
-    if (!shiftMap[s.date]) shiftMap[s.date] = []
-    shiftMap[s.date].push(s)
-  })
+  shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
   let html = `<div class="cal-week">`
-  // time gutter header
   html += `<div style="border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);padding:10px 4px;"></div>`
   for (let i = 0; i < 7; i++) {
     const d = new Date(ws); d.setDate(d.getDate() + i)
@@ -310,56 +369,178 @@ function renderWeek() {
       <div class="day-num">${d.getDate()}</div>
     </div>`
   }
-  // time gutter body + day columns
   html += `<div class="cal-week-time-col" style="padding:8px 4px;font-size:11px;color:var(--text-3)">`
   for (let h = 7; h <= 21; h++) html += `<div style="height:40px;padding-top:2px">${h}:00</div>`
   html += `</div>`
   for (let i = 0; i < 7; i++) {
-    const d = new Date(ws); d.setDate(d.getDate() + i)
+    const d  = new Date(ws); d.setDate(d.getDate() + i)
     const ds = toDateStr(d)
     const dayShifts = shiftMap[ds] || []
-    html += `<div class="cal-week-day-col" onclick="openCreateModal('${ds}')">`
+    const dayHols   = holidays[ds] || []
+    const hasPaste  = copiedShift && dayShifts.length === 0
+    html += `<div class="cal-week-day-col${hasPaste?' can-paste':''}" onclick="handleCellClick('${ds}')">`
     html += `<div class="cal-week-shifts">`
+    dayHols.forEach(h => {
+      html += `<div class="cal-holiday-chip week-holiday" title="${h.name}">${h.emoji} ${h.name}</div>`
+    })
     dayShifts.forEach(s => {
       const color = s.location_color || s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
       const time  = s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : ''
-      html += `<div class="cal-week-shift-card" style="background:${color}" onclick="event.stopPropagation();openEditModal('${s.id}')">
-        <div class="shift-loc">${cfg.user.role==='admin' ? (s.user_name?.split(' ')[0]+': '):''}${label}</div>
+      html += `<div class="cal-week-shift-card" style="background:${color}"
+        onclick="event.stopPropagation();openEditModal('${s.id}')"
+        oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')">
+        <div class="shift-loc">${cfg.user.role==='admin'?(s.user_name?.split(' ')[0]+': '):''}${label}</div>
         ${time ? `<div class="shift-time">${time}</div>` : ''}
         ${s.notes ? `<div class="shift-notes">${s.notes.slice(0,60)}${s.notes.length>60?'…':''}</div>` : ''}
       </div>`
     })
+    if (hasPaste) {
+      html += `<div class="cal-paste-hint" onclick="event.stopPropagation();pasteShift('${ds}')">📋 Paste shift</div>`
+    }
     html += `</div></div>`
   }
   html += `</div>`
   grid.innerHTML = html
 }
 
+// ── ISO week number helper ─────────────────────────────────────────────────────
+function _isoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
+}
+
+// ── Nav ────────────────────────────────────────────────────────────────────────
 function prev() {
   if (view === 'month') currentDate.setMonth(currentDate.getMonth() - 1)
   else currentDate.setDate(currentDate.getDate() - 7)
   renderView()
 }
-
 function next() {
   if (view === 'month') currentDate.setMonth(currentDate.getMonth() + 1)
   else currentDate.setDate(currentDate.getDate() + 7)
   renderView()
 }
-
 function goToday() { currentDate = new Date(); renderView() }
 function setView(v) { view = v; renderView() }
+
+// ── Cell click — aware of paste mode ──────────────────────────────────────────
+function handleCellClick(date) {
+  dismissContextMenu()
+  if (copiedShift) {
+    // Paste if the day is empty; otherwise open create modal pre-filled
+    const dayHasShift = shifts.some(s => s.date === date)
+    if (!dayHasShift) { pasteShift(date); return }
+  }
+  openCreateModal(date)
+}
+
+// ── Copy / Paste ───────────────────────────────────────────────────────────────
+function copyShift(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  copiedShift = {
+    location_id: s.location_id,
+    start_time:  s.start_time,
+    end_time:    s.end_time,
+    notes:       s.notes,
+    note_color:  s.note_color,
+    is_off:      s.is_off,
+  }
+  if (cfg.user.role === 'admin') copiedShift.user_id = s.user_id
+  updatePasteHint()
+  renderView()
+  toast('Shift copied — click an empty day to paste', 'success', 2500)
+}
+
+async function pasteShift(date) {
+  if (!copiedShift) return
+  try {
+    await api('/api/shifts', { method: 'POST', body: { ...copiedShift, date } })
+    toast('Shift pasted', 'success')
+    renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+function clearCopy() {
+  copiedShift = null
+  updatePasteHint()
+  renderView()
+}
+
+function updatePasteHint() {
+  let hint = document.getElementById('copyPasteHint')
+  if (copiedShift) {
+    if (!hint) {
+      hint = document.createElement('div')
+      hint.id = 'copyPasteHint'
+      hint.className = 'cal-copy-hint'
+      hint.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+        Paste mode — click any empty day &nbsp;
+        <button onclick="clearCopy()" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0;opacity:.7;font-size:13px">✕ Cancel</button>`
+      document.querySelector('.cal-toolbar').appendChild(hint)
+    }
+  } else if (hint) {
+    hint.remove()
+  }
+}
+
+// ── Context menu ───────────────────────────────────────────────────────────────
+function showShiftContextMenu(e, id) {
+  dismissContextMenu()
+  const menu = document.createElement('div')
+  menu.id = 'shiftContextMenu'
+  menu.className = 'cal-context-menu'
+  menu.style.top  = e.clientY + 'px'
+  menu.style.left = e.clientX + 'px'
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="copyShift('${id}');dismissContextMenu()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+      Copy shift
+    </button>
+    <button class="ctx-item" onclick="openEditModal('${id}');dismissContextMenu()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+      Edit shift
+    </button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item ctx-danger" onclick="quickDeleteShift('${id}');dismissContextMenu()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+      Delete shift
+    </button>`
+  document.body.appendChild(menu)
+  // Nudge if off-screen
+  const r = menu.getBoundingClientRect()
+  if (r.right  > window.innerWidth)  menu.style.left = (e.clientX - r.width)  + 'px'
+  if (r.bottom > window.innerHeight) menu.style.top  = (e.clientY - r.height) + 'px'
+}
+
+function dismissContextMenu() {
+  document.getElementById('shiftContextMenu')?.remove()
+}
+
+async function quickDeleteShift(id) {
+  if (!confirm('Delete this shift?')) return
+  try {
+    await api(`/api/shifts/${id}`, { method: 'DELETE' })
+    toast('Shift deleted', 'success')
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
 function openCreateModal(date) {
   editingShiftId = null
   selectedColour = '#4f46e5'
   document.getElementById('modalTitle').textContent = 'Add Shift'
-  document.getElementById('modalDate').value = date
+  document.getElementById('modalDate').value  = date
   document.getElementById('modalLocation').value = ''
-  document.getElementById('modalStart').value = ''
-  document.getElementById('modalEnd').value = ''
+  // Pre-fill default times from prefs
+  document.getElementById('modalStart').value = prefs?.defaultShiftStart || ''
+  document.getElementById('modalEnd').value   = prefs?.defaultShiftEnd   || ''
   document.getElementById('modalNotes').value = ''
   document.getElementById('modalIsOff').checked = false
   document.getElementById('deleteShiftBtn').style.display = 'none'
@@ -374,10 +555,10 @@ function openEditModal(id) {
   editingShiftId = id
   selectedColour = s.note_color || '#4f46e5'
   document.getElementById('modalTitle').textContent = 'Edit Shift'
-  document.getElementById('modalDate').value = s.date
+  document.getElementById('modalDate').value  = s.date
   document.getElementById('modalLocation').value = s.location_id || ''
   document.getElementById('modalStart').value = s.start_time || ''
-  document.getElementById('modalEnd').value = s.end_time || ''
+  document.getElementById('modalEnd').value   = s.end_time || ''
   document.getElementById('modalNotes').value = s.notes || ''
   document.getElementById('modalIsOff').checked = !!s.is_off
   document.getElementById('deleteShiftBtn').style.display = 'flex'
@@ -437,7 +618,6 @@ async function deleteShift() {
   }
 }
 
-// Close modal on overlay click
 document.getElementById('shiftModal').addEventListener('click', e => {
   if (e.target === document.getElementById('shiftModal')) closeModal()
 })

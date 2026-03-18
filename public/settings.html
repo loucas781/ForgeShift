@@ -10,6 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/js/password-policy.js"></script>
+  <script src="/js/prefs.js"></script>
   <script>
     // Apply theme immediately to avoid flash
     (function(){
@@ -123,7 +124,7 @@
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
-  <div class="app-body" style="flex-direction:column;overflow:hidden">
+  <div class="app-body" style="flex:1;min-height:0;flex-direction:column;overflow:hidden">
     <div class="settings-tabs-wrap">
       <!-- Desktop: horizontal tab bar -->
       <div class="settings-tabs" id="settingsTabs"></div>
@@ -239,6 +240,8 @@ async function init() {
   cfg = await loadConfig()
   if (!cfg) return
   renderShell(cfg, 'settings')
+  // Load user prefs so the Preferences panel can show current values
+  await loadPrefs()
 
   const isAdmin = cfg.user.role === 'admin'
 
@@ -247,6 +250,8 @@ async function init() {
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
     { id: 'ical', label: 'Calendar Feed', adminOnly: false,
       icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
+    { id: 'preferences', label: 'Preferences', adminOnly: false,
+      icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
     { id: 'team', label: 'Team', adminOnly: true,
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
@@ -262,6 +267,8 @@ async function init() {
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
     { id: 'buildinfo', label: 'Build Info', adminOnly: true,
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
+    { id: 'account', label: 'Account', adminOnly: false,
+      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
     { id: 'about', label: 'About', adminOnly: false,
       icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
@@ -295,6 +302,7 @@ async function init() {
   await Promise.all([
     renderAppearancePanel(),
     renderIcalPanel(),
+    renderPreferencesPanel(),
     isAdmin ? renderTeamPanel() : Promise.resolve(),
     isAdmin ? renderLocationsPanel() : Promise.resolve(),
     isAdmin ? renderSecurityPanel() : Promise.resolve(),
@@ -302,6 +310,7 @@ async function init() {
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
     isAdmin ? renderBuildInfoPanel() : Promise.resolve(),
+    renderAccountPanel(),
     renderAboutPanel(),
   ])
 
@@ -375,6 +384,167 @@ function pickTheme(theme) {
   document.getElementById('themeOpt-' + theme)?.classList.add('active')
   document.getElementById('currentThemeName').textContent = theme
   toast('Theme set to ' + theme, 'success', 1500)
+}
+
+// ── Preferences panel ──────────────────────────────────────────────────────────
+async function renderPreferencesPanel() {
+  const el = document.getElementById('panel-preferences')
+  if (!el) return
+  const p = getPrefs()
+
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Preferences</h2>
+    <p style="font-size:13px;color:var(--text-3);margin-bottom:20px;margin-top:-12px">
+      These preferences only affect your view — they don't change anything for other users.
+    </p>
+
+    <!-- Calendar display -->
+    <div class="card section-card">
+      <div class="card-header">
+        <h3 class="card-title">Calendar</h3>
+        <button class="btn btn-primary btn-sm" onclick="savePrefsPanel()">Save</button>
+      </div>
+      <div class="card-body">
+
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Week starts on</strong>
+            <span>Choose whether your week begins on Monday or Sunday</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="pref-choice-btn${p.weekStartDay===1?' active':''}" id="wsd-mon" onclick="pickWeekStart(1)">Monday</button>
+            <button class="pref-choice-btn${p.weekStartDay===0?' active':''}" id="wsd-sun" onclick="pickWeekStart(0)">Sunday</button>
+          </div>
+        </div>
+
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Default view</strong>
+            <span>Which calendar view opens when you visit the calendar</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="pref-choice-btn${p.defaultView==='month'?' active':''}" id="dv-month" onclick="pickDefaultView('month')">Month</button>
+            <button class="pref-choice-btn${p.defaultView==='week'?' active':''}" id="dv-week" onclick="pickDefaultView('week')">Week</button>
+          </div>
+        </div>
+
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Show week numbers</strong>
+            <span>Display ISO week numbers in the left gutter of the month view</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="prefShowWkNums" ${p.showWeekNumbers?'checked':''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Compact shift chips</strong>
+            <span>Show smaller shift chips in month view — useful on busy rotas</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="prefCompact" ${p.compactChips?'checked':''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Shift defaults -->
+    <div class="card section-card">
+      <div class="card-header">
+        <h3 class="card-title">Shift Defaults</h3>
+        <button class="btn btn-primary btn-sm" onclick="savePrefsPanel()">Save</button>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+          These times are pre-filled when you create a new shift. Leave blank to keep the fields empty.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:320px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Default start time</label>
+            <input type="time" class="form-input" id="prefDefaultStart" value="${p.defaultShiftStart||''}">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Default end time</label>
+            <input type="time" class="form-input" id="prefDefaultEnd" value="${p.defaultShiftEnd||''}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Holiday calendars -->
+    <div class="card section-card">
+      <div class="card-header">
+        <h3 class="card-title">Holiday Calendars</h3>
+        <button class="btn btn-primary btn-sm" onclick="savePrefsPanel()">Save</button>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+          Select which holiday sets to overlay on your calendar. These are shown as small chips on the relevant dates and only affect your view.
+        </p>
+        <div id="holidaySetsGrid" style="display:grid;gap:8px">
+          ${HOLIDAY_SETS.map(s => `
+            <label style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);cursor:pointer;transition:background var(--t-fast)" class="holiday-set-row">
+              <input type="checkbox" id="hol-${s.id}" ${(p.holidays||[]).includes(s.id)?'checked':''}
+                style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer;flex-shrink:0">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600">${s.emoji} ${s.label}</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:1px">${s.region}</div>
+              </div>
+            </label>`).join('')}
+        </div>
+        <p style="font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.5">
+          Holiday data is built-in and works offline. Moveable feasts (Easter, bank holidays, lunar festivals) are calculated for each year. Data covers 2020–2035.
+        </p>
+      </div>
+    </div>`
+}
+
+function pickWeekStart(day) {
+  document.getElementById('wsd-mon')?.classList.toggle('active', day === 1)
+  document.getElementById('wsd-sun')?.classList.toggle('active', day === 0)
+  window._pendingWeekStart = day
+}
+
+function pickDefaultView(v) {
+  document.getElementById('dv-month')?.classList.toggle('active', v === 'month')
+  document.getElementById('dv-week')?.classList.toggle('active', v === 'week')
+  window._pendingDefaultView = v
+}
+
+async function savePrefsPanel() {
+  // Read all controls
+  const wsd = window._pendingWeekStart !== undefined
+    ? window._pendingWeekStart
+    : (document.getElementById('wsd-sun')?.classList.contains('active') ? 0 : 1)
+  const dv = window._pendingDefaultView !== undefined
+    ? window._pendingDefaultView
+    : (document.getElementById('dv-week')?.classList.contains('active') ? 'week' : 'month')
+
+  const holidays = HOLIDAY_SETS
+    .filter(s => document.getElementById('hol-' + s.id)?.checked)
+    .map(s => s.id)
+
+  const updates = {
+    weekStartDay:      wsd,
+    defaultView:       dv,
+    showWeekNumbers:   document.getElementById('prefShowWkNums')?.checked ?? false,
+    compactChips:      document.getElementById('prefCompact')?.checked ?? false,
+    defaultShiftStart: document.getElementById('prefDefaultStart')?.value || '',
+    defaultShiftEnd:   document.getElementById('prefDefaultEnd')?.value || '',
+    holidays,
+  }
+
+  // Clear pending
+  delete window._pendingWeekStart
+  delete window._pendingDefaultView
+
+  await savePrefs(updates)
+  toast('Preferences saved', 'success')
 }
 
 // ── iCal panel ─────────────────────────────────────────────────────────────────
@@ -1659,6 +1829,124 @@ async function renderBuildInfoPanel() {
           </div>`).join('')}
       </div>`
   } catch {}
+}
+
+// ── Account panel ─────────────────────────────────────────────────────────────
+async function renderAccountPanel() {
+  const el = document.getElementById('panel-account')
+  if (!el) return
+
+  // Fetch session info
+  let sessionsData = null
+  try { sessionsData = await api('/api/auth/sessions') } catch {}
+
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Account</h2>
+
+    <!-- Active Sessions -->
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Active Sessions</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+          ${sessionsData?.note || 'ForgeShift uses HTTP-only cookies — only one active session per browser is tracked.'}
+        </p>
+        <div id="sessionsList">
+          ${sessionsData?.sessions?.map(s => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="color:var(--text-3)"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/></svg>
+                <span style="font-size:13px;font-weight:500">${s.label}</span>
+              </div>
+              ${s.isCurrent ? '<span class="badge badge-green" style="font-size:11px">ACTIVE</span>' : ''}
+            </div>`).join('') || '<p style="font-size:13px;color:var(--text-3)">No session data available.</p>'}
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="signOutEverywhere()">Sign out everywhere</button>
+      </div>
+    </div>
+
+    <!-- Export My Data -->
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Export My Data</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
+          Download a JSON file containing all your account data, shifts you have been assigned, and calendar feed tokens.
+        </p>
+        <a href="/api/auth/export" class="btn btn-secondary btn-sm" download style="display:inline-flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          Download my data
+        </a>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="card section-card" style="border-color:rgba(220,38,38,.3)">
+      <div class="card-header" style="border-bottom-color:rgba(220,38,38,.2)">
+        <h3 class="card-title" style="color:var(--red)">Danger Zone</h3>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:4px">
+          Permanently delete your account and all associated data. This cannot be undone.
+        </p>
+        <p style="font-size:12px;color:var(--text-3);margin-bottom:16px">
+          <strong>Note:</strong> As an admin, deleting your account will only work if at least one other admin exists.
+        </p>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="openDeleteAccountModal()">
+          Delete my account
+        </button>
+      </div>
+    </div>`
+}
+
+async function signOutEverywhere() {
+  if (!confirm('This will sign you out on this browser. Continue?')) return
+  try {
+    await api('/api/auth/logout-all', { method: 'POST' })
+    window.location.href = '/login.html'
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function openDeleteAccountModal() {
+  const existing = document.getElementById('deleteAccountModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'deleteAccountModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--red)">Delete My Account</h3>
+        <button class="modal-close" onclick="document.getElementById('deleteAccountModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="padding:12px 14px;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);border-radius:var(--r-md);font-size:13px;color:var(--red);margin-bottom:16px;line-height:1.5">
+          <strong>This action is permanent and cannot be undone.</strong> Your account, all shifts, and calendar tokens will be deleted immediately.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm your password</label>
+          <input type="password" class="form-input" id="deleteAccountPw" placeholder="Enter your password to confirm" autocomplete="current-password">
+        </div>
+        <div id="deleteAccountErr" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('deleteAccountModal').remove()">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="doDeleteAccount()">Delete my account</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('deleteAccountPw')?.focus(), 50)
+}
+
+async function doDeleteAccount() {
+  const pw  = document.getElementById('deleteAccountPw').value
+  const err = document.getElementById('deleteAccountErr')
+  if (!pw) { err.style.display = 'block'; err.textContent = 'Password is required.'; return }
+  err.style.display = 'none'
+  try {
+    await api('/api/auth/account', { method: 'DELETE', body: { password: pw } })
+    window.location.href = '/login.html'
+  } catch (e) { err.style.display = 'block'; err.textContent = e.message }
 }
 
 // ── About panel ───────────────────────────────────────────────────────────────

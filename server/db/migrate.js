@@ -189,6 +189,10 @@ function migrateAdditive() {
     db.exec("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
     console.log('✓ Added totp_enabled column')
   }
+  if (!cols.includes('prefs')) {
+    db.exec("ALTER TABLE users ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}'")
+    console.log('✓ Added prefs column')
+  }
 }
 
 try {
