@@ -220,21 +220,26 @@ function openEditTmpl(id) {
   document.getElementById('tmplModal').classList.add('open')
 }
 
-function closeTmplModal() { document.getElementById('tmplModal').classList.remove('open') }
+function closeTmplModal() {
+  closeCopyDayMenu()
+  document.getElementById('tmplModal').classList.remove('open')
+}
 
 function renderDayEditor() {
   const grid = document.getElementById('dayEditorGrid')
   grid.innerHTML = ''
-  // 0=Mon, 6=Sun
   for (let i = 0; i < 7; i++) {
     const cfg_day = dayConfigs[i] || { note_color: '#4f46e5', is_off: 0 }
     const cell = document.createElement('div')
     cell.className = 'day-editor-cell'
     cell.innerHTML = `
-      <div class="day-editor-cell-header">
+      <div class="day-editor-cell-header" id="dc_hdr_${i}">
         <span class="day-label">${DAY_FULL[i]}</span>
-        <button class="day-copy-btn" onclick="openCopyDayMenu(event,${i})" title="Copy day to…">
-          <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><path d="M10.5 1.5A1.5 1.5 0 0112 3v7a1.5 1.5 0 01-1.5 1.5h-6A1.5 1.5 0 013 10V3A1.5 1.5 0 014.5 1.5h6zm0 1h-6a.5.5 0 00-.5.5v7a.5.5 0 00.5.5h6a.5.5 0 00.5-.5V3a.5.5 0 00-.5-.5z"/><path d="M5 0h6A1.5 1.5 0 0112.5 1.5v.5h-1v-.5A.5.5 0 0011 1H5a.5.5 0 00-.5.5V10h-1V1.5A1.5 1.5 0 015 0z"/></svg>
+        <button class="day-copy-btn" id="dc_copybtn_${i}" title="Copy this day to other days…">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+            <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z"/>
+            <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z"/>
+          </svg>
         </button>
       </div>
       <div class="day-editor-cell-body">
@@ -260,62 +265,91 @@ function renderDayEditor() {
       </div>`
     grid.appendChild(cell)
 
+    // Wire up copy button
+    document.getElementById(`dc_copybtn_${i}`).addEventListener('click', e => {
+      e.stopPropagation()
+      openCopyDayMenu(i)
+    })
+
     // Colour picker
     const colContainer = document.getElementById(`dc_colours_${i}`)
     let thisColour = cfg_day.note_color || '#4f46e5'
     renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v })
-    // Store initial colour
     if (!dayConfigs[i]) dayConfigs[i] = {}
     dayConfigs[i].note_color = thisColour
   }
 }
 
-// ── Copy day ───────────────────────────────────────────────────────────────────
+// ── Copy day (portal dropdown — fixed position to escape overflow:hidden) ──────
 let _copyDdSrc = null
+let _copyDdEl  = null
 
-function openCopyDayMenu(evt, srcDay) {
-  evt.stopPropagation()
-  closeAllCopyMenus()
+function openCopyDayMenu(srcDay) {
+  closeCopyDayMenu()
   _copyDdSrc = srcDay
 
-  const header = evt.currentTarget.closest('.day-editor-cell-header')
+  const btn = document.getElementById(`dc_copybtn_${srcDay}`)
+  const rect = btn.getBoundingClientRect()
+
   const dd = document.createElement('div')
   dd.className = 'copy-day-dropdown'
   dd.id = 'copyDayDd'
 
-  const targets = DAY_FULL.filter((_, i) => i !== srcDay)
-  const targetIdxs = Array.from({length:7}, (_, i) => i).filter(i => i !== srcDay)
-
+  const targets = Array.from({length:7}, (_,i) => i).filter(i => i !== srcDay)
   dd.innerHTML = `
-    <div class="copy-dd-label">Copy to…</div>
-    ${targetIdxs.map(i => `<button onclick="copyDayTo(${srcDay},${i})">${DAY_FULL[i]}</button>`).join('')}
-    <hr>
-    <button onclick="copyDayToAll(${srcDay})">All other days</button>`
+    <span class="copy-dd-label">Copy ${DAY_FULL[srcDay]} to…</span>
+    ${targets.map(i => `<button data-target="${i}">${DAY_FULL[i]}</button>`).join('')}
+    <hr class="copy-dd-sep">
+    <button data-target="all">All other days</button>`
 
-  header.appendChild(dd)
-  setTimeout(() => document.addEventListener('click', closeAllCopyMenus, {once:true}), 0)
+  dd.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation()
+      const t = b.dataset.target
+      if (t === 'all') copyDayToAll(srcDay)
+      else copyDayTo(srcDay, parseInt(t))
+    })
+  })
+
+  document.body.appendChild(dd)
+  _copyDdEl = dd
+
+  // Position: prefer below-right of button, flip up if near bottom
+  const ddW = 170, ddH = 8 + 20 + targets.length * 30 + 24
+  let top = rect.bottom + 4
+  let left = rect.right - ddW
+  if (top + ddH > window.innerHeight - 8) top = rect.top - ddH - 4
+  if (left < 8) left = 8
+  dd.style.top  = top  + 'px'
+  dd.style.left = left + 'px'
+  dd.style.width = ddW + 'px'
+
+  // Close on any outside click
+  setTimeout(() => document.addEventListener('click', _onDocClickCloseCopyDd), 0)
 }
 
-function closeAllCopyMenus() {
-  document.getElementById('copyDayDd')?.remove()
+function _onDocClickCloseCopyDd(e) {
+  if (_copyDdEl && !_copyDdEl.contains(e.target)) closeCopyDayMenu()
+}
+
+function closeCopyDayMenu() {
+  if (_copyDdEl) { _copyDdEl.remove(); _copyDdEl = null }
+  document.removeEventListener('click', _onDocClickCloseCopyDd)
   _copyDdSrc = null
 }
 
 function snapshotDay(dayIdx) {
-  // Read current live values from DOM into dayConfigs
   if (!dayConfigs[dayIdx]) dayConfigs[dayIdx] = {}
   dayConfigs[dayIdx].location_id = document.getElementById(`dc_loc_${dayIdx}`)?.value || null
   dayConfigs[dayIdx].start_time  = document.getElementById(`dc_start_${dayIdx}`)?.value || null
   dayConfigs[dayIdx].end_time    = document.getElementById(`dc_end_${dayIdx}`)?.value || null
   dayConfigs[dayIdx].notes       = document.getElementById(`dc_notes_${dayIdx}`)?.value.trim() || null
   dayConfigs[dayIdx].is_off      = document.getElementById(`dc_off_${dayIdx}`)?.checked || false
-  // note_color is already kept in sync via renderColourPicker callback
   return { ...dayConfigs[dayIdx] }
 }
 
 function applyDaySnapshot(snap, targetIdx) {
   dayConfigs[targetIdx] = { ...snap, day_of_week: targetIdx }
-  // Update DOM fields directly
   const locEl = document.getElementById(`dc_loc_${targetIdx}`)
   if (locEl) locEl.value = snap.location_id || ''
   const startEl = document.getElementById(`dc_start_${targetIdx}`)
@@ -326,7 +360,6 @@ function applyDaySnapshot(snap, targetIdx) {
   if (notesEl) notesEl.value = snap.notes || ''
   const offEl = document.getElementById(`dc_off_${targetIdx}`)
   if (offEl) offEl.checked = !!snap.is_off
-  // Re-render colour picker for this target
   const colContainer = document.getElementById(`dc_colours_${targetIdx}`)
   if (colContainer) {
     const colour = snap.note_color || '#4f46e5'
@@ -336,14 +369,14 @@ function applyDaySnapshot(snap, targetIdx) {
 }
 
 function copyDayTo(srcIdx, targetIdx) {
-  closeAllCopyMenus()
+  closeCopyDayMenu()
   const snap = snapshotDay(srcIdx)
   applyDaySnapshot(snap, targetIdx)
   toast(`${DAY_FULL[srcIdx]} copied to ${DAY_FULL[targetIdx]}`, 'success', 2000)
 }
 
 function copyDayToAll(srcIdx) {
-  closeAllCopyMenus()
+  closeCopyDayMenu()
   const snap = snapshotDay(srcIdx)
   for (let i = 0; i < 7; i++) {
     if (i !== srcIdx) applyDaySnapshot(snap, i)
@@ -351,11 +384,11 @@ function copyDayToAll(srcIdx) {
   toast(`${DAY_FULL[srcIdx]} copied to all days`, 'success', 2000)
 }
 
+// ── Save / Delete ──────────────────────────────────────────────────────────────
 async function saveTmpl() {
   const name = document.getElementById('tmplName').value.trim()
   if (!name) { toast('Template name is required', 'error'); return }
 
-  // Collect day configs
   const days = []
   for (let i = 0; i < 7; i++) {
     const dc = dayConfigs[i] || {}
@@ -428,7 +461,6 @@ async function duplicateTmpl(id) {
 // ── Apply Template ─────────────────────────────────────────────────────────────
 function openApplyTmpl(id) {
   applyingTmplId = id
-  // Default to next Monday
   const d = new Date()
   const day = d.getDay()
   const diff = day === 1 ? 0 : (8 - day) % 7 || 7
