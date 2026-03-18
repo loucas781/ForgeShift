@@ -150,10 +150,11 @@ function renderTemplateGrid() {
       const d = dayMap[i]
       if (!d) return `<div class="template-day-cell"><div class="day-abbr">${dayAbbrs[i]}</div><div class="day-loc">—</div></div>`
       const locName = d.location_id ? (locations.find(l=>l.id===d.location_id)?.name||'?') : (d.is_off?'Off':'—')
+      const swatchColor = (d.location_id ? locations.find(l=>l.id===d.location_id)?.color : null) || d.note_color || '#4f46e5'
       return `<div class="template-day-cell">
         <div class="day-abbr">${dayAbbrs[i]}</div>
         <div class="day-loc" title="${locName}">${locName}</div>
-        <div class="day-swatch" style="background:${d.note_color||'#4f46e5'}"></div>
+        <div class="day-swatch" style="background:${swatchColor}"></div>
       </div>`
     }).join('')
 

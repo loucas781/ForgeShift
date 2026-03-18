@@ -189,7 +189,7 @@ async function changePassword() {
   const v = validatePasswordClient(npw)
   if (!v.ok)              { toast(v.errors[0], 'error'); return }
   try {
-    await api('/api/auth/change-password', { method: 'POST', body: { currentPassword: cur, newPassword: npw } })
+    await api('/api/auth/profile', { method: 'PATCH', body: { currentPassword: cur, newPassword: npw } })
     toast('Password updated', 'success')
     document.getElementById('curPw').value  = ''
     document.getElementById('newPw').value  = ''
@@ -233,6 +233,8 @@ async function regenerateIcal() {
     toast('Token regenerated', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
+
+init()
 </script>
 </body>
 </html>

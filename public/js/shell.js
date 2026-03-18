@@ -248,12 +248,10 @@ function renderShell(cfg, activePage) {
   if (menuBtn && mobileNavEl) {
     menuBtn.addEventListener('click', e => {
       e.stopPropagation()
+      // Close other menus before toggling mobile nav
+      document.getElementById('userMenu')?.classList.remove('open')
+      document.getElementById('themeMenu')?.classList.remove('open')
       mobileNavEl.classList.toggle('open')
-    })
-    document.addEventListener('click', e => {
-      if (mobileNavEl.classList.contains('open') && !mobileNavEl.contains(e.target) && e.target !== menuBtn) {
-        mobileNavEl.classList.remove('open')
-      }
     })
   }
 
@@ -263,6 +261,9 @@ function renderShell(cfg, activePage) {
     if (ud && !ud.contains(e.target)) document.getElementById('userMenu')?.classList.remove('open')
     const td = document.getElementById('themeDropdown')
     if (td && !td.contains(e.target)) document.getElementById('themeMenu')?.classList.remove('open')
+    const mn = document.getElementById('mobileNavDropdown')
+    const mb = document.getElementById('menuToggle')
+    if (mn && mb && !mn.contains(e.target) && !mb.contains(e.target)) mn.classList.remove('open')
   })
 }
 
@@ -282,8 +283,9 @@ function toggleThemeMenu(e) {
 
 function toggleUserMenu(e) {
   if (e) e.stopPropagation()
-  // Close theme menu if open
+  // Close theme menu and mobile nav if open
   document.getElementById('themeMenu')?.classList.remove('open')
+  document.getElementById('mobileNavDropdown')?.classList.remove('open')
   document.getElementById('userMenu')?.classList.toggle('open')
 }
 
