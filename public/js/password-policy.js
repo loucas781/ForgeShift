@@ -9,7 +9,7 @@
 
 // Global policy — set by each page after calling /api/config
 let APP_POLICY = {
-  minLength: 8, requireUpper: true, requireLower: true,
+  minLength: 12, requireUpper: true, requireLower: true,
   requireNumber: true, requireSpecial: false, noSequential: false,
 }
 

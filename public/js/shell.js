@@ -125,7 +125,7 @@ function renderShell(cfg, activePage) {
       </a>` : ''}
     </nav>
     <div class="dropdown-wrapper" id="userDropdown">
-      <button class="topbar-user-btn" onclick="toggleUserMenu()">
+      <button class="topbar-user-btn" onclick="toggleUserMenu(event)">
         ${avatarEl(cfg.user).outerHTML}
         <span>${cfg.user.name.split(' ')[0]}</span>
         <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
@@ -149,12 +149,34 @@ function renderShell(cfg, activePage) {
     </div>
   `
 
+  // Inject mobile nav dropdown element directly after topbar
+  let mobileNav = document.getElementById('mobileNavDropdown')
+  if (!mobileNav) {
+    mobileNav = document.createElement('nav')
+    mobileNav.id = 'mobileNavDropdown'
+    mobileNav.className = 'mobile-nav-dropdown'
+    topbar.parentNode.insertBefore(mobileNav, topbar.nextSibling)
+  }
+  mobileNav.innerHTML = `
+    <a href="/" class="topbar-nav-btn${activePage==='calendar'?' active':''}">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+      Calendar
+    </a>
+    <a href="/templates.html" class="topbar-nav-btn${activePage==='templates'?' active':''}">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/><path d="M3 8a2 2 0 012-2h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+      Templates
+    </a>
+    ${cfg.user.role === 'admin' ? `<a href="/settings.html" class="topbar-nav-btn${activePage==='settings'?' active':''}">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+      Settings
+    </a>` : ''}
+  `
+
   // Sidebar
   const sidebar = document.getElementById('sidebar')
   if (sidebar) {
     sidebar.innerHTML = `
       <div class="sidebar-section">
-        <div class="sidebar-label">Rota</div>
         <a href="/" class="sidebar-item${activePage==='calendar'?' active':''}">
           <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
           Calendar
@@ -163,10 +185,7 @@ function renderShell(cfg, activePage) {
           <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/></svg>
           Templates
         </a>
-      </div>
-      ${cfg.user.role === 'admin' ? `
-      <div class="sidebar-section">
-        <div class="sidebar-label">Admin</div>
+        ${cfg.user.role === 'admin' ? `
         <a href="/settings.html#users" class="sidebar-item${activePage==='users'?' active':''}">
           <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
           Users
@@ -174,8 +193,8 @@ function renderShell(cfg, activePage) {
         <a href="/settings.html" class="sidebar-item${activePage==='settings'?' active':''}">
           <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
           Settings
-        </a>
-      </div>` : ''}
+        </a>` : ''}
+      </div>
     `
   }
 
@@ -186,22 +205,22 @@ function renderShell(cfg, activePage) {
     if (el) el.style.display = id === currentTheme ? 'inline' : 'none'
   })
 
-  // Mobile overlay
-  const overlay = document.getElementById('sidebarOverlay')
+  // Hamburger toggles mobile nav dropdown
   const menuBtn = document.getElementById('menuToggle')
-  const sidebarEl = document.getElementById('sidebar')
-  if (menuBtn && sidebarEl && overlay) {
-    menuBtn.addEventListener('click', () => {
-      sidebarEl.classList.toggle('open')
-      overlay.classList.toggle('open')
+  const mobileNavEl = document.getElementById('mobileNavDropdown')
+  if (menuBtn && mobileNavEl) {
+    menuBtn.addEventListener('click', e => {
+      e.stopPropagation()
+      mobileNavEl.classList.toggle('open')
     })
-    overlay.addEventListener('click', () => {
-      sidebarEl.classList.remove('open')
-      overlay.classList.remove('open')
+    document.addEventListener('click', e => {
+      if (mobileNavEl.classList.contains('open') && !mobileNavEl.contains(e.target) && e.target !== menuBtn) {
+        mobileNavEl.classList.remove('open')
+      }
     })
   }
 
-  // Close dropdown on outside click
+  // Close user dropdown on outside click
   document.addEventListener('click', e => {
     const dd = document.getElementById('userDropdown')
     if (dd && !dd.contains(e.target)) {
@@ -210,7 +229,8 @@ function renderShell(cfg, activePage) {
   })
 }
 
-function toggleUserMenu() {
+function toggleUserMenu(e) {
+  if (e) e.stopPropagation()
   document.getElementById('userMenu')?.classList.toggle('open')
 }
 

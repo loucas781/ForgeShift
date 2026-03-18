@@ -43,7 +43,7 @@ async function comparePassword(password, storedHash) {
 }
 
 const DEFAULT_POLICY = {
-  minLength:      8,
+  minLength:      12,
   requireUpper:   true,
   requireLower:   true,
   requireNumber:  true,

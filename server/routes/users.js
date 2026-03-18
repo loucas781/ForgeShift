@@ -7,6 +7,24 @@ const { requireAuth, requireAdmin } = require('../middleware/auth')
 const audit   = require('../audit')
 const fs      = require('fs')
 const path    = require('path')
+const multer  = require('multer')
+
+// ── Avatar upload storage ──────────────────────────────────────────────────────
+const AVATARS_DIR = path.join(__dirname, '../../public/uploads/avatars')
+if (!fs.existsSync(AVATARS_DIR)) fs.mkdirSync(AVATARS_DIR, { recursive: true })
+
+const avatarStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, AVATARS_DIR),
+  filename: (req, _file, cb) => cb(null, `${req.user.id}.jpg`),
+})
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4 MB
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Images only'))
+    cb(null, true)
+  },
+})
 
 function loadOverrides() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
@@ -132,6 +150,33 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
     }
     db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id)
     audit(req.user.id, 'user.delete', 'user', req.params.id, user.name, { by: req.user.name })
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/users/me/avatar — upload profile photo ─────────────────────────
+router.post('/me/avatar', requireAuth, (req, res) => {
+  avatarUpload.single('avatar')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.message })
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+
+    // Store a cache-busted URL path (served as static)
+    const avatarUrl = `/uploads/avatars/${req.user.id}.jpg?v=${Date.now()}`
+    db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(avatarUrl, req.user.id)
+    audit(req.user.id, 'user.avatar_upload', 'user', req.user.id, null)
+    res.json({ ok: true, avatar: avatarUrl })
+  })
+})
+
+// ── DELETE /api/users/me/avatar — remove profile photo ───────────────────────
+router.delete('/me/avatar', requireAuth, (req, res) => {
+  try {
+    const filePath = path.join(AVATARS_DIR, `${req.user.id}.jpg`)
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    db.prepare('UPDATE users SET avatar = NULL WHERE id = ?').run(req.user.id)
+    audit(req.user.id, 'user.avatar_remove', 'user', req.user.id, null)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })

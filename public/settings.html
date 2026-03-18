@@ -75,7 +75,6 @@
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <div class="app-body" style="flex-direction:column;overflow:hidden">
     <div class="settings-tabs-wrap">
       <div class="settings-tabs" id="settingsTabs"></div>
@@ -127,6 +126,29 @@
           <span class="form-label" style="margin:0">Account active</span>
         </div>
       </div>
+      <!-- Set Password toggle -->
+      <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <label class="toggle"><input type="checkbox" id="euSetPwToggle" onchange="toggleEuSetPw()"><span class="toggle-slider"></span></label>
+          <span class="form-label" style="margin:0">Set new password for this user</span>
+        </div>
+        <div id="euSetPwFields" style="display:none">
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label">New password</label>
+            <div style="position:relative">
+              <input type="password" class="form-input" id="euNewPw" placeholder="••••••••" style="padding-right:40px" oninput="updatePasswordIndicator(euPwIndicator, this.value)">
+              <button type="button" onclick="(function(){var i=document.getElementById('euNewPw');i.type=i.type==='text'?'password':'text'})()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+              </button>
+            </div>
+            <div id="euPwIndicatorWrap" style="margin-top:8px"></div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Confirm password</label>
+            <input type="password" class="form-input" id="euNewPw2" placeholder="••••••••">
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="document.getElementById('editUserModal').classList.remove('open')">Cancel</button>
@@ -160,6 +182,7 @@
 
 let cfg = null, users = [], locations = []
 let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
+let euPwIndicator = null
 
 async function init() {
   cfg = await loadConfig()
@@ -207,6 +230,8 @@ async function init() {
   if (isAdmin) await Promise.all([loadUsers(), loadLocations()])
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
+  // Wire password indicator for Edit User modal
+  euPwIndicator = document.getElementById('euPwIndicatorWrap')
   await Promise.all([
     renderAppearancePanel(),
     renderIcalPanel(),
@@ -514,10 +539,31 @@ function openEditUser(id) {
   document.getElementById('euEmail').value  = u.email
   document.getElementById('euRole').value   = u.role
   document.getElementById('euActive').checked = !!u.is_active
+  // Reset the set-password section
+  document.getElementById('euSetPwToggle').checked = false
+  document.getElementById('euSetPwFields').style.display = 'none'
+  document.getElementById('euNewPw').value  = ''
+  document.getElementById('euNewPw2').value = ''
+  euPwIndicator.innerHTML = ''
   document.getElementById('editUserModal').classList.add('open')
+}
+function toggleEuSetPw() {
+  const show = document.getElementById('euSetPwToggle').checked
+  document.getElementById('euSetPwFields').style.display = show ? 'block' : 'none'
+  if (!show) { document.getElementById('euNewPw').value = ''; document.getElementById('euNewPw2').value = ''; euPwIndicator.innerHTML = '' }
 }
 async function saveEditUser() {
   try {
+    const setPw = document.getElementById('euSetPwToggle').checked
+    if (setPw) {
+      const pw  = document.getElementById('euNewPw').value
+      const pw2 = document.getElementById('euNewPw2').value
+      if (!pw)       { toast('Enter a new password', 'error'); return }
+      if (pw !== pw2) { toast('Passwords do not match', 'error'); return }
+      const v = validatePasswordClient(pw)
+      if (!v.ok)     { toast(v.errors[0], 'error'); return }
+      await api(`/api/users/${editingUserId}/reset-password`, { method: 'POST', body: { password: pw } })
+    }
     await api(`/api/users/${editingUserId}`, { method: 'PATCH', body: {
       name:      document.getElementById('euName').value.trim(),
       email:     document.getElementById('euEmail').value.trim(),

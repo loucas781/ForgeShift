@@ -12,7 +12,6 @@
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <div class="app-body">
     <nav class="sidebar" id="sidebar"></nav>
     <main class="page-content" style="padding:0;display:flex;flex-direction:column;">
@@ -154,11 +153,15 @@ async function loadUsers() {
 async function loadShifts() {
   let start, end
   if (view === 'month') {
-    start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-    end   = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
-    // pad to full weeks
-    start.setDate(start.getDate() - start.getDay())
-    end.setDate(end.getDate() + (6 - end.getDay()))
+    const year  = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const first = new Date(year, month, 1)
+    const last  = new Date(year, month + 1, 0)
+    // Pad to Monday-first full weeks
+    const startOffset = (first.getDay() + 6) % 7
+    start = new Date(year, month, 1 - startOffset)
+    const endOffset = (last.getDay() === 0) ? 0 : 7 - last.getDay()
+    end   = new Date(year, month, last.getDate() + endOffset)
   } else {
     start = startOfWeek(currentDate, 1)
     end   = new Date(start); end.setDate(end.getDate() + 6)
@@ -199,8 +202,10 @@ function renderMonth() {
   const month = currentDate.getMonth()
   const first = new Date(year, month, 1)
   const last  = new Date(year, month + 1, 0)
-  const startDay = first.getDay() // 0=Sun
-  const totalCells = Math.ceil((startDay + last.getDate()) / 7) * 7
+
+  // Monday-first: Mon=0 ... Sun=6
+  const startOffset = (first.getDay() + 6) % 7
+  const totalCells  = Math.ceil((startOffset + last.getDate()) / 7) * 7
 
   // Build shift map: date -> [shifts]
   const shiftMap = {}
@@ -209,29 +214,30 @@ function renderMonth() {
     shiftMap[s.date].push(s)
   })
 
-  let html = `<div class="cal-month">`
-  DAY_ABBR.forEach(d => { html += `<div class="cal-day-header">${d}</div>` })
+  const MON_ABBR = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  let html = '<div class="cal-month">'
+  MON_ABBR.forEach(d => { html += '<div class="cal-day-header">' + d + '</div>' })
 
   for (let i = 0; i < totalCells; i++) {
-    const d = new Date(year, month, 1 - startDay + i)
+    const d = new Date(year, month, 1 - startOffset + i)
     const ds = toDateStr(d)
     const isCurrentMonth = d.getMonth() === month
     const isToday = ds === today
     const dayShifts = shiftMap[ds] || []
 
-    html += `<div class="cal-cell${isCurrentMonth ? '' : ' other-month'}${isToday ? ' today' : ''}" data-date="${ds}" onclick="openCreateModal('${ds}')">`
-    html += `<div class="cal-cell-date">${d.getDate()}</div>`
+    html += '<div class="cal-cell' + (isCurrentMonth ? '' : ' other-month') + (isToday ? ' today' : '') + '" data-date="' + ds + '" onclick="openCreateModal(\'' + ds + '\')">' 
+    html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
     dayShifts.forEach(s => {
       const color = s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift')
-      html += `<div class="cal-shift-chip${s.is_off?' is-off':''}" style="background:${color}" title="${s.user_name || ''}: ${label}" onclick="event.stopPropagation();openEditModal('${s.id}')">${cfg.user.role==='admin'?s.user_name?.split(' ')[0]+': ':''} ${label}</div>`
+      const name  = cfg.user.role === 'admin' && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + '" style="background:' + color + '" title="' + (s.user_name || '') + ': ' + label + '" onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')">' + name + label + '</div>'
     })
-    html += `</div>`
+    html += '</div>'
   }
-  html += `</div>`
+  html += '</div>'
   grid.innerHTML = html
 }
-
 function renderWeek() {
   const grid = document.getElementById('calGrid')
   const today = toDateStr(new Date())

@@ -95,6 +95,8 @@ ENVEOF
 
 # Create data directory with correct permissions
 mkdir -p /opt/forgeshift/data
+mkdir -p /opt/forgeshift/public/uploads/avatars
+chmod 755 /opt/forgeshift/public/uploads/avatars
 msg_ok "Configuration written (.env.${APP_ENV})"
 
 # ── 7. Database migration ──────────────────────────────────────────────────────
