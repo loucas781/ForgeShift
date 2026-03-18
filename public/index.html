@@ -111,6 +111,7 @@
   </div>
 </div>
 
+<script src="/js/shell.js"></script>
 <script src="/js/prefs.js"></script>
 <script>
 'use strict'
@@ -313,14 +314,16 @@ function renderMonth() {
     html += '<div class="cal-cell' +
       (isCurrentMonth ? '' : ' other-month') +
       (isToday ? ' today' : '') +
+      (dayHols.length ? ' is-holiday' : '') +
       (hasPaste ? ' can-paste' : '') +
       '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')">'
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
 
-    // Holiday chips
-    dayHols.forEach(h => {
-      html += '<div class="cal-holiday-chip" title="' + h.name + '">' + h.emoji + ' ' + h.name + '</div>'
-    })
+    // Holiday label(s) — pinned, non-interactive, behind shifts
+    if (dayHols.length) {
+      const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
+      html += '<div class="cal-holiday-label" title="' + names + '">' + names + '</div>'
+    }
 
     // Shift chips
     dayShifts.forEach(s => {
@@ -363,8 +366,9 @@ function renderWeek() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(ws); d.setDate(d.getDate() + i)
     const ds = toDateStr(d)
-    const isToday = ds === today
-    html += `<div class="cal-week-day-header${isToday?' today':''}" style="border-right:1px solid var(--border)">
+    const isToday  = ds === today
+    const hdrHols  = holidays[ds] || []
+    html += `<div class="cal-week-day-header${isToday?' today':''}${hdrHols.length?' is-holiday':''}" style="border-right:1px solid var(--border)">
       <div class="day-name">${DAY_ABBR[d.getDay()]}</div>
       <div class="day-num">${d.getDate()}</div>
     </div>`
@@ -378,11 +382,13 @@ function renderWeek() {
     const dayShifts = shiftMap[ds] || []
     const dayHols   = holidays[ds] || []
     const hasPaste  = copiedShift && dayShifts.length === 0
-    html += `<div class="cal-week-day-col${hasPaste?' can-paste':''}" onclick="handleCellClick('${ds}')">`
+    html += `<div class="cal-week-day-col${hasPaste?' can-paste':''}${dayHols.length?' is-holiday':''}" onclick="handleCellClick('${ds}')">`
     html += `<div class="cal-week-shifts">`
-    dayHols.forEach(h => {
-      html += `<div class="cal-holiday-chip week-holiday" title="${h.name}">${h.emoji} ${h.name}</div>`
-    })
+    // Holiday label — pinned at top of day column, non-interactive
+    if (dayHols.length) {
+      const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
+      html += `<div class="cal-holiday-label week-holiday-label" title="${names}">${names}</div>`
+    }
     dayShifts.forEach(s => {
       const color = s.location_color || s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')

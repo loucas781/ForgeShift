@@ -768,16 +768,81 @@ tr:hover td { background: var(--surface-2); }
   .cal-month .cal-cell-date { font-size: 11px; width: 20px; height: 20px; }
 }
 
-/* ── Holiday chips ─────────────────────────────────────────────────────────── */
-.cal-holiday-chip {
-  font-size: 10px; font-weight: 500; color: var(--text-2);
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 3px; padding: 1px 5px; margin-bottom: 2px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 100%; cursor: default; line-height: 1.5;
+/* ── Holiday cell tints & labels ───────────────────────────────────────────── */
+/* Warm amber/honey tint — completely outside the user's shift colour palette.
+   pointer-events:none on all holiday elements so they can never be confused
+   with or accidentally interact with shift chips. */
+
+/* Month view — cell background tint */
+.cal-cell.is-holiday {
+  background: rgba(180, 130, 30, 0.07);
 }
-.cal-holiday-chip.week-holiday {
-  margin-bottom: 4px; font-size: 11px;
+.cal-cell.is-holiday:hover {
+  background: rgba(180, 130, 30, 0.12);
+}
+[data-theme="dark"] .cal-cell.is-holiday,
+[data-theme="oled"] .cal-cell.is-holiday {
+  background: rgba(251, 191, 36, 0.08);
+}
+[data-theme="dark"] .cal-cell.is-holiday:hover,
+[data-theme="oled"] .cal-cell.is-holiday:hover {
+  background: rgba(251, 191, 36, 0.13);
+}
+
+/* Week view — day column tint */
+.cal-week-day-col.is-holiday {
+  background: rgba(180, 130, 30, 0.06);
+}
+[data-theme="dark"] .cal-week-day-col.is-holiday,
+[data-theme="oled"] .cal-week-day-col.is-holiday {
+  background: rgba(251, 191, 36, 0.07);
+}
+
+/* Week view — header tint for holiday days */
+.cal-week-day-header.is-holiday {
+  background: rgba(180, 130, 30, 0.1);
+}
+[data-theme="dark"] .cal-week-day-header.is-holiday,
+[data-theme="oled"] .cal-week-day-header.is-holiday {
+  background: rgba(251, 191, 36, 0.1);
+}
+
+/* Holiday label — pinned strip, non-interactive in every way */
+.cal-holiday-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: #92650a;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  padding: 1px 3px 2px;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  pointer-events: none;
+  user-select: none;
+  cursor: default;
+  border-left: 2px solid rgba(180, 130, 30, 0.5);
+}
+[data-theme="dark"] .cal-holiday-label,
+[data-theme="oled"] .cal-holiday-label {
+  color: #fbbf24;
+  border-left-color: rgba(251, 191, 36, 0.4);
+}
+
+/* Week view holiday label — slightly larger, same non-interactive rules */
+.cal-holiday-label.week-holiday-label {
+  font-size: 10px;
+  padding: 3px 6px 3px 5px;
+  margin-bottom: 6px;
+  background: rgba(180, 130, 30, 0.08);
+  border-radius: 0 3px 3px 0;
+  border-left-width: 3px;
+}
+[data-theme="dark"] .cal-holiday-label.week-holiday-label,
+[data-theme="oled"] .cal-holiday-label.week-holiday-label {
+  background: rgba(251, 191, 36, 0.08);
 }
 
 /* ── Week number gutter ────────────────────────────────────────────────────── */
@@ -799,8 +864,8 @@ tr:hover td { background: var(--surface-2); }
 .cal-month.compact-chips .cal-shift-chip {
   font-size: 9px; padding: 1px 4px; border-radius: 3px;
 }
-.cal-month.compact-chips .cal-holiday-chip {
-  font-size: 9px; padding: 1px 3px;
+.cal-month.compact-chips .cal-holiday-label {
+  font-size: 8px; padding: 0 2px 1px;
 }
 
 /* ── Copy/paste ────────────────────────────────────────────────────────────── */
