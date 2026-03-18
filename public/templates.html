@@ -58,7 +58,7 @@
         <input type="text" class="form-input" id="tmplDesc" placeholder="Describe this template…">
       </div>
       <h4 style="margin:16px 0 12px;font-size:13px">Configure each day</h4>
-      <div id="copyDayBar" style="display:none"></div>
+      <div id="copyDayBar" style="display:none;margin-bottom:10px"></div>
       <div class="day-editor-wrap"><div class="day-editor-grid" id="dayEditorGrid"></div></div>
     </div>
     <div class="modal-footer">
@@ -270,7 +270,7 @@ function renderDayEditor() {
     const copyBtn = document.getElementById(`dc_copybtn_${i}`)
     copyBtn.addEventListener('click', e => {
       e.stopPropagation()
-      openCopyDayMenu(i, copyBtn)
+      openCopyDayMenu(i)
     })
 
     // Colour picker
@@ -282,66 +282,48 @@ function renderDayEditor() {
   }
 }
 
-// ── Copy day (portal dropdown — fixed position to escape overflow:hidden) ──────
+// ── Copy day (inline bar — no floating/positioning needed) ─────────────────────
 let _copyDdSrc = null
-let _copyDdEl  = null
 
-function openCopyDayMenu(srcDay, btnEl) {
-  closeCopyDayMenu()
+function openCopyDayMenu(srcDay) {
+  // Toggle off if clicking the same day's button again
+  if (_copyDdSrc === srcDay) { closeCopyDayMenu(); return }
   _copyDdSrc = srcDay
 
-  const rect = btnEl.getBoundingClientRect()
+  // Mark active button
+  for (let i = 0; i < 7; i++) {
+    document.getElementById(`dc_copybtn_${i}`)?.classList.toggle('active', i === srcDay)
+  }
 
-  const dd = document.createElement('div')
-  dd.className = 'copy-day-dropdown'
-  dd.id = 'copyDayDd'
-
+  const bar = document.getElementById('copyDayBar')
   const targets = Array.from({length:7}, (_,i) => i).filter(i => i !== srcDay)
-  dd.innerHTML = `
-    <span class="copy-dd-label">Copy ${DAY_FULL[srcDay]} to…</span>
-    ${targets.map(i => `<button data-target="${i}">${DAY_FULL[i]}</button>`).join('')}
-    <hr class="copy-dd-sep">
-    <button data-target="all">All other days</button>`
+  bar.innerHTML = `
+    <span class="copy-day-bar-label">Copy <strong>${DAY_FULL[srcDay]}</strong> to:</span>
+    <div class="copy-day-bar-pills">
+      ${targets.map(i => `<button class="copy-day-pill" data-target="${i}">${DAY_FULL[i]}</button>`).join('')}
+      <button class="copy-day-pill all" data-target="all">All other days</button>
+    </div>
+    <button class="copy-day-bar-close" title="Close">✕</button>`
 
-  dd.querySelectorAll('button').forEach(b => {
-    b.addEventListener('click', e => {
-      e.stopPropagation()
+  bar.querySelectorAll('.copy-day-pill').forEach(b => {
+    b.addEventListener('click', () => {
       const t = b.dataset.target
       if (t === 'all') copyDayToAll(srcDay)
       else copyDayTo(srcDay, parseInt(t))
     })
   })
-
-  // Append to body so it's never clipped by any overflow
-  document.body.appendChild(dd)
-  _copyDdEl = dd
-
-  // Measure dropdown after insert
-  const ddRect = dd.getBoundingClientRect()
-  const ddW = Math.max(ddRect.width, 160)
-
-  // Prefer below the button, right-aligned to it; flip up if off-screen
-  let top  = rect.bottom + 6
-  let left = rect.right - ddW
-  if (top + ddRect.height > window.innerHeight - 8) top = rect.top - ddRect.height - 6
-  if (left < 8) left = 8
-  if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8
-
-  dd.style.top  = top  + 'px'
-  dd.style.left = left + 'px'
-  dd.style.width = ddW + 'px'
-
-  setTimeout(() => document.addEventListener('click', _onDocClickCloseCopyDd), 0)
-}
-
-function _onDocClickCloseCopyDd(e) {
-  if (_copyDdEl && !_copyDdEl.contains(e.target)) closeCopyDayMenu()
+  bar.querySelector('.copy-day-bar-close').addEventListener('click', closeCopyDayMenu)
+  bar.style.display = 'flex'
 }
 
 function closeCopyDayMenu() {
-  if (_copyDdEl) { _copyDdEl.remove(); _copyDdEl = null }
-  document.removeEventListener('click', _onDocClickCloseCopyDd)
   _copyDdSrc = null
+  for (let i = 0; i < 7; i++) {
+    document.getElementById(`dc_copybtn_${i}`)?.classList.remove('active')
+  }
+  const bar = document.getElementById('copyDayBar')
+  bar.style.display = 'none'
+  bar.innerHTML = ''
 }
 
 function snapshotDay(dayIdx) {
@@ -370,7 +352,7 @@ function applyDaySnapshot(snap, targetIdx) {
   if (colContainer) {
     const colour = snap.note_color || '#4f46e5'
     dayConfigs[targetIdx].note_color = colour
-    colContainer.innerHTML = '' // clear existing swatches before re-rendering
+    colContainer.innerHTML = ''
     renderColourPicker(colContainer, colour, v => { dayConfigs[targetIdx].note_color = v })
   }
 }
