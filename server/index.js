@@ -172,6 +172,7 @@ app.use('/api/users',     require('./routes/users'))
 app.use('/api/shifts',    require('./routes/shifts'))
 app.use('/api/templates', require('./routes/templates'))
 app.use('/api/locations', require('./routes/locations'))
+app.use('/api/teams',     require('./routes/teams'))
 app.use('/api/ical',      require('./routes/ical'))
 app.use('/api/backup',    require('./routes/backup'))
 

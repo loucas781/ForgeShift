@@ -469,17 +469,213 @@ async function changePassword() {
 }
 
 // ── Team panel ─────────────────────────────────────────────────────────────────
+let settingsTeams = []
+
 async function renderTeamPanel() {
   const el = document.getElementById('panel-team')
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Team Members</h2>
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Members</h2>
+    <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+      Individual accounts. Each person can have their own rota independently, or be added to a team.
+    </p>
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="btn btn-primary btn-sm" onclick="openInviteModal()">+ Create user</button>
     </div>
     <div class="card" id="teamCard">
       <div class="card-body" id="teamList">Loading…</div>
+    </div>
+
+    <div style="margin-top:32px">
+      <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Teams</h2>
+      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+        Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-secondary btn-sm" onclick="openCreateTeamModal()">+ Create team</button>
+      </div>
+      <div class="card" id="teamsCard">
+        <div class="card-body" id="teamsListEl">Loading…</div>
+      </div>
     </div>`
   renderTeamList()
+  await loadSettingsTeams()
+}
+
+async function loadSettingsTeams() {
+  try {
+    settingsTeams = await api('/api/teams')
+    renderTeamsList()
+  } catch { document.getElementById('teamsListEl').innerHTML = '<p style="font-size:13px;color:var(--red)">Failed to load teams.</p>' }
+}
+
+function renderTeamsList() {
+  const el = document.getElementById('teamsListEl')
+  if (!el) return
+  if (!settingsTeams.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-3)">No teams yet. Create one to group users and enable team calendar views.</p>'
+    return
+  }
+  el.innerHTML = settingsTeams.map(t => {
+    const memberNames = t.members.length
+      ? t.members.map(m => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
+          <span style="width:16px;height:16px;border-radius:50%;background:${m.color};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${m.initials}</span>
+          ${m.name}</span>`).join('')
+      : '<span style="font-size:12px;color:var(--text-3)">No members yet</span>'
+    return `<div class="member-row">
+      <div class="member-info">
+        <div style="width:14px;height:14px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px">${t.name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${memberNames}</div>
+        </div>
+      </div>
+      <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEditTeamModal('${t.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openTeamMembersModal('${t.id}')">Manage members</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTeam('${t.id}','${t.name}')">Delete</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+// ── Create team modal ──────────────────────────────────────────────────────────
+function openCreateTeamModal() {
+  const existing = document.getElementById('createTeamModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'createTeamModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Team</h3>
+        <button class="modal-close" onclick="document.getElementById('createTeamModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Team name</label><input type="text" class="form-input" id="ctName" placeholder="e.g. Weekend Crew"></div>
+        <div id="ctError" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('createTeamModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doCreateTeam()">Create team</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  setTimeout(() => document.getElementById('ctName').focus(), 50)
+}
+
+async function doCreateTeam() {
+  const name = document.getElementById('ctName').value.trim()
+  if (!name) { document.getElementById('ctError').style.display = 'block'; document.getElementById('ctError').textContent = 'Team name is required.'; return }
+  try {
+    await api('/api/teams', { method: 'POST', body: { name } })
+    document.getElementById('createTeamModal').remove()
+    await loadSettingsTeams()
+    toast('Team created', 'success')
+  } catch (err) { document.getElementById('ctError').style.display = 'block'; document.getElementById('ctError').textContent = err.message }
+}
+
+// ── Edit team modal ────────────────────────────────────────────────────────────
+function openEditTeamModal(id) {
+  const team = settingsTeams.find(t => t.id === id)
+  if (!team) return
+  const existing = document.getElementById('editTeamModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'editTeamModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Team</h3>
+        <button class="modal-close" onclick="document.getElementById('editTeamModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Team name</label><input type="text" class="form-input" id="etName" value="${team.name}"></div>
+        <div id="etError" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('editTeamModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doEditTeam('${id}')">Save</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+}
+
+async function doEditTeam(id) {
+  const name = document.getElementById('etName').value.trim()
+  if (!name) { document.getElementById('etError').style.display = 'block'; document.getElementById('etError').textContent = 'Name required.'; return }
+  try {
+    await api(\`/api/teams/\${id}\`, { method: 'PATCH', body: { name } })
+    document.getElementById('editTeamModal').remove()
+    await loadSettingsTeams()
+    toast('Team updated', 'success')
+  } catch (err) { document.getElementById('etError').style.display = 'block'; document.getElementById('etError').textContent = err.message }
+}
+
+async function deleteTeam(id, name) {
+  if (!confirm(\`Delete team "\${name}"? This cannot be undone. Users will not be deleted.\`)) return
+  try {
+    await api(\`/api/teams/\${id}\`, { method: 'DELETE' })
+    await loadSettingsTeams()
+    toast('Team deleted', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Manage team members modal ─────────────────────────────────────────────────
+function openTeamMembersModal(teamId) {
+  const team = settingsTeams.find(t => t.id === teamId)
+  if (!team) return
+  const activeUsers = users.filter(u => u.is_active)
+  const memberIds = new Set(team.members.map(m => m.id))
+
+  const existing = document.getElementById('teamMembersModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'teamMembersModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Manage Members — ${team.name}</h3>
+        <button class="modal-close" onclick="document.getElementById('teamMembersModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Select which users belong to this team.</p>
+        <div id="tmUserList" style="display:flex;flex-direction:column;gap:2px">
+          ${activeUsers.map(u => `
+            <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;transition:background var(--t-fast)" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+              <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer">
+              <div class="avatar" style="width:28px;height:28px;font-size:10px;background:${u.color}">${u.initials}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500">${u.name}</div>
+                <div style="font-size:11px;color:var(--text-3)">${u.email}</div>
+              </div>
+              <span class="badge badge-${u.role === 'admin' ? 'blue' : 'gray'}" style="font-size:10px">${u.role}</span>
+            </label>`).join('')}
+        </div>
+        <div id="tmError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('teamMembersModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTeamMembers('${teamId}')">Save members</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+}
+
+async function saveTeamMembers(teamId) {
+  const checks = document.querySelectorAll('#tmUserList input[type=checkbox]')
+  const user_ids = [...checks].filter(c => c.checked).map(c => c.value)
+  try {
+    await api(\`/api/teams/\${teamId}/members\`, { method: 'PUT', body: { user_ids } })
+    document.getElementById('teamMembersModal').remove()
+    await loadSettingsTeams()
+    toast('Team members updated', 'success')
+  } catch (err) { document.getElementById('tmError').style.display = 'block'; document.getElementById('tmError').textContent = err.message }
 }
 
 function renderTeamList() {
@@ -532,9 +728,19 @@ async function doInvite() {
       resultEl.style.cssText = 'display:block;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#065f46'
       resultEl.innerHTML = `✓ Account created for <strong>${name}</strong>. An invitation email has been sent to <strong>${email}</strong>.`
     } else {
-      resultEl.style.cssText = 'display:block;background:var(--brand-light);border:1px solid rgba(79,70,229,.3);color:var(--brand)'
-      resultEl.innerHTML = `✓ Account created. <strong>SMTP not configured</strong> — share this temporary password with the user (shown once only):<br>
-        <code style="font-size:13px;font-family:var(--mono);display:block;margin-top:8px;padding:8px;background:var(--surface);border-radius:4px;word-break:break-all;color:var(--text)">${r.tempPassword}</code>`
+      resultEl.style.cssText = 'display:block'
+      resultEl.innerHTML = `
+        <div style="background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.3);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
+          ✓ Account created for <strong>${name}</strong>.
+        </div>
+        <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.4);border-radius:var(--r-md);padding:12px 14px;font-size:13px">
+          <div style="font-weight:600;color:var(--text);margin-bottom:6px">⚠️ Temporary Password — share securely, shown once only</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <code style="flex:1;font-size:14px;font-family:var(--mono);padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);word-break:break-all;color:var(--text);letter-spacing:.04em">${r.tempPassword}</code>
+            <button class="btn btn-secondary btn-sm" onclick="(function(b){navigator.clipboard.writeText('${r.tempPassword}').then(()=>{b.textContent='✓ Copied';setTimeout(()=>b.textContent='Copy',2000)})})(this)" style="flex-shrink:0">Copy</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px">The user should change this password after first login.</div>
+        </div>`
     }
     document.getElementById('inviteSubmitBtn').style.display = 'none'
     toast('User created', 'success')

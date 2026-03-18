@@ -34,8 +34,8 @@
           </div>
           <h2 class="cal-title" id="calTitle">Loading…</h2>
           <div id="userFilterWrap" style="display:none">
-            <select class="cal-user-filter" id="userFilter" onchange="renderView()">
-              <option value="">All team</option>
+            <select class="cal-user-filter" id="teamFilter" onchange="renderView()">
+              <option value="">My shifts</option>
             </select>
           </div>
           <div class="cal-view-tabs" style="margin-left:auto">
@@ -128,7 +128,7 @@ async function init() {
     document.getElementById('adminUserField').style.display = 'block'
   }
 
-  await Promise.all([loadLocations(), loadUsers()])
+  await Promise.all([loadLocations(), loadUsers(), loadTeams()])
   renderView()
 
   document.getElementById('prevBtn').addEventListener('click', prev)
@@ -148,13 +148,33 @@ async function loadLocations() {
 async function loadUsers() {
   if (cfg.user.role !== 'admin') { users = [cfg.user]; return }
   users = await api('/api/users')
-  const sel = document.getElementById('userFilter')
+  // Populate the "assign user" field in the shift modal
   const msel = document.getElementById('modalUser')
   users.filter(u => u.is_active).forEach(u => {
-    const o1 = document.createElement('option'); o1.value = u.id; o1.textContent = u.name
-    sel.appendChild(o1.cloneNode(true))
-    const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
-    msel.appendChild(o2)
+    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+    msel.appendChild(o)
+  })
+}
+
+let teams = []
+async function loadTeams() {
+  if (cfg.user.role !== 'admin') return
+  try {
+    teams = await api('/api/teams')
+  } catch { teams = [] }
+  const sel = document.getElementById('teamFilter')
+  // Clear previous options except "My shifts"
+  while (sel.options.length > 1) sel.remove(1)
+  // Add "All shifts" option
+  const allOpt = document.createElement('option')
+  allOpt.value = 'all'; allOpt.textContent = 'All shifts'
+  sel.appendChild(allOpt)
+  // Add each team
+  teams.forEach(t => {
+    const o = document.createElement('option')
+    o.value = 'team:' + t.id
+    o.textContent = t.name + (t.member_count > 0 ? ' (' + t.member_count + ')' : '')
+    sel.appendChild(o)
   })
 }
 
@@ -175,9 +195,31 @@ async function loadShifts() {
     end   = new Date(start); end.setDate(end.getDate() + 6)
   }
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
-  const uid = document.getElementById('userFilter')?.value
-  if (uid) params.set('user_id', uid)
-  else if (cfg.user.role !== 'admin') params.set('user_id', cfg.user.id)
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  if (cfg.user.role !== 'admin') {
+    // Non-admins only see their own shifts
+    params.set('user_id', cfg.user.id)
+  } else if (filterVal === '' ) {
+    // "My shifts" — admin views only their own
+    params.set('user_id', cfg.user.id)
+  } else if (filterVal === 'all') {
+    // All shifts — no user_id filter
+  } else if (filterVal.startsWith('team:')) {
+    const teamId = filterVal.slice(5)
+    const team = teams.find(t => t.id === teamId)
+    if (team && team.members.length) {
+      // Fetch shifts for each team member in parallel then merge
+      const fetches = team.members
+        .filter(m => m.is_active)
+        .map(m => {
+          const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
+          return api('/api/shifts?' + p)
+        })
+      const results = await Promise.all(fetches)
+      shifts = results.flat()
+      return
+    }
+  }
   shifts = await api('/api/shifts?' + params)
 }
 

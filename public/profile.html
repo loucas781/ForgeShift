@@ -23,11 +23,12 @@
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
-  <main class="page-content">
+  <main class="page-content" style="display:flex;flex-direction:column;align-items:center">
+      <div style="width:100%;max-width:560px">
       <div class="page-header">
         <h1 class="page-title">My Profile</h1>
       </div>
-      <div style="display:grid;gap:20px;max-width:560px">
+      <div style="display:grid;gap:20px">
 
         <!-- Profile Info -->
         <div class="card">
@@ -247,5 +248,6 @@ async function regenerateIcal() {
 
 init()
 </script>
+</div><!-- /max-width wrapper -->
 </body>
 </html>

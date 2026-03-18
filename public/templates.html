@@ -43,7 +43,7 @@
 
 <!-- Template Modal -->
 <div class="modal-overlay" id="tmplModal">
-  <div class="modal" style="max-width:720px">
+  <div class="modal" style="max-width:min(96vw,980px)">
     <div class="modal-header">
       <h3 class="modal-title" id="tmplModalTitle">New Template</h3>
       <button class="modal-close" onclick="closeTmplModal()">✕</button>
@@ -58,7 +58,7 @@
         <input type="text" class="form-input" id="tmplDesc" placeholder="Describe this template…">
       </div>
       <h4 style="margin:16px 0 12px;font-size:13px">Configure each day</h4>
-      <div class="day-editor-grid" id="dayEditorGrid"></div>
+      <div class="day-editor-wrap"><div class="day-editor-grid" id="dayEditorGrid"></div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeTmplModal()">Cancel</button>

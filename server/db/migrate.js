@@ -148,6 +148,23 @@ function migrate() {
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- ── Teams ─────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS teams (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      color       TEXT NOT NULL DEFAULT '#0052cc',
+      created_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ── Team Members ──────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS team_members (
+      team_id    TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      added_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (team_id, user_id)
+    );
+
     -- ── Indexes ──────────────────────────────────────────────────────
     CREATE INDEX IF NOT EXISTS idx_shifts_user     ON shifts(user_id);
     CREATE INDEX IF NOT EXISTS idx_shifts_date     ON shifts(date);
@@ -177,7 +194,31 @@ function migrateAdditive() {
 try {
   migrate()
   migrateAdditive()
+  migrateTeams()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)
+}
+
+// Additive: teams support (safe on existing DBs)
+function migrateTeams() {
+  // teams table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS teams (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      color       TEXT NOT NULL DEFAULT '#0052cc',
+      created_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS team_members (
+      team_id    TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      added_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (team_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
+    CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+  `)
+  console.log('✓ Teams schema ready')
 }
