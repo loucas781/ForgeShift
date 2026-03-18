@@ -34,6 +34,29 @@
     .settings-tab:hover { color:var(--text); }
     .settings-tab.active { color:var(--brand); border-bottom-color:var(--brand); font-weight:600; }
     .settings-tab svg { width:14px; height:14px; flex-shrink:0; }
+    /* Backup panel */
+    .backup-section { margin-bottom: 28px; }
+    .backup-section:last-child { margin-bottom: 0; }
+    .backup-meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px; }
+    .backup-meta-item { background: var(--gray-50); border: 1px solid var(--border-2); border-radius: var(--r-md); padding: 10px 12px; }
+    .backup-meta-item .bm-val { font-size: 20px; font-weight: 700; font-family: var(--mono); color: var(--text); line-height: 1; }
+    .backup-meta-item .bm-lbl { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+    .restore-preview { background: var(--gray-50); border: 1px solid var(--border-2); border-radius: var(--r-lg); padding: 16px; margin-bottom: 16px; }
+    .restore-preview h5 { font-size: 12px; font-weight: 700; color: var(--text-2); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; }
+    .restore-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border-2); }
+    .restore-row:last-child { border-bottom: none; }
+    .restore-row span:first-child { color: var(--text-2); }
+    .restore-row span:last-child { font-family: var(--mono); font-weight: 600; color: var(--text); }
+    .backup-drop-zone { border: 2px dashed var(--border); border-radius: var(--r-lg); padding: 32px 24px; text-align: center; cursor: pointer; transition: border-color var(--t-fast), background var(--t-fast); background: var(--gray-50); }
+    .backup-drop-zone:hover, .backup-drop-zone.drag-over { border-color: var(--brand); background: var(--brand-light); }
+    .backup-drop-zone svg { color: var(--text-3); margin-bottom: 8px; }
+    .backup-drop-zone p { margin: 0; font-size: 13px; color: var(--text-2); }
+    .backup-drop-zone small { font-size: 11px; color: var(--text-3); }
+    .backup-progress { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--brand-light); border: 1px solid var(--brand); border-radius: var(--r-lg); font-size: 13px; color: var(--brand); }
+    .backup-result-ok  { padding: 12px 16px; background: rgba(0,135,90,.08); border: 1px solid rgba(0,135,90,.3); border-radius: var(--r-lg); font-size: 13px; }
+    .backup-result-err { padding: 12px 16px; background: rgba(222,53,11,.06); border: 1px solid rgba(222,53,11,.25); border-radius: var(--r-lg); font-size: 13px; color: var(--red,#de350b); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; display: inline-block; }
     .settings-panel { display:none; padding:24px; max-width:700px; }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
@@ -210,6 +233,12 @@ async function init() {
       icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
     { id: 'audit', label: 'Audit Log', adminOnly: true,
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
+    { id: 'backup', label: 'Backup', adminOnly: true,
+      icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
+    { id: 'buildinfo', label: 'Build Info', adminOnly: true,
+      icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
+    { id: 'about', label: 'About', adminOnly: false,
+      icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
 
   const tabs = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
@@ -242,6 +271,9 @@ async function init() {
     isAdmin ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderApplicationPanel() : Promise.resolve(),
     isAdmin ? renderAuditPanel() : Promise.resolve(),
+    isAdmin ? renderBackupPanel() : Promise.resolve(),
+    isAdmin ? renderBuildInfoPanel() : Promise.resolve(),
+    renderAboutPanel(),
   ])
 
   // Show first tab (or hash)
@@ -906,19 +938,6 @@ async function renderApplicationPanel() {
           <label class="toggle"><input type="checkbox" id="allowSignupToggle" ${c.allowSignup!==false?'checked':''} onchange="setAllowSignup(this.checked)"><span class="toggle-slider"></span></label>
         </div>
       </div>
-    </div>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Build Information</h3></div>
-      <div class="card-body">
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <tr><td style="color:var(--text-3);padding:8px 0;width:140px;border-bottom:1px solid var(--border)">Version</td>
-              <td style="padding:8px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 6px;border-radius:4px">${c.version}</code></td></tr>
-          <tr><td style="color:var(--text-3);padding:8px 0;border-bottom:1px solid var(--border)">Environment</td>
-              <td style="padding:8px 0;border-bottom:1px solid var(--border)"><span class="badge badge-${c.appEnv==='production'?'red':c.appEnv==='staging'?'orange':'green'}">${c.appEnv}</span></td></tr>
-          <tr><td style="color:var(--text-3);padding:8px 0">Stack</td>
-              <td style="padding:8px 0;color:var(--text-3)">Node.js / Express / SQLite</td></tr>
-        </table>
-      </div>
     </div>`
 }
 
@@ -974,6 +993,384 @@ async function loadAudit(offset) {
   } catch (err) {
     document.getElementById('auditBody').innerHTML = `<tr><td colspan="4" style="color:var(--red);padding:24px;text-align:center">${err.message}</td></tr>`
   }
+}
+
+// ── Backup panel ──────────────────────────────────────────────────────────────
+async function renderBackupPanel() {
+  const el = document.getElementById('panel-backup')
+  if (!el) return
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  }
+
+  // Fetch live counts for the export summary
+  let counts = { users: '…', locations: '…', shifts: '…', templates: '…' }
+  try {
+    const [u, l, s, t] = await Promise.all([
+      api('/api/users'),
+      api('/api/locations'),
+      api('/api/shifts'),
+      api('/api/templates'),
+    ])
+    counts = {
+      users:     Array.isArray(u) ? u.length : '?',
+      locations: Array.isArray(l) ? l.length : '?',
+      shifts:    Array.isArray(s) ? s.length : '?',
+      templates: Array.isArray(t) ? t.length : '?',
+    }
+  } catch {}
+
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Backup &amp; Restore</h2>
+
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Export Backup</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
+          Downloads a single <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.fsbackup</code>
+          file containing your entire database — users, locations, shift templates, shifts, iCal tokens, and preferences.
+        </p>
+        <div class="backup-meta">
+          <div class="backup-meta-item"><div class="bm-val">${counts.users}</div><div class="bm-lbl">Users</div></div>
+          <div class="backup-meta-item"><div class="bm-val">${counts.locations}</div><div class="bm-lbl">Locations</div></div>
+          <div class="backup-meta-item"><div class="bm-val">${counts.shifts}</div><div class="bm-lbl">Shifts</div></div>
+          <div class="backup-meta-item"><div class="bm-val">${counts.templates}</div><div class="bm-lbl">Templates</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="backupExportBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Backup
+          </button>
+          <span id="backupExportStatus" style="font-size:12px;color:var(--text-3)">Includes all data</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Restore from Backup</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:8px;line-height:1.6">
+          Upload a <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.fsbackup</code> file to restore data.
+          Restore is <strong>additive</strong> — existing records are updated with backup values and records not in the backup are left untouched.
+        </p>
+        <div style="padding:10px 14px;background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.3);border-radius:var(--r-md);font-size:12px;color:var(--orange,#e07b00);margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Passwords are included in the backup. Restoring on a new instance will allow users to log in with their original credentials immediately. If the new instance uses a different <code style="font-family:var(--mono);font-size:11px">PASSWORD_PEPPER</code>, users will need to reset their passwords.</span>
+        </div>
+        <div class="backup-drop-zone" id="backupDropZone">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>Drop a <strong>.fsbackup</strong> file here, or click to browse</p>
+          <small>Maximum 256 MB</small>
+          <input type="file" id="backupFileInput" accept=".fsbackup,application/octet-stream" style="display:none" />
+        </div>
+        <div id="backupPreviewArea" style="margin-top:16px;display:none"></div>
+        <div id="backupResultArea"  style="margin-top:16px;display:none"></div>
+      </div>
+    </div>`
+
+  // ── Export button ───────────────────────────────────────────────────────────
+  document.getElementById('backupExportBtn').addEventListener('click', async () => {
+    const btn    = document.getElementById('backupExportBtn')
+    const status = document.getElementById('backupExportStatus')
+    btn.disabled = true
+    btn.innerHTML = `<svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg> Generating…`
+    status.textContent = 'Building backup…'
+    status.style.color = 'var(--text-3)'
+    try {
+      const resp = await fetch('/api/backup/export', { credentials: 'include' })
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: 'Export failed' }))
+        throw new Error(err.error || 'Export failed')
+      }
+      const blob = await resp.blob()
+      const cd   = resp.headers.get('Content-Disposition') || ''
+      const fnMatch = cd.match(/filename="([^"]+)"/)
+      const filename = fnMatch ? fnMatch[1] : 'forgeshift-backup.fsbackup'
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      const kb = (blob.size / 1024).toFixed(0)
+      const mb = (blob.size / 1024 / 1024).toFixed(2)
+      status.textContent = `✓ Downloaded ${blob.size > 1024*1024 ? mb + ' MB' : kb + ' KB'} — ${filename}`
+      status.style.color = 'var(--green,#0a7c41)'
+    } catch (err) {
+      status.textContent = '✗ ' + err.message
+      status.style.color = 'var(--red,#de350b)'
+    } finally {
+      btn.disabled = false
+      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Backup`
+    }
+  })
+
+  // ── Drop zone & file picker ─────────────────────────────────────────────────
+  const dropZone  = document.getElementById('backupDropZone')
+  const fileInput = document.getElementById('backupFileInput')
+
+  dropZone.addEventListener('click', () => fileInput.click())
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over') })
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'))
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over')
+    const file = e.dataTransfer.files[0]
+    if (file) handleRestoreFile(file)
+  })
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0]
+    if (file) handleRestoreFile(file)
+  })
+
+  // ── Parse backup file and show preview ─────────────────────────────────────
+  function handleRestoreFile(file) {
+    const previewArea = document.getElementById('backupPreviewArea')
+    const resultArea  = document.getElementById('backupResultArea')
+    resultArea.style.display = 'none'
+    resultArea.innerHTML = ''
+
+    if (!file.name.endsWith('.fsbackup') && file.type !== 'application/octet-stream' && file.type !== '') {
+      previewArea.style.display = 'block'
+      previewArea.innerHTML = `<div class="backup-result-err">Not a valid backup file. Please select a <code>.fsbackup</code> file.</div>`
+      return
+    }
+
+    previewArea.style.display = 'block'
+    previewArea.innerHTML = `<div class="backup-progress"><svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg> Reading backup file…</div>`
+
+    const reader = new FileReader()
+    reader.onerror = () => { previewArea.innerHTML = `<div class="backup-result-err">Failed to read file.</div>` }
+    reader.onload = ev => {
+      let manifest
+      try { manifest = JSON.parse(ev.target.result) } catch {
+        previewArea.innerHTML = `<div class="backup-result-err">File could not be parsed. Make sure it is a valid <code>.fsbackup</code> file and has not been modified.</div>`
+        return
+      }
+
+      if (manifest.format !== 'forgeshift-backup') {
+        previewArea.innerHTML = `<div class="backup-result-err">Not a ForgeShift backup file.</div>`
+        return
+      }
+      if (manifest.version > 1) {
+        previewArea.innerHTML = `<div class="backup-result-err">This backup was created with a newer version of ForgeShift (format v${manifest.version}). Please upgrade first.</div>`
+        return
+      }
+
+      const t = manifest.tables || {}
+      const exportedAt = manifest.exported_at ? new Date(manifest.exported_at).toLocaleString() : 'unknown'
+      const instance   = manifest.instance || 'unknown'
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+
+      previewArea.innerHTML = `
+        <div class="restore-preview">
+          <h5>Backup Details</h5>
+          <div class="restore-row"><span>Exported at</span><span>${esc(exportedAt)}</span></div>
+          <div class="restore-row"><span>Source instance</span><span>${esc(instance)}</span></div>
+          <div class="restore-row"><span>File size</span><span>${fileSizeMB} MB</span></div>
+        </div>
+        <div class="restore-preview">
+          <h5>Contents</h5>
+          <div class="restore-row"><span>Users</span><span>${(t.users||[]).length}</span></div>
+          <div class="restore-row"><span>Locations</span><span>${(t.locations||[]).length}</span></div>
+          <div class="restore-row"><span>Shift Templates</span><span>${(t.shift_templates||[]).length}</span></div>
+          <div class="restore-row"><span>Template Days</span><span>${(t.template_days||[]).length}</span></div>
+          <div class="restore-row"><span>Shifts</span><span>${(t.shifts||[]).length}</span></div>
+          <div class="restore-row"><span>Preferences</span><span>${(t.app_preferences||[]).length}</span></div>
+        </div>
+        <div style="padding:10px 14px;background:rgba(0,82,204,.06);border:1px solid rgba(0,82,204,.2);border-radius:var(--r-md);font-size:12px;color:var(--brand);margin-bottom:16px">
+          Restore is <strong>additive</strong>: existing records will be updated with values from the backup, and records not present in the backup will not be touched. No data will be deleted.
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary" id="backupRestoreConfirmBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.73"/></svg>
+            Restore Now
+          </button>
+          <button class="btn btn-secondary" id="backupRestoreCancelBtn">Cancel</button>
+          <span style="font-size:12px;color:var(--text-3)">Export a fresh backup first if unsure</span>
+        </div>`
+
+      document.getElementById('backupRestoreCancelBtn').addEventListener('click', () => {
+        previewArea.style.display = 'none'
+        previewArea.innerHTML = ''
+        fileInput.value = ''
+      })
+      document.getElementById('backupRestoreConfirmBtn').addEventListener('click', () => {
+        doRestore(ev.target.result)
+      })
+    }
+    reader.readAsText(file)
+  }
+
+  // ── Send restore to server ──────────────────────────────────────────────────
+  async function doRestore(rawJson) {
+    const previewArea = document.getElementById('backupPreviewArea')
+    const resultArea  = document.getElementById('backupResultArea')
+
+    previewArea.innerHTML = `<div class="backup-progress">
+      <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
+      Restoring — writing to database. Do not close this page…
+    </div>`
+
+    try {
+      const resp = await fetch('/api/backup/restore', {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    rawJson,
+        credentials: 'include',
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'Restore failed')
+
+      const s = data.stats || {}
+      previewArea.style.display = 'none'
+      resultArea.style.display  = 'block'
+      resultArea.innerHTML = `
+        <div class="backup-result-ok">
+          <div style="font-weight:700;color:var(--green,#0a7c41);margin-bottom:10px;font-size:13px">✓ Restore complete</div>
+          <div class="restore-preview" style="margin-bottom:0">
+            <h5>Restored</h5>
+            <div class="restore-row"><span>Users</span><span>${s.users ?? 0}</span></div>
+            <div class="restore-row"><span>Locations</span><span>${s.locations ?? 0}</span></div>
+            <div class="restore-row"><span>Shift Templates</span><span>${s.templates ?? 0}</span></div>
+            <div class="restore-row"><span>Template Days</span><span>${s.templateDays ?? 0}</span></div>
+            <div class="restore-row"><span>Shifts</span><span>${s.shifts ?? 0}</span></div>
+          </div>
+          <div style="margin-top:12px;font-size:12px;color:var(--text-2)">
+            Source: ${esc(data.instance || 'unknown')} · Exported ${data.exported_at ? new Date(data.exported_at).toLocaleString() : ''}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="location.reload()" style="margin-top:12px">Reload page</button>
+        </div>`
+    } catch (err) {
+      previewArea.style.display = 'none'
+      resultArea.style.display  = 'block'
+      resultArea.innerHTML = `<div class="backup-result-err"><strong>Restore failed</strong><br>${esc(err.message)}</div>`
+    }
+  }
+}
+
+// ── Build Info panel ──────────────────────────────────────────────────────────
+async function renderBuildInfoPanel() {
+  const el = document.getElementById('panel-buildinfo')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Build Info</h2>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Version</h3></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
+          <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
+          <span class="badge badge-${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
+        </div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr>
+            <td style="color:var(--text-3);padding:10px 0;width:160px;border-bottom:1px solid var(--border)">Version string</td>
+            <td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.version}</code></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Environment</td>
+            <td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appEnv}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">App name</td>
+            <td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appName || 'ForgeShift'}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Node.js</td>
+            <td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.nodeVersion || 'unknown'}</code></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-3);padding:10px 0">Runtime</td>
+            <td style="padding:10px 0">Node.js / Express / SQLite</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
+      <div class="card-body" id="buildInfoStats">
+        <div style="color:var(--text-3);font-size:13px">Loading…</div>
+      </div>
+    </div>`
+
+  try {
+    const stats = await api('/api/stats')
+    document.getElementById('buildInfoStats').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
+        ${[
+          { label: 'Active Users',  value: stats.users },
+          { label: 'Shifts',        value: stats.shifts },
+          { label: 'Locations',     value: stats.locations },
+          { label: 'Templates',     value: stats.templates },
+        ].map(s => `
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
+            <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
+          </div>`).join('')}
+      </div>`
+  } catch {}
+}
+
+// ── About panel ───────────────────────────────────────────────────────────────
+async function renderAboutPanel() {
+  const el = document.getElementById('panel-about')
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About ForgeShift</h2>
+    <div class="card section-card">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+          <div style="width:52px;height:52px;flex-shrink:0">
+            <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
+              <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
+              <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
+              <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
+              <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
+              <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/>
+            </svg>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
+            <div style="font-size:13px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management</div>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
+          ForgeShift is a lightweight, self-hosted workforce scheduling application. It lets teams manage
+          shift rotas, create reusable templates, and subscribe to their schedule via iCal — all without
+          any cloud dependency or third-party services.
+        </p>
+        <p style="font-size:13px;color:var(--text-2);line-height:1.6">
+          Designed to be deployed on a single server, ForgeShift keeps your data local and under your control.
+        </p>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Tech Stack</h3></div>
+      <div class="card-body">
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          ${[
+            ['Frontend',  'Vanilla HTML, CSS, JavaScript'],
+            ['Backend',   'Node.js · Express'],
+            ['Database',  'SQLite (better-sqlite3)'],
+            ['Auth',      'Session-based · HMAC-SHA256 pepper'],
+            ['Calendar',  'iCal feed (ical-generator)'],
+            ['Email',     'Nodemailer (optional SMTP)'],
+            ['Deployment','Docker · PM2 · Proxmox LXC'],
+          ].map(([k,v]) => `
+            <tr>
+              <td style="color:var(--text-3);padding:10px 0;width:140px;border-bottom:1px solid var(--border)">${k}</td>
+              <td style="padding:10px 0;border-bottom:1px solid var(--border);font-weight:500">${v}</td>
+            </tr>`).join('')}
+        </table>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Licence &amp; Source</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-2);line-height:1.6">
+          ForgeShift is open-source software, part of the <strong>Forge</strong> suite of self-hosted tools.
+          Source code and deployment instructions are available on GitHub.
+        </p>
+      </div>
+    </div>`
 }
 
 // Close modals on overlay click

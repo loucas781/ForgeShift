@@ -12,9 +12,7 @@
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
-  <div class="app-body">
-    <nav class="sidebar" id="sidebar"></nav>
-    <main class="page-content" style="padding:0;display:flex;flex-direction:column;">
+  <main class="page-content" style="padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
       <div class="cal-wrapper">
         <!-- Toolbar -->
         <div class="cal-toolbar">
@@ -38,7 +36,6 @@
         <div class="cal-grid" id="calGrid"></div>
       </div>
     </main>
-  </div>
 </div>
 
 <!-- Shift Modal -->
@@ -228,7 +225,7 @@ function renderMonth() {
     html += '<div class="cal-cell' + (isCurrentMonth ? '' : ' other-month') + (isToday ? ' today' : '') + '" data-date="' + ds + '" onclick="openCreateModal(\'' + ds + '\')">' 
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
     dayShifts.forEach(s => {
-      const color = s.note_color || '#4f46e5'
+      const color = s.location_color || s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift')
       const name  = cfg.user.role === 'admin' && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + '" style="background:' + color + '" title="' + (s.user_name || '') + ': ' + label + '" onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')">' + name + label + '</div>'
@@ -271,7 +268,7 @@ function renderWeek() {
     html += `<div class="cal-week-day-col" onclick="openCreateModal('${ds}')">`
     html += `<div class="cal-week-shifts">`
     dayShifts.forEach(s => {
-      const color = s.note_color || '#4f46e5'
+      const color = s.location_color || s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
       const time  = s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : ''
       html += `<div class="cal-week-shift-card" style="background:${color}" onclick="event.stopPropagation();openEditModal('${s.id}')">

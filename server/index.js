@@ -61,6 +61,8 @@ const app = express()
 
 app.use(express.json({ limit: '5mb' }))
 app.use(express.urlencoded({ extended: false }))
+// Raw text body parser for backup restore (accepts large .fsbackup files)
+app.use('/api/backup/restore', express.text({ limit: '256mb', type: 'text/plain' }))
 app.use(cookieParser())
 
 app.use((req, res, next) => {
@@ -91,6 +93,8 @@ app.get('/api/config', optionalAuth, (req, res) => {
     appName:        process.env.APP_NAME      || 'ForgeShift',
     appEnv:         process.env.APP_ENV       || env,
     version:        APP_VERSION,
+    nodeVersion:    process.version,
+    platform:       process.platform,
     user,
     allowSignup:    (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
     cookieSecure:   process.env.COOKIE_SECURE === 'true',
@@ -151,6 +155,17 @@ app.get('/api/audit', requireAuth, (req, res) => {
   res.json({ entries, total, limit, offset })
 })
 
+// ── GET /api/stats — instance stats for Build Info panel ──────────────────────
+app.get('/api/stats', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const db = require('./db/connection')
+  const users     = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_active = 1').get().c
+  const shifts    = db.prepare('SELECT COUNT(*) as c FROM shifts').get().c
+  const locations = db.prepare('SELECT COUNT(*) as c FROM locations').get().c
+  const templates = db.prepare('SELECT COUNT(*) as c FROM shift_templates').get().c
+  res.json({ users, shifts, locations, templates })
+})
+
 // ── API Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/auth',      require('./routes/auth'))
 app.use('/api/users',     require('./routes/users'))
@@ -158,6 +173,7 @@ app.use('/api/shifts',    require('./routes/shifts'))
 app.use('/api/templates', require('./routes/templates'))
 app.use('/api/locations', require('./routes/locations'))
 app.use('/api/ical',      require('./routes/ical'))
+app.use('/api/backup',    require('./routes/backup'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {

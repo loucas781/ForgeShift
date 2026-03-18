@@ -108,8 +108,8 @@ function renderShell(cfg, activePage) {
         <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/></svg>
       <span class="topbar-logo-text">ForgeShift</span>
     </a>
-    <span class="env-badge ${envClass}" title="v${cfg.version}">${envClass} <span style="opacity:.7;font-weight:500;letter-spacing:0">v${cfg.version}</span></span>
-    <div class="topbar-spacer"></div>
+    <span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>
+    <span class="version-badge">v${cfg.version}</span>
     <nav class="topbar-nav">
       <a href="/" class="topbar-nav-btn${activePage==='calendar'?' active':''}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
@@ -124,6 +124,50 @@ function renderShell(cfg, activePage) {
         Settings
       </a>` : ''}
     </nav>
+    <div class="topbar-spacer"></div>
+
+    <!-- Standalone theme picker button -->
+    <div class="dropdown-wrapper" id="themeDropdown">
+      <button class="topbar-icon-btn" id="themeBtn" onclick="toggleThemeMenu(event)" aria-label="Change theme" title="Change theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <path d="M8 21h8M12 17v4"/>
+        </svg>
+      </button>
+      <div class="dropdown-menu" id="themeMenu" style="min-width:190px">
+        <div style="padding:6px 12px 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)">Appearance</div>
+        <button class="theme-option" id="themeOpt-system" onclick="setTheme('system')">
+          <span class="theme-option-icon">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 1.5A4.5 4.5 0 018 13V3.5z"/></svg>
+          </span>
+          System
+          <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
+        </button>
+        <button class="theme-option" id="themeOpt-light" onclick="setTheme('light')">
+          <span class="theme-option-icon">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M8 11a3 3 0 100-6 3 3 0 000 6zm0 1.5a4.5 4.5 0 110-9 4.5 4.5 0 010 9zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM0 8a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5H.75A.75.75 0 010 8zm13 0a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0113 8z"/></svg>
+          </span>
+          Light
+          <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
+        </button>
+        <button class="theme-option" id="themeOpt-dark" onclick="setTheme('dark')">
+          <span class="theme-option-icon">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786z"/></svg>
+          </span>
+          Dark
+          <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
+        </button>
+        <button class="theme-option" id="themeOpt-oled" onclick="setTheme('oled')">
+          <span class="theme-option-icon" style="background:#000;border-color:#333">
+            <svg viewBox="0 0 16 16" fill="white" width="10" height="10"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+          </span>
+          OLED Black
+          <span class="theme-option-check"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- User menu — Profile + Sign out only -->
     <div class="dropdown-wrapper" id="userDropdown">
       <button class="topbar-user-btn" onclick="toggleUserMenu(event)">
         ${avatarEl(cfg.user).outerHTML}
@@ -135,11 +179,6 @@ function renderShell(cfg, activePage) {
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
           My Profile
         </a>
-        <div class="dropdown-sep"></div>
-        <button class="dropdown-item" id="themeItemSystem" onclick="setTheme('system')">🖥️ System <span id="themeCheck-system" style="margin-left:auto;display:none">✓</span></button>
-        <button class="dropdown-item" id="themeItemLight"  onclick="setTheme('light')">☀️ Light  <span id="themeCheck-light"  style="margin-left:auto;display:none">✓</span></button>
-        <button class="dropdown-item" id="themeItemDark"   onclick="setTheme('dark')">🌙 Dark   <span id="themeCheck-dark"   style="margin-left:auto;display:none">✓</span></button>
-        <button class="dropdown-item" id="themeItemOled"   onclick="setTheme('oled')">⬛ OLED Black <span id="themeCheck-oled" style="margin-left:auto;display:none">✓</span></button>
         <div class="dropdown-sep"></div>
         <button class="dropdown-item danger" onclick="doLogout()">
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
@@ -170,40 +209,38 @@ function renderShell(cfg, activePage) {
       <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
       Settings
     </a>` : ''}
+    <div class="mobile-nav-sep"></div>
+    <div class="mobile-nav-label">Appearance</div>
+    <button class="topbar-nav-btn" onclick="setTheme('system');document.getElementById('mobileNavDropdown').classList.remove('open')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      System
+    </button>
+    <button class="topbar-nav-btn" onclick="setTheme('light');document.getElementById('mobileNavDropdown').classList.remove('open')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+      Light
+    </button>
+    <button class="topbar-nav-btn" onclick="setTheme('dark');document.getElementById('mobileNavDropdown').classList.remove('open')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+      Dark
+    </button>
+    <button class="topbar-nav-btn" onclick="setTheme('oled');document.getElementById('mobileNavDropdown').classList.remove('open')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>
+      OLED Black
+    </button>
   `
 
-  // Sidebar
-  const sidebar = document.getElementById('sidebar')
-  if (sidebar) {
-    sidebar.innerHTML = `
-      <div class="sidebar-section">
-        <a href="/" class="sidebar-item${activePage==='calendar'?' active':''}">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-          Calendar
-        </a>
-        <a href="/templates.html" class="sidebar-item${activePage==='templates'?' active':''}">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/></svg>
-          Templates
-        </a>
-        ${cfg.user.role === 'admin' ? `
-        <a href="/settings.html#users" class="sidebar-item${activePage==='users'?' active':''}">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
-          Users
-        </a>
-        <a href="/settings.html" class="sidebar-item${activePage==='settings'?' active':''}">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
-          Settings
-        </a>` : ''}
-      </div>
-    `
+  // Inject fixed bottom-right env pill (ForgeTrack style)
+  let envPill = document.getElementById('envCornerPill')
+  if (!envPill) {
+    envPill = document.createElement('span')
+    envPill.id = 'envCornerPill'
+    envPill.className = `env-badge ${envClass}`
+    document.body.appendChild(envPill)
   }
+  envPill.textContent = envClass
 
-  // Set initial theme checkmark
-  const currentTheme = getTheme()
-  ;['system','light','dark','oled'].forEach(id => {
-    const el = document.getElementById('themeCheck-' + id)
-    if (el) el.style.display = id === currentTheme ? 'inline' : 'none'
-  })
+  // Set initial theme active state on option rows
+  _updateThemeOptions(getTheme())
 
   // Hamburger toggles mobile nav dropdown
   const menuBtn = document.getElementById('menuToggle')
@@ -220,28 +257,40 @@ function renderShell(cfg, activePage) {
     })
   }
 
-  // Close user dropdown on outside click
+  // Close all dropdowns on outside click
   document.addEventListener('click', e => {
-    const dd = document.getElementById('userDropdown')
-    if (dd && !dd.contains(e.target)) {
-      document.getElementById('userMenu')?.classList.remove('open')
-    }
+    const ud = document.getElementById('userDropdown')
+    if (ud && !ud.contains(e.target)) document.getElementById('userMenu')?.classList.remove('open')
+    const td = document.getElementById('themeDropdown')
+    if (td && !td.contains(e.target)) document.getElementById('themeMenu')?.classList.remove('open')
   })
+}
+
+function _updateThemeOptions(t) {
+  ;['system','light','dark','oled'].forEach(id => {
+    const el = document.getElementById('themeOpt-' + id)
+    if (el) el.classList.toggle('active', id === t)
+  })
+}
+
+function toggleThemeMenu(e) {
+  if (e) e.stopPropagation()
+  // Close user menu if open
+  document.getElementById('userMenu')?.classList.remove('open')
+  document.getElementById('themeMenu')?.classList.toggle('open')
 }
 
 function toggleUserMenu(e) {
   if (e) e.stopPropagation()
+  // Close theme menu if open
+  document.getElementById('themeMenu')?.classList.remove('open')
   document.getElementById('userMenu')?.classList.toggle('open')
 }
 
 function setTheme(t) {
   applyTheme(t)
-  document.getElementById('userMenu')?.classList.remove('open')
-  // Update checkmark indicators
-  ;['system','light','dark','oled'].forEach(id => {
-    const el = document.getElementById('themeCheck-' + id)
-    if (el) el.style.display = id === t ? 'inline' : 'none'
-  })
+  document.getElementById('themeMenu')?.classList.remove('open')
+  _updateThemeOptions(t)
   toast(`Theme: ${t}`, 'success', 1500)
 }
 
