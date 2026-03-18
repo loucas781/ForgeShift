@@ -608,36 +608,6 @@ async function regenerateIcal() {
   toast('Token regenerated', 'success')
 }
 
-// ── Account panel ──────────────────────────────────────────────────────────────
-
-async function saveProfile() {
-  const name  = document.getElementById('profileName').value.trim()
-  const email = document.getElementById('profileEmail').value.trim()
-  if (!name) { toast('Name is required', 'error'); return }
-  try {
-    const r = await api('/api/auth/profile', { method: 'PATCH', body: { name, email, color: window._profileColour } })
-    document.getElementById('settingsAvatar').style.background = window._profileColour
-    document.getElementById('settingsAvatar').textContent = r.user.initials
-    _config = null
-    toast('Profile saved', 'success')
-  } catch (err) { toast(err.message, 'error') }
-}
-
-async function changePassword() {
-  const cur = document.getElementById('curPw').value
-  const np  = document.getElementById('newPw').value
-  const np2 = document.getElementById('newPw2').value
-  if (!cur || !np)  { toast('All fields required', 'error'); return }
-  if (np !== np2)   { toast('Passwords do not match', 'error'); return }
-  try {
-    await api('/api/auth/profile', { method: 'PATCH', body: { currentPassword: cur, newPassword: np } })
-    document.getElementById('curPw').value = ''
-    document.getElementById('newPw').value = ''
-    document.getElementById('newPw2').value = ''
-    toast('Password updated', 'success')
-  } catch (err) { toast(err.message, 'error') }
-}
-
 // ── Team panel ─────────────────────────────────────────────────────────────────
 let settingsTeams = []
 
@@ -778,7 +748,7 @@ async function doEditTeam(id) {
   const name = document.getElementById('etName').value.trim()
   if (!name) { document.getElementById('etError').style.display = 'block'; document.getElementById('etError').textContent = 'Name required.'; return }
   try {
-    await api(\`/api/teams/\${id}\`, { method: 'PATCH', body: { name } })
+    await api(`/api/teams/${id}`, { method: 'PATCH', body: { name } })
     document.getElementById('editTeamModal').remove()
     await loadSettingsTeams()
     toast('Team updated', 'success')
@@ -786,9 +756,9 @@ async function doEditTeam(id) {
 }
 
 async function deleteTeam(id, name) {
-  if (!confirm(\`Delete team "\${name}"? This cannot be undone. Users will not be deleted.\`)) return
+  if (!confirm(`Delete team "${name}"? This cannot be undone. Users will not be deleted.`)) return
   try {
-    await api(\`/api/teams/\${id}\`, { method: 'DELETE' })
+    await api(`/api/teams/${id}`, { method: 'DELETE' })
     await loadSettingsTeams()
     toast('Team deleted', 'success')
   } catch (err) { toast(err.message, 'error') }
@@ -841,7 +811,7 @@ async function saveTeamMembers(teamId) {
   const checks = document.querySelectorAll('#tmUserList input[type=checkbox]')
   const user_ids = [...checks].filter(c => c.checked).map(c => c.value)
   try {
-    await api(\`/api/teams/\${teamId}/members\`, { method: 'PUT', body: { user_ids } })
+    await api(`/api/teams/${teamId}/members`, { method: 'PUT', body: { user_ids } })
     document.getElementById('teamMembersModal').remove()
     await loadSettingsTeams()
     toast('Team members updated', 'success')

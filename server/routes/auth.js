@@ -361,12 +361,12 @@ router.get('/export', requireAuth, (req, res) => {
     const user = db.prepare('SELECT id, name, email, initials, color, role, created_at FROM users WHERE id = ?').get(uid)
     if (!user) return res.status(404).json({ error: 'User not found' })
     const shifts    = db.prepare('SELECT * FROM shifts    WHERE user_id = ? ORDER BY date').all(uid)
-    const icalTokens = db.prepare('SELECT token_hash, created_at FROM ical_tokens WHERE user_id = ?').all(uid)
+    const icalTokens = db.prepare('SELECT created_at FROM ical_tokens WHERE user_id = ?').all(uid)
     const payload = {
       exported_at: new Date().toISOString(),
       account: user,
       shifts,
-      ical_tokens: icalTokens.map(t => ({ created_at: t.created_at, note: 'token hash stored, raw token not recoverable' })),
+      ical_tokens: icalTokens.map(t => ({ created_at: t.created_at, note: 'raw token omitted for security' })),
     }
     const filename = `forgeshift-export-${user.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
