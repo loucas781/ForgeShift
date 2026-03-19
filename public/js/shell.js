@@ -205,7 +205,7 @@ function renderShell(cfg, activePage) {
   }
   mobileNav.innerHTML = `
     <div class="mobile-nav-user-header">
-      <div class="avatar" style="background:${cfg.user.color};width:36px;height:36px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;flex-shrink:0">${cfg.user.initials}</div>
+      ${avatarEl(cfg.user, 'lg').outerHTML}
       <div style="min-width:0">
         <div style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cfg.user.name}</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cfg.user.email}</div>

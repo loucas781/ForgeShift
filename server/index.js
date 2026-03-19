@@ -184,7 +184,7 @@ app.get('/api/audit', requireAuth, (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit || '50'), 200)
   const offset = parseInt(req.query.offset || '0')
   const entries = db.prepare(`
-    SELECT a.*, u.name as actor_name, u.initials as actor_initials, u.color as actor_color
+    SELECT a.*, u.name as actor_name, u.initials as actor_initials, u.color as actor_color, u.avatar as actor_avatar
     FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
     ORDER BY a.created_at DESC LIMIT ? OFFSET ?
   `).all(limit, offset)

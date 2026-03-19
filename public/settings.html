@@ -388,7 +388,23 @@ async function init() {
   showTab(validTab ? hash : tabs[0].id)
 }
 
-function showTab(id) {
+// ── Avatar helper — mirrors shell.js avatarEl ─────────────────────────────────
+// Returns an outerHTML string for an avatar element that shows the photo if
+// available, or falls back to an initials badge.
+// size: '' = default (32px), 'sm' = 22px, 'xs' = 20px, 'md' = 28px
+function _avatarHTML(user, size) {
+  const dims = { sm: 22, xs: 20, md: 28, lg: 40 }
+  const px   = dims[size] || 32
+  const fs   = Math.round(px * 0.38)
+  const base = `border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:${px}px;height:${px}px;font-size:${fs}px;font-weight:700;color:#fff`
+  if (user && user.avatar) {
+    return `<div class="avatar" style="${base};background:${user.color||'#4f46e5'}"><img src="${user.avatar}" alt="${user.name||''}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div>`
+  }
+  const initials = user ? (user.initials || (user.name||'?').slice(0,2).toUpperCase()) : '?'
+  return `<div class="avatar" style="${base};background:${(user&&user.color)||'#4f46e5'}">${initials}</div>`
+}
+
+
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'))
   document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'))
   const panel = document.getElementById('panel-' + id)
@@ -800,7 +816,7 @@ function renderMyTeamsList() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center" id="myteam-members-${t.id}">
           ${(t.members||[]).filter(m => m.is_active).map(m =>
             `<div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 4px">
-              <div class="avatar" style="background:${m.color};width:22px;height:22px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;flex-shrink:0">${m.initials}</div>
+              ${_avatarHTML(m, 'sm')}
               <span style="font-size:12px;font-weight:500">${m.name}</span>
               <button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>
             </div>`
@@ -1017,7 +1033,7 @@ function renderTeamListFiltered() {
   el.innerHTML = filtered.map(u => `
     <div class="member-row">
       <div class="member-info">
-        <div class="avatar" style="background:${u.color}">${u.initials}</div>
+        ${_avatarHTML(u)}
         <div style="min-width:0">
           <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
           <div style="font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
@@ -1051,7 +1067,7 @@ function renderTeamsList() {
   el.innerHTML = settingsTeams.map(t => {
     const memberNames = t.members.length
       ? t.members.map(m => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
-          <span style="width:16px;height:16px;border-radius:50%;background:${m.color};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${m.initials}</span>
+          ${_avatarHTML(m, 'xs')}
           ${m.name}</span>`).join('')
       : '<span style="font-size:12px;color:var(--text-3)">No members yet</span>'
     return `<div class="member-row">
@@ -1181,7 +1197,7 @@ function openTeamMembersModal(teamId) {
           ${activeUsers.map(u => `
             <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;transition:background var(--t-fast)" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
               <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer">
-              <div class="avatar" style="width:28px;height:28px;font-size:10px;background:${u.color}">${u.initials}</div>
+              ${_avatarHTML(u, 'md')}
               <div style="flex:1;min-width:0">
                 <div style="font-size:13px;font-weight:500">${u.name}</div>
                 <div style="font-size:11px;color:var(--text-3)">${u.email}</div>
@@ -1237,7 +1253,7 @@ function renderTmplGroupsList() {
     const memberPills = (g.members || []).length
       ? g.members.map(m => `
           <span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
-            <span style="width:16px;height:16px;border-radius:50%;background:${m.color};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${m.initials}</span>
+            ${_avatarHTML(m, 'xs')}
             ${m.name}
           </span>`).join('')
       : '<span style="font-size:12px;color:var(--text-3)">No members assigned</span>'
@@ -1377,7 +1393,7 @@ function openTmplGroupMembersModal(groupId) {
         <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
           <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}
             style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
-          <div class="avatar" style="background:${u.color};width:28px;height:28px;font-size:10px;flex-shrink:0">${u.initials}</div>
+          ${_avatarHTML(u, 'md')}
           <div style="min-width:0">
             <div style="font-weight:600;font-size:13px">${u.name}</div>
             <div style="font-size:11px;color:var(--text-3)">${u.email} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role}</span></div>
@@ -2246,7 +2262,7 @@ async function loadAudit(offset) {
       const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
       return `<tr>
         <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${ts}</td>
-        <td>${e.actor_name ? `<div style="display:flex;align-items:center;gap:6px"><div class="avatar" style="width:20px;height:20px;font-size:9px;background:${e.actor_color||'#4f46e5'}">${e.actor_initials||'?'}</div><span style="font-size:12px">${e.actor_name}</span></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td>${e.actor_name ? `<div style="display:flex;align-items:center;gap:6px">${_avatarHTML({name:e.actor_name,initials:e.actor_initials,color:e.actor_color||'#4f46e5',avatar:e.actor_avatar||null},'xs')}<span style="font-size:12px">${e.actor_name}</span></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
         <td><code style="font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px">${e.action}</code></td>
         <td style="font-size:12px;color:var(--text-3)">${e.entity_name||e.entity_id||'—'}</td>
       </tr>`

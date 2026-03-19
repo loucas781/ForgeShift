@@ -25,6 +25,10 @@ const router  = require('express').Router()
 const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit   = require('../audit')
+const fs      = require('fs')
+const path    = require('path')
+
+const AVATARS_DIR = path.join(__dirname, '../../public/uploads/avatars')
 
 const BACKUP_FORMAT_VERSION = 1
 
@@ -58,6 +62,21 @@ router.get('/export', (req, res) => {
       audit_log:           db.prepare('SELECT * FROM audit_log ORDER BY created_at LIMIT 10000').all(),
     }
 
+    // ── Avatar files — stored separately from DB rows ─────────────────────────
+    // Each entry is { filename, data } where data is a base64-encoded JPEG.
+    // Kept out of the users table rows intentionally — the DB only holds a URL
+    // path; the actual image bytes live on disk and are round-tripped here.
+    const avatars = []
+    if (fs.existsSync(AVATARS_DIR)) {
+      const files = fs.readdirSync(AVATARS_DIR).filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f))
+      for (const filename of files) {
+        try {
+          const data = fs.readFileSync(path.join(AVATARS_DIR, filename)).toString('base64')
+          avatars.push({ filename, data })
+        } catch { /* skip unreadable files */ }
+      }
+    }
+
     const manifest = {
       format:      'forgeshift-backup',
       version:     BACKUP_FORMAT_VERSION,
@@ -65,6 +84,7 @@ router.get('/export', (req, res) => {
       exported_by: req.user.id,
       instance:    process.env.APP_URL || 'unknown',
       tables,
+      avatars,      // [{ filename, data }] — image bytes as base64, separate from DB rows
     }
 
     const json      = JSON.stringify(manifest)
@@ -180,6 +200,12 @@ router.post('/restore', (req, res) => {
       stats.users = userCount
 
       // ── 2. Locations ───────────────────────────────────────────────────────
+      // Two-step: re-key any existing row that shares the same name but has a
+      // different id (e.g. a default location auto-created on fresh install),
+      // then upsert on id so subsequent restores stay idempotent.
+      const updateLocIdByName = db.prepare(`
+        UPDATE locations SET id = @id WHERE LOWER(TRIM(name)) = LOWER(TRIM(@name)) AND id != @id
+      `)
       const upsertLoc = db.prepare(`
         INSERT INTO locations (id, name, address, color, created_by, created_at)
         VALUES (@id, @name, @address, @color, @created_by, @created_at)
@@ -188,6 +214,7 @@ router.post('/restore', (req, res) => {
       `)
       let locCount = 0
       for (const l of (tables.locations || [])) {
+        updateLocIdByName.run({ id: l.id, name: l.name })
         upsertLoc.run({
           id:         l.id,
           name:       l.name,
@@ -224,6 +251,11 @@ router.post('/restore', (req, res) => {
       }
 
       // ── 4. Shift Templates ─────────────────────────────────────────────────
+      // Two-step: re-key existing rows sharing the same name under a different
+      // id before upserting, matching the same pattern used for locations.
+      const updateTmplIdByName = db.prepare(`
+        UPDATE shift_templates SET id = @id WHERE LOWER(TRIM(name)) = LOWER(TRIM(@name)) AND id != @id
+      `)
       const tmplHasGroupId = new Set(
         db.prepare('PRAGMA table_info(shift_templates)').all().map(c => c.name)
       ).has('group_id')
@@ -240,6 +272,7 @@ router.post('/restore', (req, res) => {
       `)
       let tmplCount = 0
       for (const t of (tables.shift_templates || [])) {
+        updateTmplIdByName.run({ id: t.id, name: t.name })
         upsertTmpl.run({
           id:          t.id,
           name:        t.name,
@@ -486,6 +519,30 @@ router.post('/restore', (req, res) => {
 
   try {
     restore()
+
+    // ── Restore avatar files ─────────────────────────────────────────────────
+    // Written to disk after the DB transaction so a DB failure doesn't leave
+    // orphaned files. Filenames are validated to prevent path traversal.
+    const avatarStats = { restored: 0, skipped: 0 }
+    if (Array.isArray(manifest.avatars) && manifest.avatars.length > 0) {
+      if (!fs.existsSync(AVATARS_DIR)) fs.mkdirSync(AVATARS_DIR, { recursive: true })
+      for (const entry of manifest.avatars) {
+        // Strict filename validation — only allow <id>.jpg / <id>.jpeg / <id>.png etc.
+        if (!entry.filename || !/^[\w-]+\.(jpg|jpeg|png|gif|webp)$/i.test(entry.filename)) {
+          avatarStats.skipped++
+          continue
+        }
+        try {
+          const dest = path.join(AVATARS_DIR, entry.filename)
+          fs.writeFileSync(dest, Buffer.from(entry.data, 'base64'))
+          avatarStats.restored++
+        } catch {
+          avatarStats.skipped++
+        }
+      }
+    }
+    stats.avatars = avatarStats
+
     audit(req.user.id, 'backup.restore', 'system', null, manifest.exported_at, { stats })
     res.json({ ok: true, exported_at: manifest.exported_at, instance: manifest.instance, stats })
   } catch (err) {
