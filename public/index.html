@@ -283,12 +283,37 @@ async function loadTeams() {
   const allOpt = document.createElement('option')
   allOpt.value = 'all'; allOpt.textContent = cfg.user.role === 'admin' ? 'All shifts' : 'All my teams'
   sel.appendChild(allOpt)
-  teams.forEach(t => {
-    const o = document.createElement('option')
-    o.value = 'team:' + t.id
-    o.textContent = t.name + (t.member_count > 0 ? ' (' + t.member_count + ')' : '')
-    sel.appendChild(o)
-  })
+
+  // Teams group
+  if (teams.length) {
+    const tGrp = document.createElement('optgroup')
+    tGrp.label = 'Teams'
+    teams.forEach(t => {
+      const o = document.createElement('option')
+      o.value = 'team:' + t.id
+      o.textContent = t.name + (t.member_count > 0 ? ' (' + t.member_count + ')' : '')
+      tGrp.appendChild(o)
+    })
+    sel.appendChild(tGrp)
+  }
+
+  // Individual users group.
+  // Admins: all active users.
+  // Shift leads: only members of their own teams (the `users` array has already
+  //   been narrowed to team scope inside loadTeams(), so no extra filtering needed).
+  // Both roles can open and EDIT the rota for any user shown here.
+  const scopeUsers = users.filter(u => u.is_active)
+  if (scopeUsers.length) {
+    const uGrp = document.createElement('optgroup')
+    uGrp.label = 'Individual'
+    scopeUsers.forEach(u => {
+      const o = document.createElement('option')
+      o.value = 'user:' + u.id
+      o.textContent = u.name + (u.id === cfg.user.id ? ' (me)' : '')
+      uGrp.appendChild(o)
+    })
+    sel.appendChild(uGrp)
+  }
 }
 
 async function loadTaskLists() {
@@ -356,6 +381,9 @@ async function loadShifts() {
         shifts = (await Promise.all(fetches)).flat()
         return
       }
+    } else if (filterVal.startsWith('user:')) {
+      // Individual rota view — single user, admin/shift_lead can edit
+      params.set('user_id', filterVal.slice(5))
     }
   }
   shifts = await api('/api/shifts?' + params)
@@ -504,8 +532,8 @@ function renderMonth() {
       html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
         '" style="background:' + color + '"' +
         ' title="' + (s.user_name || '') + ': ' + label + '"' +
-        ' onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')"' +
-        ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')">' +
+        (canManage() ? ' onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')"' : ' onclick="event.stopPropagation();openViewModal(\'' + s.id + '\')"') +
+        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')"' : '') + '>' +
         name + label + '</div>'
     })
 
@@ -545,8 +573,7 @@ function renderWeek() {
     taskLists.length > 0 || Object.keys(taskMap).some(d => d >= toDateStr(ws) && d <= toDateStr(new Date(ws.getTime() + 6*86400000)))
   )
 
-  let html = `<div class="cal-week">`
-  html += `<div style="border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);padding:10px 4px;"></div>`
+  let html = `<div class="cal-week-scroll-wrap"><div class="cal-week">`
   for (let i = 0; i < 7; i++) {
     const d = new Date(ws); d.setDate(d.getDate() + i)
     const ds = toDateStr(d)
@@ -560,7 +587,7 @@ function renderWeek() {
 
   // Task row for week view — one cell per day
   if (cfg.featureTasks && (weekHasTasks || canManage())) {
-    html += `<div style="border-right:1px solid var(--border);background:var(--surface-2);padding:4px 4px;font-size:10px;color:var(--text-3);display:flex;align-items:center;justify-content:center">Tasks</div>`
+
     for (let i = 0; i < 7; i++) {
       const d  = new Date(ws); d.setDate(d.getDate() + i)
       const ds = toDateStr(d)
@@ -584,9 +611,7 @@ function renderWeek() {
     }
   }
 
-  html += `<div class="cal-week-time-col" style="padding:8px 4px;font-size:11px;color:var(--text-3)">`
-  for (let h = 7; h <= 21; h++) html += `<div style="height:40px;padding-top:2px">${h}:00</div>`
-  html += `</div>`
+
   for (let i = 0; i < 7; i++) {
     const d  = new Date(ws); d.setDate(d.getDate() + i)
     const ds = toDateStr(d)
@@ -605,8 +630,9 @@ function renderWeek() {
       const label = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
       const time  = s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : ''
       html += `<div class="cal-week-shift-card${s.is_oncall?' is-oncall':''}" style="background:${color}"
-        onclick="event.stopPropagation();openEditModal('${s.id}')"
-        oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')">
+        onclick="event.stopPropagation();${canManage()?`openEditModal('${s.id}')`:`openViewModal('${s.id}')`}"
+        ${canManage()?`oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')"`:''}
+        >
         <div class="shift-loc">${canManage()?(s.user_name?.split(' ')[0]+': '):''}${label}</div>
         ${time ? `<div class="shift-time">${time}</div>` : ''}
         ${s.notes ? `<div class="shift-notes">${s.notes.slice(0,60)}${s.notes.length>60?'…':''}</div>` : ''}
@@ -617,7 +643,7 @@ function renderWeek() {
     }
     html += `</div></div>`
   }
-  html += `</div>`
+  html += `</div></div>`
   grid.innerHTML = html
 }
 
@@ -792,8 +818,44 @@ function setupColourPicker() {
   renderColourPicker(el, selectedColour, v => { selectedColour = v })
 }
 
+// Read-only shift view for members (no save/delete controls)
+function openViewModal(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  editingShiftId = null
+  document.getElementById('modalTitle').textContent = 'Shift Details'
+  document.getElementById('modalDate').value     = s.date
+  document.getElementById('modalLocation').value = s.location_id || ''
+  document.getElementById('modalStart').value    = s.start_time || ''
+  document.getElementById('modalEnd').value      = s.end_time || ''
+  document.getElementById('modalNotes').value    = s.notes || ''
+  document.getElementById('modalIsOff').checked    = !!s.is_off
+  document.getElementById('modalIsOncall').checked = !!s.is_oncall
+  document.getElementById('deleteShiftBtn').style.display = 'none'
+  // Hide save button and make fields read-only for members
+  const saveBtn = document.querySelector('#shiftModal .btn-primary')
+  if (saveBtn) saveBtn.style.display = 'none'
+  ;['modalDate','modalLocation','modalStart','modalEnd','modalNotes'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.setAttribute('disabled', 'disabled')
+  })
+  document.getElementById('modalIsOff').disabled    = true
+  document.getElementById('modalIsOncall').disabled = true
+  setupColourPicker()
+  document.getElementById('shiftModal').classList.add('open')
+}
+
 function closeModal() {
   document.getElementById('shiftModal').classList.remove('open')
+  // Re-enable fields after member view (in case admin also uses the modal)
+  ;['modalDate','modalLocation','modalStart','modalEnd','modalNotes'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.removeAttribute('disabled')
+  })
+  document.getElementById('modalIsOff').disabled    = false
+  document.getElementById('modalIsOncall').disabled = false
+  const saveBtn = document.querySelector('#shiftModal .btn-primary')
+  if (saveBtn) saveBtn.style.display = ''
 }
 
 async function saveShift() {

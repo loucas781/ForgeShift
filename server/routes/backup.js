@@ -118,11 +118,13 @@ router.post('/restore', (req, res) => {
     db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name)
   )
 
-  const restore = db.transaction(() => {
-    // Disable FK checks for the duration so re-keying user rows and the
-    // parent-before-child ordering can't trigger accidental cascade deletes.
-    db.pragma('foreign_keys = OFF')
+  // IMPORTANT: In better-sqlite3 the FK pragma must be set at connection level
+  // *before* starting a transaction — PRAGMAs inside a transaction are silently
+  // ignored by SQLite (FK enforcement is a compile-time session setting, not
+  // transactional). Disable now, restore in the finally block below.
+  db.pragma('foreign_keys = OFF')
 
+  const restore = db.transaction(() => {
     try {
 
       // ── 1. Users ───────────────────────────────────────────────────────────
@@ -477,9 +479,8 @@ router.post('/restore', (req, res) => {
       }
       stats.preferences = prefCount
 
-    } finally {
-      // Always re-enable FK enforcement before the transaction commits
-      db.pragma('foreign_keys = ON')
+    } catch (err) {
+      throw err
     }
   })
 
@@ -490,6 +491,10 @@ router.post('/restore', (req, res) => {
   } catch (err) {
     console.error('backup restore error:', err.message)
     res.status(500).json({ error: 'Restore failed: ' + err.message })
+  } finally {
+    // Always re-enable FK enforcement after the restore attempt — must be done
+    // outside the transaction so it actually takes effect at connection level.
+    db.pragma('foreign_keys = ON')
   }
 })
 
