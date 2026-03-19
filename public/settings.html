@@ -67,7 +67,11 @@
     .settings-panel { display:none; padding:24px; max-width:900px; }
     .settings-panel.active { display:block; }
     /* Team panel two-column grid collapses on narrow viewports */
-    @media(max-width:860px) { .team-panel-grid { grid-template-columns:1fr !important; } }
+    /* Team panel responsive grids — collapse to single column on narrow screens */
+    @media(max-width:780px) {
+      .team-top-row    { grid-template-columns:1fr !important; }
+      .team-bottom-row { grid-template-columns:1fr !important; }
+    }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
     .pref-row:last-child { border-bottom:none; }
@@ -879,83 +883,39 @@ async function renderTeamPanel() {
     : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'
 
   el.innerHTML = `
-    <div class="team-panel-grid" style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
-    <div><!-- left column: invite + members -->
+    <!-- Top row: Invite + Role Permissions side by side -->
+    <div class="team-top-row" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;align-items:start">
 
-    <!-- Invite Member card -->
-    <div class="card" style="margin-bottom:24px">
-      <div class="card-body">
-        <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Full Name</label>
-            <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
+      <!-- Invite Member card -->
+      <div class="card" style="height:100%">
+        <div class="card-body">
+          <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
+          <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" id="iEmail" placeholder="jane@company.com">
+            </div>
           </div>
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-input" id="iEmail" placeholder="jane@company.com">
+          <div class="form-group" style="max-width:260px;margin-bottom:20px">
+            <label class="form-label">Role</label>
+            <select class="form-select" id="iRole">
+              <option value="member">Member</option>
+              <option value="shift_lead">Shift Lead</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
+          <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
+          <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
         </div>
-        <div class="form-group" style="max-width:280px;margin-bottom:20px">
-          <label class="form-label">Role</label>
-          <select class="form-select" id="iRole">
-            <option value="member">Member</option>
-            <option value="shift_lead">Shift Lead</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
-        <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
       </div>
-    </div>
 
-    <!-- Team Members card -->
-    <div class="card">
-      <div class="card-body">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h2 style="font-size:16px;font-weight:700" id="teamMembersTitle">Team Members</h2>
-          <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
-        </div>
-        <!-- Role tabs -->
-        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
-        <!-- Tab description -->
-        <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
-        <!-- Members list -->
-        <div id="teamList">Loading…</div>
-      </div>
-    </div>
-
-    <div style="margin-top:32px">
-      <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Teams</h2>
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-        Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
-      </p>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button class="btn btn-secondary btn-sm" onclick="openCreateTeamModal()">+ Create team</button>
-      </div>
-      <div class="card" id="teamsCard">
-        <div class="card-body" id="teamsListEl">Loading…</div>
-      </div>
-    </div>
-
-    <div style="margin-top:32px">
-      <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Template Groups</h2>
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-        Organise templates into groups and control which members can see them. Members only see templates belonging to groups they are assigned to. Ungrouped templates are visible to everyone.
-      </p>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button class="btn btn-secondary btn-sm" onclick="openCreateTmplGroupModal()">+ Create group</button>
-      </div>
-      <div class="card">
-        <div class="card-body" id="tmplGroupsListEl">Loading…</div>
-      </div>
-    </div>
-
-    </div><!-- end left column -->
-
-    <!-- Right column: Role permissions reference -->
-    <div style="position:sticky;top:80px">
+      <!-- Role Permissions card -->
+      <div>
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">Role Permissions</h3>
@@ -1032,9 +992,53 @@ async function renderTeamPanel() {
           }).join('')}
         </div>
       </div>
-    </div><!-- end right column -->
+      </div><!-- end permissions card col -->
 
-    </div><!-- end grid -->`
+    </div><!-- end top row grid -->
+
+    <!-- Team Members — full width -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="font-size:16px;font-weight:700" id="teamMembersTitle">Team Members</h2>
+          <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
+        </div>
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
+        <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
+        <div id="teamList">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Teams + Template Groups side by side -->
+    <div class="team-bottom-row" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+      <div>
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:8px">Teams</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">
+          Group users into teams. Shift leads and admins can filter the calendar by team.
+        </p>
+        <div style="margin-bottom:12px">
+          <button class="btn btn-secondary btn-sm" onclick="openCreateTeamModal()">+ Create team</button>
+        </div>
+        <div class="card" id="teamsCard">
+          <div class="card-body" id="teamsListEl">Loading…</div>
+        </div>
+      </div>
+
+      <div>
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:8px">Template Groups</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">
+          Organise templates into groups and control which members can see them. Ungrouped templates are visible to everyone.
+        </p>
+        <div style="margin-bottom:12px">
+          <button class="btn btn-secondary btn-sm" onclick="openCreateTmplGroupModal()">+ Create group</button>
+        </div>
+        <div class="card">
+          <div class="card-body" id="tmplGroupsListEl">Loading…</div>
+        </div>
+      </div>
+
+    </div><!-- end bottom row -->`
 
   renderTeamList()
   await loadSettingsTeams()
