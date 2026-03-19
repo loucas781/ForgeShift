@@ -100,21 +100,28 @@ router.get('/assignments', requireAuth, (req, res) => {
     if (user_id) { sql += ' AND a.user_id = ?'; params.push(user_id) }
 
     if (req.user.role === 'admin') {
-      // no extra filter
+      // no extra filter — admins see all assignments, including individual user views
     } else if (req.user.role === 'shift_lead') {
-      if (!user_id) {
-        const teams = db.prepare('SELECT id FROM teams WHERE owned_by = ? OR created_by = ?').all(req.user.id, req.user.id)
-        if (teams.length) {
-          const teamIds = teams.map(t => t.id)
-          const members = db.prepare(
-            `SELECT DISTINCT user_id FROM team_members WHERE team_id IN (${teamIds.map(() => '?').join(',')})`
-          ).all(...teamIds).map(m => m.user_id)
-          members.push(req.user.id)
-          sql += ` AND a.user_id IN (${members.map(() => '?').join(',')})`
-          params.push(...members)
-        } else {
-          sql += ' AND a.user_id = ?'; params.push(req.user.id)
-        }
+      // Always constrain to team scope whether or not a specific user_id was requested.
+      const teams = db.prepare('SELECT id FROM teams WHERE owned_by = ? OR created_by = ?').all(req.user.id, req.user.id)
+      let scopeIds
+      if (teams.length) {
+        const teamIds = teams.map(t => t.id)
+        const members = db.prepare(
+          `SELECT DISTINCT user_id FROM team_members WHERE team_id IN (${teamIds.map(() => '?').join(',')})`
+        ).all(...teamIds).map(m => m.user_id)
+        members.push(req.user.id)
+        scopeIds = members
+      } else {
+        scopeIds = [req.user.id]
+      }
+      if (user_id) {
+        // Specific user requested — must be in scope
+        if (!scopeIds.includes(user_id)) return res.status(403).json({ error: 'That user is not in your team.' })
+        // user_id filter already applied to SQL above; no extra IN clause needed
+      } else {
+        sql += ` AND a.user_id IN (${scopeIds.map(() => '?').join(',')})`
+        params.push(...scopeIds)
       }
     } else {
       if (!user_id) { sql += ' AND a.user_id = ?'; params.push(req.user.id) }
