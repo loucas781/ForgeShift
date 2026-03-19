@@ -93,6 +93,8 @@ app.get('/api/config', optionalAuth, (req, res) => {
   const db = require('./db/connection')
   const featureTasksRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
   const featureTasks = featureTasksRow ? featureTasksRow.value === 'true' : false
+  const featureDragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
+  const featureDragDrop = featureDragDropRow ? featureDragDropRow.value !== 'false' : true
   res.json({
     appName:        process.env.APP_NAME      || 'ForgeShift',
     appEnv:         process.env.APP_ENV       || env,
@@ -106,6 +108,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     passwordPolicy: getPasswordPolicy(overrides),
     smtpEnabled:    emailSvc.getSmtpConfig().enabled,
     featureTasks,
+    featureDragDrop,
   })
 })
 
@@ -113,20 +116,33 @@ app.get('/api/config', optionalAuth, (req, res) => {
 app.get('/api/features', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
-  const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
-  res.json({ feature_tasks: row ? row.value === 'true' : false })
+  const tasksRow    = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  const dragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
+  res.json({
+    feature_tasks:     tasksRow    ? tasksRow.value    === 'true'  : false,
+    feature_drag_drop: dragDropRow ? dragDropRow.value !== 'false' : true,
+  })
 })
 app.patch('/api/features', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
-  const { feature_tasks } = req.body
+  const { feature_tasks, feature_drag_drop } = req.body
   if (typeof feature_tasks === 'boolean') {
     db.prepare(`INSERT INTO app_preferences (key, value, updated_at) VALUES ('feature_tasks', ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
       .run(feature_tasks ? 'true' : 'false')
   }
-  const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
-  res.json({ feature_tasks: row ? row.value === 'true' : false })
+  if (typeof feature_drag_drop === 'boolean') {
+    db.prepare(`INSERT INTO app_preferences (key, value, updated_at) VALUES ('feature_drag_drop', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
+      .run(feature_drag_drop ? 'true' : 'false')
+  }
+  const tasksRow    = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  const dragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
+  res.json({
+    feature_tasks:     tasksRow    ? tasksRow.value    === 'true'  : false,
+    feature_drag_drop: dragDropRow ? dragDropRow.value !== 'false' : true,
+  })
 })
 
 // ── Admin: toggle runtime settings ────────────────────────────────────────────

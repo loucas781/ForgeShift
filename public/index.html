@@ -1434,7 +1434,7 @@ let _drag = null  // { shiftId, date, start_time, end_time, durationMins, ghost,
 
 function _initDragDrop() {
   const grid = document.getElementById('calGrid')
-  if (!grid || !canManage()) return
+  if (!grid || !canManage() || cfg.featureDragDrop === false) return
 
   grid.addEventListener('pointerdown', e => {
     const card = e.target.closest('.cal-week-shift-card')
@@ -1524,7 +1524,7 @@ function _initDragDrop() {
     _drag = null
 
     ghost.remove()
-    card.style.opacity = ''
+    card.style.display = 'none'  // hide during API call — renderView() will rebuild
     card.classList.remove('dragging')
     document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
 
@@ -1564,6 +1564,7 @@ function _initDragDrop() {
     if (!_drag) return
     _drag.ghost.remove()
     _drag.card.style.opacity = ''
+    _drag.card.style.display = ''
     _drag.card.classList.remove('dragging')
     document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
     _drag = null
