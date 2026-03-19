@@ -228,30 +228,39 @@ function migrateAdditive() {
   console.log('✓ Task lists schema ready')
 
   // Expand role CHECK to include shift_lead — SQLite can't ALTER constraints
-  // so we check if the constraint is already expanded and rebuild if not
+  // so we check if the constraint is already expanded and rebuild if not.
+  // IMPORTANT: must disable foreign_keys during the rebuild to prevent CASCADE
+  // deletes from wiping shifts, team_members, tokens, etc.
   const tableSQL = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get()
   if (tableSQL && !tableSQL.sql.includes('shift_lead')) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users_new (
-        id          TEXT PRIMARY KEY,
-        name        TEXT NOT NULL,
-        email       TEXT NOT NULL UNIQUE,
-        password    TEXT NOT NULL,
-        initials    TEXT NOT NULL,
-        color       TEXT NOT NULL DEFAULT '#0052cc',
-        avatar      TEXT,
-        role        TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','shift_lead','member')),
-        is_active   INTEGER NOT NULL DEFAULT 1,
-        totp_secret TEXT,
-        totp_enabled INTEGER NOT NULL DEFAULT 0,
-        prefs       TEXT NOT NULL DEFAULT '{}',
-        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-      INSERT OR IGNORE INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at FROM users;
-      DROP TABLE users;
-      ALTER TABLE users_new RENAME TO users;
-    `)
-    console.log('✓ Expanded users.role CHECK to include shift_lead')
+    db.pragma('foreign_keys = OFF')
+    try {
+      db.exec(`
+        BEGIN;
+        CREATE TABLE users_new (
+          id          TEXT PRIMARY KEY,
+          name        TEXT NOT NULL,
+          email       TEXT NOT NULL UNIQUE,
+          password    TEXT NOT NULL,
+          initials    TEXT NOT NULL,
+          color       TEXT NOT NULL DEFAULT '#0052cc',
+          avatar      TEXT,
+          role        TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','shift_lead','member')),
+          is_active   INTEGER NOT NULL DEFAULT 1,
+          totp_secret TEXT,
+          totp_enabled INTEGER NOT NULL DEFAULT 0,
+          prefs       TEXT NOT NULL DEFAULT '{}',
+          created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
+        COMMIT;
+      `)
+      console.log('✓ Expanded users.role CHECK to include shift_lead')
+    } finally {
+      db.pragma('foreign_keys = ON')
+    }
   }
 
   // team_owned_by: track which shift_lead owns a team
