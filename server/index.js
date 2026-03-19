@@ -192,16 +192,17 @@ app.get('/api/stats', requireAuth, (req, res) => {
 })
 
 // ── API Routes ─────────────────────────────────────────────────────────────────
-app.use('/api/auth',      require('./routes/auth'))
-app.use('/api/users',     require('./routes/users'))
-app.use('/api/shifts',    require('./routes/shifts'))
-app.use('/api/templates', require('./routes/templates'))
-app.use('/api/locations', require('./routes/locations'))
-app.use('/api/teams',     require('./routes/teams'))
-app.use('/api/ical',      require('./routes/ical'))
-app.use('/api/backup',    require('./routes/backup'))
-app.use('/api/tasks',     require('./routes/tasks'))
-app.use('/api/holidays',  require('./routes/holidays'))
+app.use('/api/auth',             require('./routes/auth'))
+app.use('/api/users',            require('./routes/users'))
+app.use('/api/shifts',           require('./routes/shifts'))
+app.use('/api/templates',        require('./routes/templates'))
+app.use('/api/template-groups',  require('./routes/template-groups'))
+app.use('/api/locations',        require('./routes/locations'))
+app.use('/api/teams',            require('./routes/teams'))
+app.use('/api/ical',             require('./routes/ical'))
+app.use('/api/backup',           require('./routes/backup'))
+app.use('/api/tasks',            require('./routes/tasks'))
+app.use('/api/holidays',         require('./routes/holidays'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {

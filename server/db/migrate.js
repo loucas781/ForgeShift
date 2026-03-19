@@ -269,6 +269,36 @@ function migrateAdditive() {
     db.exec("ALTER TABLE teams ADD COLUMN owned_by TEXT REFERENCES users(id) ON DELETE SET NULL")
     console.log('✓ Added owned_by column to teams')
   }
+
+  // Template groups
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS template_groups (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_template_groups_sort ON template_groups(sort_order);
+  `)
+  const tmplCols = db.prepare("PRAGMA table_info(shift_templates)").all().map(c => c.name)
+  if (!tmplCols.includes('group_id')) {
+    db.exec("ALTER TABLE shift_templates ADD COLUMN group_id TEXT REFERENCES template_groups(id) ON DELETE SET NULL")
+    console.log('✓ Added group_id column to shift_templates')
+  }
+
+  // User → template group assignments
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_template_groups (
+      user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      group_id TEXT NOT NULL REFERENCES template_groups(id) ON DELETE CASCADE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, group_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_utg_user  ON user_template_groups(user_id);
+    CREATE INDEX IF NOT EXISTS idx_utg_group ON user_template_groups(group_id);
+  `)
+  console.log('✓ Template groups schema ready')
 }
 
 try {

@@ -7,12 +7,37 @@ const audit  = require('../audit')
 
 // ── GET /api/templates ────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
-  const templates = db.prepare(`
-    SELECT t.*, u.name as created_by_name
-    FROM shift_templates t
-    LEFT JOIN users u ON u.id = t.created_by
-    ORDER BY t.name
-  `).all()
+  let templates
+
+  if (req.user.role === 'admin') {
+    // Admins see everything
+    templates = db.prepare(`
+      SELECT t.*, u.name as created_by_name,
+             g.name as group_name, g.id as group_id
+      FROM shift_templates t
+      LEFT JOIN users u ON u.id = t.created_by
+      LEFT JOIN template_groups g ON g.id = t.group_id
+      ORDER BY g.sort_order, g.name, t.name
+    `).all()
+  } else {
+    // Members and shift_leads: see templates where either
+    //   (a) the template has no group (ungrouped = visible to all), OR
+    //   (b) the template's group is one the user is assigned to
+    // If the user has no group assignments at all, they see all ungrouped templates only.
+    templates = db.prepare(`
+      SELECT t.*, u.name as created_by_name,
+             g.name as group_name, g.id as group_id
+      FROM shift_templates t
+      LEFT JOIN users u ON u.id = t.created_by
+      LEFT JOIN template_groups g ON g.id = t.group_id
+      WHERE t.group_id IS NULL
+         OR EXISTS (
+              SELECT 1 FROM user_template_groups utg
+              WHERE utg.user_id = ? AND utg.group_id = t.group_id
+            )
+      ORDER BY g.sort_order, g.name, t.name
+    `).all(req.user.id)
+  }
 
   const days = db.prepare('SELECT * FROM template_days ORDER BY day_of_week').all()
   const daysByTemplate = {}
@@ -35,12 +60,12 @@ router.get('/:id', requireAuth, (req, res) => {
 // ── POST /api/templates ───────────────────────────────────────────────────────
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, description, days } = req.body
+    const { name, description, group_id, days } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Template name is required.' })
 
     const id = uuidv4()
-    db.prepare('INSERT INTO shift_templates (id, name, description, created_by) VALUES (?,?,?,?)')
-      .run(id, name.trim(), description || null, req.user.id)
+    db.prepare('INSERT INTO shift_templates (id, name, description, group_id, created_by) VALUES (?,?,?,?,?)')
+      .run(id, name.trim(), description || null, group_id || null, req.user.id)
 
     if (Array.isArray(days)) {
       const ins = db.prepare(`
@@ -73,10 +98,10 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     const tmpl = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(req.params.id)
     if (!tmpl) return res.status(404).json({ error: 'Template not found' })
 
-    const { name, description, days } = req.body
+    const { name, description, group_id, days } = req.body
     if (name?.trim()) {
-      db.prepare('UPDATE shift_templates SET name=?, description=? WHERE id=?')
-        .run(name.trim(), description ?? tmpl.description, req.params.id)
+      db.prepare('UPDATE shift_templates SET name=?, description=?, group_id=? WHERE id=?')
+        .run(name.trim(), description ?? tmpl.description, group_id ?? tmpl.group_id, req.params.id)
     }
 
     if (Array.isArray(days)) {

@@ -31,7 +31,8 @@
         </div>
         <div style="display:flex;gap:8px" id="adminActions"></div>
       </div>
-      <div class="template-grid" id="templateGrid">
+      <div id="groupFilterBar" style="display:none;margin-bottom:20px"></div>
+      <div id="templateGrid">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>
           <h3>No templates yet</h3>
@@ -56,6 +57,12 @@
       <div class="form-group">
         <label class="form-label">Description (optional)</label>
         <input type="text" class="form-input" id="tmplDesc" placeholder="Describe this template…">
+      </div>
+      <div class="form-group" id="tmplGroupRow">
+        <label class="form-label">Group</label>
+        <select class="form-select" id="tmplGroup">
+          <option value="">No group</option>
+        </select>
       </div>
       <h4 style="margin:16px 0 12px;font-size:13px">Configure each day</h4>
       <div id="copyDayBar" style="display:none;margin-bottom:10px"></div>
@@ -106,10 +113,12 @@
 
 let cfg = null
 let templates = []
+let groups = []
 let locations = []
 let users = []
 let editingTmplId = null
 let applyingTmplId = null
+let activeGroupFilter = 'all'
 let dayConfigs = {} // day_of_week -> { location_id, start_time, end_time, notes, note_color, is_off }
 let excludedDays = new Set() // day indices excluded from this template
 
@@ -119,7 +128,7 @@ async function init() {
   cfg = await loadConfig()
   if (!cfg) return
   renderShell(cfg, 'templates')
-  await Promise.all([loadLocations(), loadUsers(), loadTemplates()])
+  await Promise.all([loadLocations(), loadUsers(), loadGroups(), loadTemplates()])
 
   if (cfg.user.role === 'admin') {
     document.getElementById('adminActions').innerHTML = `
@@ -128,6 +137,14 @@ async function init() {
         New Template
       </button>`
   }
+}
+
+async function loadGroups() {
+  try {
+    // Admins get full group list; others get their assigned groups only
+    const endpoint = cfg.user.role === 'admin' ? '/api/template-groups' : '/api/template-groups/my'
+    groups = await api(endpoint)
+  } catch { groups = [] }
 }
 
 async function loadLocations() {
@@ -152,11 +169,120 @@ async function loadUsers() {
 
 async function loadTemplates() {
   templates = await api('/api/templates')
+  renderGroupFilterBar()
   renderTemplateGrid()
+}
+
+function renderGroupFilterBar() {
+  const bar = document.getElementById('groupFilterBar')
+  // Only show bar if there are groups to filter
+  if (!groups.length) { bar.style.display = 'none'; return }
+  bar.style.display = 'flex'
+  bar.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:20px'
+
+  const allCount = templates.length
+  const pills = [{ id: 'all', name: 'All', count: allCount }]
+  groups.forEach(g => {
+    const count = templates.filter(t => t.group_id === g.id).length
+    pills.push({ id: g.id, name: g.name, count })
+  })
+  // Add ungrouped pill if any ungrouped templates exist (admin only, informational)
+  const ungroupedCount = templates.filter(t => !t.group_id).length
+  if (cfg.user.role === 'admin' && ungroupedCount > 0) {
+    pills.push({ id: 'ungrouped', name: 'Ungrouped', count: ungroupedCount })
+  }
+
+  bar.innerHTML = pills.map(p => {
+    const active = activeGroupFilter === p.id
+    return `<button onclick="setGroupFilter('${p.id}')" style="
+      display:inline-flex;align-items:center;gap:5px;
+      padding:5px 12px;border-radius:20px;font-size:12px;font-weight:${active?'600':'500'};
+      border:1px solid ${active?'var(--blue)':'var(--border)'};
+      background:${active?'var(--blue)':'var(--surface)'};
+      color:${active?'#fff':'var(--text-2)'};
+      cursor:pointer;transition:all .15s
+    ">
+      ${p.name}
+      <span style="
+        font-size:10px;padding:0 5px;border-radius:10px;
+        background:${active?'rgba(255,255,255,.25)':'var(--surface-2)'};
+        color:${active?'#fff':'var(--text-3)'}
+      ">${p.count}</span>
+    </button>`
+  }).join('')
+}
+
+function setGroupFilter(groupId) {
+  activeGroupFilter = groupId
+  renderGroupFilterBar()
+  renderTemplateGrid()
+}
+
+function renderTemplateCard(t) {
+  const dayAbbrs = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  const dayMap = {}
+  ;(t.days||[]).forEach(d => { dayMap[d.day_of_week] = d })
+  const dayCells = Array.from({length:7}, (_,i) => {
+    const d = dayMap[i]
+    if (!d) return `<div class="template-day-cell"><div class="day-abbr">${dayAbbrs[i]}</div><div class="day-loc">—</div></div>`
+    const locName = d.location_id ? (locations.find(l=>l.id===d.location_id)?.name||'?') : (d.is_off?'Off':'—')
+    const swatchColor = (d.location_id ? locations.find(l=>l.id===d.location_id)?.color : null) || d.note_color || '#4f46e5'
+    return `<div class="template-day-cell">
+      <div class="day-abbr">${dayAbbrs[i]}</div>
+      <div class="day-loc" title="${locName}">${locName}</div>
+      <div class="day-swatch" style="background:${swatchColor}"></div>
+    </div>`
+  }).join('')
+
+  const groupBadge = t.group_name
+    ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);margin-top:3px">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="9" height="9"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+        ${t.group_name}
+      </span>`
+    : ''
+
+  const adminBtns = cfg.user.role === 'admin' ? `
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="duplicateTmpl('${t.id}')" title="Duplicate template">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditTmpl('${t.id}')" title="Edit">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTmpl('${t.id}')" title="Delete" style="color:var(--red)">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>` : cfg.user.role === 'shift_lead' ? `
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
+    </div>` : ''
+
+  return `<div class="template-card">
+    <div class="template-card-header">
+      <div>
+        <div class="template-card-title">${t.name}</div>
+        ${t.description ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${t.description}</div>` : ''}
+        ${groupBadge}
+      </div>
+      ${adminBtns}
+    </div>
+    <div class="template-days-row">${dayCells}</div>
+  </div>`
 }
 
 function renderTemplateGrid() {
   const grid = document.getElementById('templateGrid')
+  grid.className = 'template-grid'
+
+  // Filter by active group
+  let visible = templates
+  if (activeGroupFilter === 'ungrouped') {
+    visible = templates.filter(t => !t.group_id)
+  } else if (activeGroupFilter !== 'all') {
+    visible = templates.filter(t => t.group_id === activeGroupFilter)
+  }
+
   if (!templates.length) {
     grid.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12z"/></svg>
@@ -166,55 +292,70 @@ function renderTemplateGrid() {
     return
   }
 
-  // Mon=0..Sun=6 in template (day_of_week 0=Mon)
-  const dayAbbrs = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-
-  grid.innerHTML = templates.map(t => {
-    const dayMap = {}
-    ;(t.days||[]).forEach(d => { dayMap[d.day_of_week] = d })
-    const dayCells = Array.from({length:7}, (_,i) => {
-      const d = dayMap[i]
-      if (!d) return `<div class="template-day-cell"><div class="day-abbr">${dayAbbrs[i]}</div><div class="day-loc">—</div></div>`
-      const locName = d.location_id ? (locations.find(l=>l.id===d.location_id)?.name||'?') : (d.is_off?'Off':'—')
-      const swatchColor = (d.location_id ? locations.find(l=>l.id===d.location_id)?.color : null) || d.note_color || '#4f46e5'
-      return `<div class="template-day-cell">
-        <div class="day-abbr">${dayAbbrs[i]}</div>
-        <div class="day-loc" title="${locName}">${locName}</div>
-        <div class="day-swatch" style="background:${swatchColor}"></div>
-      </div>`
-    }).join('')
-
-    const adminBtns = cfg.user.role === 'admin' ? `
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
-        <button class="btn btn-ghost btn-sm btn-icon" onclick="duplicateTmpl('${t.id}')" title="Duplicate template">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/></svg>
-        </button>
-        <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditTmpl('${t.id}')" title="Edit">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
-        </button>
-        <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTmpl('${t.id}')" title="Delete" style="color:var(--red)">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-        </button>
-      </div>` : cfg.user.role === 'shift_lead' ? `
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
-      </div>` : ''
-
-    return `<div class="template-card">
-      <div class="template-card-header">
-        <div>
-          <div class="template-card-title">${t.name}</div>
-          ${t.description ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${t.description}</div>` : ''}
-        </div>
-        ${adminBtns}
-      </div>
-      <div class="template-days-row">${dayCells}</div>
+  if (!visible.length) {
+    grid.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:.4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/></svg>
+      <h3>No templates in this group</h3>
+      <p>No templates have been assigned to this group yet</p>
     </div>`
-  }).join('')
+    return
+  }
+
+  // When viewing 'all', render grouped sections if groups exist
+  if (activeGroupFilter === 'all' && groups.length > 0) {
+    let html = ''
+    // Ungrouped first (if any)
+    const ungrouped = visible.filter(t => !t.group_id)
+    // Then each group in order
+    const grouped = groups.map(g => ({
+      group: g,
+      items: visible.filter(t => t.group_id === g.id)
+    })).filter(x => x.items.length > 0)
+
+    // If there are multiple sections, show section headings
+    const showHeadings = grouped.length > 0 && (ungrouped.length > 0 || grouped.length > 1)
+
+    if (showHeadings && ungrouped.length > 0) {
+      html += `<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-bottom:4px;margin-top:4px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Ungrouped</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>`
+      html += ungrouped.map(t => renderTemplateCard(t)).join('')
+    }
+
+    grouped.forEach(({ group, items }) => {
+      if (showHeadings) {
+        html += `<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-bottom:4px;margin-top:${html?'16':'4'}px">
+          <span style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">${group.name}</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>`
+      }
+      html += items.map(t => renderTemplateCard(t)).join('')
+    })
+
+    if (!showHeadings) {
+      // Just flat list — no groups have templates yet or only one group
+      html = visible.map(t => renderTemplateCard(t)).join('')
+    }
+
+    grid.innerHTML = html
+  } else {
+    grid.innerHTML = visible.map(t => renderTemplateCard(t)).join('')
+  }
 }
 
 // ── Template Editor ────────────────────────────────────────────────────────────
+function renderGroupSelect(selectedId) {
+  const row = document.getElementById('tmplGroupRow')
+  const el  = document.getElementById('tmplGroup')
+  if (!el || !row) return
+  // Only admins can assign groups; hide the field for others
+  if (cfg.user.role !== 'admin' || groups.length === 0) { row.style.display = 'none'; return }
+  row.style.display = ''
+  el.innerHTML = '<option value="">No group</option>' +
+    groups.map(g => `<option value="${g.id}"${g.id === selectedId ? ' selected' : ''}>${g.name}</option>`).join('')
+}
+
 function openCreateTmpl() {
   editingTmplId = null
   dayConfigs = {}
@@ -222,6 +363,7 @@ function openCreateTmpl() {
   document.getElementById('tmplModalTitle').textContent = 'New Template'
   document.getElementById('tmplName').value = ''
   document.getElementById('tmplDesc').value = ''
+  renderGroupSelect(null)
   renderDayEditor()
   document.getElementById('tmplModal').classList.add('open')
 }
@@ -241,6 +383,7 @@ function openEditTmpl(id) {
   document.getElementById('tmplModalTitle').textContent = 'Edit Template'
   document.getElementById('tmplName').value = t.name
   document.getElementById('tmplDesc').value = t.description || ''
+  renderGroupSelect(t.group_id || null)
   renderDayEditor()
   document.getElementById('tmplModal').classList.add('open')
 }
@@ -448,12 +591,14 @@ async function saveTmpl() {
     })
   }
 
+  const group_id = document.getElementById('tmplGroup')?.value || null
+
   try {
     if (editingTmplId) {
-      await api(`/api/templates/${editingTmplId}`, { method: 'PUT', body: { name, description: document.getElementById('tmplDesc').value.trim(), days } })
+      await api(`/api/templates/${editingTmplId}`, { method: 'PUT', body: { name, description: document.getElementById('tmplDesc').value.trim(), group_id, days } })
       toast('Template updated', 'success')
     } else {
-      await api('/api/templates', { method: 'POST', body: { name, description: document.getElementById('tmplDesc').value.trim(), days } })
+      await api('/api/templates', { method: 'POST', body: { name, description: document.getElementById('tmplDesc').value.trim(), group_id, days } })
       toast('Template created', 'success')
     }
     closeTmplModal()
@@ -485,6 +630,7 @@ async function duplicateTmpl(id) {
       body: {
         name: newName,
         description: t.description || '',
+        group_id: t.group_id || null,
         days: (t.days || []).map(d => ({
           day_of_week: d.day_of_week,
           location_id: d.location_id || null,
