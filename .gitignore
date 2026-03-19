@@ -17,3 +17,6 @@ uploads/
 
 # Claude Code guidance file — local only
 CLAUDE.md
+
+# Claude Code local session data
+.claude/
