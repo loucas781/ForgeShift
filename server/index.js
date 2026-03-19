@@ -248,6 +248,7 @@ app.use('/api/ical',             require('./routes/ical'))
 app.use('/api/backup',           require('./routes/backup'))
 app.use('/api/tasks',            require('./routes/tasks'))
 app.use('/api/holidays',         require('./routes/holidays'))
+app.use('/api/passkeys',         require('./routes/passkeys'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {

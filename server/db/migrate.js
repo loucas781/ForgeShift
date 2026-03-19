@@ -352,6 +352,20 @@ function migrateAdditive() {
       console.log('✓ Added token_version column to users')
     }
   }
+
+  // Passkey / WebAuthn credentials
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS passkey_credentials (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      public_key  TEXT NOT NULL,
+      counter     INTEGER NOT NULL DEFAULT 0,
+      device_name TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_passkey_user ON passkey_credentials(user_id);
+  `)
+  console.log('✓ Passkey credentials schema ready')
 }
 
 try {

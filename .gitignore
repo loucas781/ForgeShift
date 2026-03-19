@@ -14,3 +14,6 @@ uploads/
 
 # Runtime overrides (toggled via Settings UI)
 .runtime-overrides.json
+
+# Claude Code guidance file — local only
+CLAUDE.md

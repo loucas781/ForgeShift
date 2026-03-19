@@ -43,6 +43,16 @@
 
     <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
 
+    <div id="passkeyDivider" style="display:none;align-items:center;gap:10px;margin:16px 0">
+      <hr style="flex:1;border:none;border-top:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-3)">or</span>
+      <hr style="flex:1;border:none;border-top:1px solid var(--border)">
+    </div>
+    <button class="btn btn-secondary auth-btn" id="passkeyBtn" style="display:none" onclick="doPasskeyLogin()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      Sign in with passkey
+    </button>
+
     <div class="auth-link" id="signupLink">
       Don't have an account? <a href="/signup.html">Sign up</a>
     </div>
@@ -71,10 +81,76 @@
         fpLink.title = 'No email server configured — ask your admin to generate a reset link from Settings → Team'
       }
     } catch {}
+    // Show passkey option if browser supports WebAuthn
+    if (window.PublicKeyCredential) {
+      document.getElementById('passkeyDivider').style.display = 'flex'
+      document.getElementById('passkeyBtn').style.display = 'block'
+    }
   }
   init()
 
   document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+
+  function _b64url(str) {
+    const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - base64.length % 4)
+    const bin = atob(base64 + pad)
+    return Uint8Array.from(bin, c => c.charCodeAt(0)).buffer
+  }
+  function _ab2b64url(buf) {
+    return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')
+  }
+
+  async function doPasskeyLogin() {
+    const btn = document.getElementById('passkeyBtn')
+    const err = document.getElementById('loginError')
+    err.classList.remove('show')
+    btn.disabled = true; btn.textContent = 'Waiting for passkey…'
+    try {
+      const email = document.getElementById('email').value.trim()
+      const optRes = await fetch('/api/passkeys/auth-options', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(email ? { email } : {})
+      })
+      const opts = await optRes.json()
+      if (!optRes.ok) { err.textContent = opts.error || 'Failed to start passkey login'; err.classList.add('show'); return }
+
+      const challenge = _b64url(opts.challenge)
+      const allowCredentials = (opts.allowCredentials || []).map(c => ({ ...c, id: _b64url(c.id) }))
+
+      const assertion = await navigator.credentials.get({
+        publicKey: { ...opts, challenge, allowCredentials }
+      })
+
+      const credential = {
+        id: assertion.id,
+        rawId: _ab2b64url(assertion.rawId),
+        type: assertion.type,
+        response: {
+          authenticatorData: _ab2b64url(assertion.response.authenticatorData),
+          clientDataJSON:    _ab2b64url(assertion.response.clientDataJSON),
+          signature:         _ab2b64url(assertion.response.signature),
+          userHandle:        assertion.response.userHandle ? _ab2b64url(assertion.response.userHandle) : null,
+        }
+      }
+
+      const verRes = await fetch('/api/passkeys/auth-verify', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ credential, nonce: opts._nonce })
+      })
+      const verData = await verRes.json()
+      if (!verRes.ok) { err.textContent = verData.error || 'Passkey verification failed'; err.classList.add('show'); return }
+      window.location.href = verData.redirectTo || '/'
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') {
+        err.textContent = 'Passkey sign-in failed — ' + (e.message || 'please try again')
+        err.classList.add('show')
+      }
+    } finally {
+      btn.disabled = false
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>Sign in with passkey'
+    }
+  }
 
   async function doLogin() {
     const btn = document.getElementById('loginBtn')
