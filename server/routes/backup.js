@@ -12,9 +12,10 @@
  *   - Upserts all rows in dependency order — never wipes existing data
  *   - Admin only
  *
- * Restore strategy: INSERT OR REPLACE / INSERT OR IGNORE
- *   Existing rows are overwritten with backup values; rows not in the backup
- *   are left untouched. Safe to run against a live instance.
+ * Restore strategy:
+ *   Each table uses the safest upsert pattern for its constraint set.
+ *   Users are handled with a two-step approach to cover both id and email
+ *   uniqueness constraints — the most common source of restore failures.
  */
 
 const router  = require('express').Router()
@@ -43,6 +44,8 @@ router.get('/export', (req, res) => {
     const icalTokens   = db.prepare('SELECT * FROM ical_tokens').all()
     const preferences  = db.prepare('SELECT * FROM app_preferences').all()
     const auditLog     = db.prepare('SELECT * FROM audit_log ORDER BY created_at LIMIT 10000').all()
+    const teams        = db.prepare('SELECT * FROM teams ORDER BY created_at').all()
+    const teamMembers  = db.prepare('SELECT * FROM team_members ORDER BY added_at').all()
 
     const manifest = {
       format:      'forgeshift-backup',
@@ -59,6 +62,8 @@ router.get('/export', (req, res) => {
         ical_tokens:      icalTokens,
         app_preferences:  preferences,
         audit_log:        auditLog,
+        teams,
+        team_members:     teamMembers,
       },
     }
 
@@ -98,32 +103,67 @@ router.post('/restore', (req, res) => {
   }
 
   const { tables = {} } = manifest
-  const stats = { users: 0, locations: 0, templates: 0, templateDays: 0, shifts: 0, preferences: 0 }
+  const stats = { users: 0, locations: 0, templates: 0, templateDays: 0, shifts: 0, preferences: 0, teams: 0, teamMembers: 0 }
+
+  // Detect which optional columns exist so we don't INSERT columns that
+  // haven't been added yet on older instances (additive migration safety).
+  const userCols  = new Set(db.prepare('PRAGMA table_info(users)').all().map(c => c.name))
+  const shiftCols = new Set(db.prepare('PRAGMA table_info(shifts)').all().map(c => c.name))
 
   // Run entire restore inside a single SQLite transaction for atomicity
   const restore = db.transaction(() => {
 
     // ── 1. Users ─────────────────────────────────────────────────────────────
+    // Two-step upsert to handle BOTH unique constraints on users:
+    //   - PRIMARY KEY (id)
+    //   - UNIQUE (email)
+    //
+    // Scenario A: same id exists → UPDATE in place (preserves passwords etc.)
+    // Scenario B: same email exists under a different id (e.g. fresh install
+    //   recreated the admin) → re-key the existing row to the backup id first,
+    //   then the main upsert on id will cleanly UPDATE it.
+    // Scenario C: neither exists → INSERT fresh.
+    const updateUserIdByEmail = db.prepare(`
+      UPDATE users SET id = @id WHERE email = @email AND id != @id
+    `)
     const upsertUser = db.prepare(`
-      INSERT INTO users (id, name, email, password, initials, color, avatar, role, is_active, created_at)
-      VALUES (@id, @name, @email, @password, @initials, @color, @avatar, @role, @is_active, @created_at)
+      INSERT INTO users (
+        id, name, email, password, initials, color, avatar, role, is_active, created_at
+        ${userCols.has('totp_secret')  ? ', totp_secret'  : ''}
+        ${userCols.has('totp_enabled') ? ', totp_enabled' : ''}
+        ${userCols.has('prefs')        ? ', prefs'        : ''}
+      ) VALUES (
+        @id, @name, @email, @password, @initials, @color, @avatar, @role, @is_active, @created_at
+        ${userCols.has('totp_secret')  ? ', @totp_secret'  : ''}
+        ${userCols.has('totp_enabled') ? ', @totp_enabled' : ''}
+        ${userCols.has('prefs')        ? ', @prefs'        : ''}
+      )
       ON CONFLICT(id) DO UPDATE SET
         name=excluded.name, email=excluded.email, initials=excluded.initials,
         color=excluded.color, avatar=excluded.avatar, role=excluded.role,
         is_active=excluded.is_active
+        ${userCols.has('totp_secret')  ? ', totp_secret=excluded.totp_secret'   : ''}
+        ${userCols.has('totp_enabled') ? ', totp_enabled=excluded.totp_enabled' : ''}
+        ${userCols.has('prefs')        ? ', prefs=excluded.prefs'               : ''}
     `)
     for (const u of (tables.users || [])) {
+      // Step 1: if this email already exists under a different id, re-key it
+      updateUserIdByEmail.run({ id: u.id, email: u.email })
+      // Step 2: upsert on id (now guaranteed to be the only row with this email)
       upsertUser.run({
-        id:         u.id,
-        name:       u.name,
-        email:      u.email,
-        password:   u.password,
-        initials:   u.initials,
-        color:      u.color || '#0052cc',
-        avatar:     u.avatar || null,
-        role:       u.role || 'member',
-        is_active:  u.is_active ?? 1,
-        created_at: u.created_at,
+        id:           u.id,
+        name:         u.name,
+        email:        u.email,
+        password:     u.password,
+        initials:     u.initials,
+        color:        u.color || '#0052cc',
+        avatar:       u.avatar || null,
+        role:         u.role || 'member',
+        is_active:    u.is_active ?? 1,
+        created_at:   u.created_at,
+        totp_secret:  u.totp_secret  || null,
+        totp_enabled: u.totp_enabled ?? 0,
+        prefs:        u.prefs        || '{}',
       })
       stats.users++
     }
@@ -166,11 +206,16 @@ router.post('/restore', (req, res) => {
     }
 
     // ── 4. Template Days ──────────────────────────────────────────────────────
+    // Has UNIQUE(template_id, day_of_week) in addition to the PK — handle both.
     const upsertTmplDay = db.prepare(`
       INSERT INTO template_days (id, template_id, day_of_week, location_id, start_time, end_time, notes, note_color, is_off)
       VALUES (@id, @template_id, @day_of_week, @location_id, @start_time, @end_time, @notes, @note_color, @is_off)
       ON CONFLICT(id) DO UPDATE SET
         day_of_week=excluded.day_of_week, location_id=excluded.location_id,
+        start_time=excluded.start_time, end_time=excluded.end_time,
+        notes=excluded.notes, note_color=excluded.note_color, is_off=excluded.is_off
+      ON CONFLICT(template_id, day_of_week) DO UPDATE SET
+        location_id=excluded.location_id,
         start_time=excluded.start_time, end_time=excluded.end_time,
         notes=excluded.notes, note_color=excluded.note_color, is_off=excluded.is_off
     `)
@@ -190,14 +235,29 @@ router.post('/restore', (req, res) => {
     }
 
     // ── 5. Shifts ─────────────────────────────────────────────────────────────
+    // Has UNIQUE(user_id, date) in addition to the PK — handle both.
     const upsertShift = db.prepare(`
-      INSERT INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, template_id, created_by, created_at, updated_at)
-      VALUES (@id, @user_id, @date, @location_id, @start_time, @end_time, @notes, @note_color, @is_off, @template_id, @created_by, @created_at, @updated_at)
+      INSERT INTO shifts (
+        id, user_id, date, location_id, start_time, end_time,
+        notes, note_color, is_off, template_id, created_by, created_at, updated_at
+        ${shiftCols.has('is_oncall') ? ', is_oncall' : ''}
+      ) VALUES (
+        @id, @user_id, @date, @location_id, @start_time, @end_time,
+        @notes, @note_color, @is_off, @template_id, @created_by, @created_at, @updated_at
+        ${shiftCols.has('is_oncall') ? ', @is_oncall' : ''}
+      )
       ON CONFLICT(id) DO UPDATE SET
         date=excluded.date, location_id=excluded.location_id,
         start_time=excluded.start_time, end_time=excluded.end_time,
         notes=excluded.notes, note_color=excluded.note_color,
         is_off=excluded.is_off, updated_at=excluded.updated_at
+        ${shiftCols.has('is_oncall') ? ', is_oncall=excluded.is_oncall' : ''}
+      ON CONFLICT(user_id, date) DO UPDATE SET
+        location_id=excluded.location_id,
+        start_time=excluded.start_time, end_time=excluded.end_time,
+        notes=excluded.notes, note_color=excluded.note_color,
+        is_off=excluded.is_off, updated_at=excluded.updated_at
+        ${shiftCols.has('is_oncall') ? ', is_oncall=excluded.is_oncall' : ''}
     `)
     for (const s of (tables.shifts || [])) {
       upsertShift.run({
@@ -210,6 +270,7 @@ router.post('/restore', (req, res) => {
         notes:       s.notes || null,
         note_color:  s.note_color || '#0052cc',
         is_off:      s.is_off ?? 0,
+        is_oncall:   s.is_oncall ?? 0,
         template_id: s.template_id || null,
         created_by:  s.created_by || null,
         created_at:  s.created_at,
@@ -219,13 +280,16 @@ router.post('/restore', (req, res) => {
     }
 
     // ── 6. iCal Tokens ────────────────────────────────────────────────────────
-    const upsertIcal = db.prepare(`
-      INSERT INTO ical_tokens (id, user_id, token, created_at)
+    // Has two UNIQUE constraints: user_id and token.
+    // Delete the existing token for this user first so neither constraint fires.
+    const deleteIcal = db.prepare('DELETE FROM ical_tokens WHERE user_id = @user_id')
+    const insertIcal = db.prepare(`
+      INSERT OR IGNORE INTO ical_tokens (id, user_id, token, created_at)
       VALUES (@id, @user_id, @token, @created_at)
-      ON CONFLICT(user_id) DO NOTHING
     `)
     for (const t of (tables.ical_tokens || [])) {
-      upsertIcal.run({ id: t.id, user_id: t.user_id, token: t.token, created_at: t.created_at })
+      deleteIcal.run({ user_id: t.user_id })
+      insertIcal.run({ id: t.id, user_id: t.user_id, token: t.token, created_at: t.created_at })
     }
 
     // ── 7. App Preferences ────────────────────────────────────────────────────
@@ -237,6 +301,38 @@ router.post('/restore', (req, res) => {
     for (const p of (tables.app_preferences || [])) {
       upsertPref.run({ key: p.key, value: p.value, updated_at: p.updated_at || new Date().toISOString() })
       stats.preferences++
+    }
+
+    // ── 8. Teams ──────────────────────────────────────────────────────────────
+    const upsertTeam = db.prepare(`
+      INSERT INTO teams (id, name, color, created_by, created_at)
+      VALUES (@id, @name, @color, @created_by, @created_at)
+      ON CONFLICT(id) DO UPDATE SET
+        name=excluded.name, color=excluded.color
+    `)
+    for (const t of (tables.teams || [])) {
+      upsertTeam.run({
+        id:         t.id,
+        name:       t.name,
+        color:      t.color || '#0052cc',
+        created_by: t.created_by || null,
+        created_at: t.created_at,
+      })
+      stats.teams++
+    }
+
+    // ── 9. Team Members ───────────────────────────────────────────────────────
+    const upsertTeamMember = db.prepare(`
+      INSERT OR IGNORE INTO team_members (team_id, user_id, added_at)
+      VALUES (@team_id, @user_id, @added_at)
+    `)
+    for (const m of (tables.team_members || [])) {
+      upsertTeamMember.run({
+        team_id:  m.team_id,
+        user_id:  m.user_id,
+        added_at: m.added_at || new Date().toISOString(),
+      })
+      stats.teamMembers++
     }
   })
 
