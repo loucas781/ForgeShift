@@ -425,7 +425,7 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   cursor: pointer;
 }
 
-.cal-grid { flex: 1; overflow: auto; min-height: 0; }
+.cal-grid { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; }
 
 /* Month view */
 .cal-month { display: grid; grid-template-columns: repeat(7,1fr); height: 100%; }
@@ -461,11 +461,6 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   outline: 2px dashed rgba(255,255,255,0.6);
   outline-offset: -2px;
 }
-.cal-week-shift-card.is-oncall {
-  outline: 2px dashed rgba(255,255,255,0.5);
-  outline-offset: -2px;
-}
-
 /* ── Task assignment banners ─────────────────────────────────────────────────── */
 .cal-task-banner {
   display: flex;
@@ -499,27 +494,39 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   padding: 3px 6px;
 }
 
-/* Week view */
-.cal-week {
-  display: grid; grid-template-columns: 60px repeat(7,1fr);
-  min-height: 100%; border-collapse: collapse;
+/* ── Week view — time grid ────────────────────────────────────────────────────── */
+
+/* Outer wrapper: header row + scrollable body below */
+.cal-week-outer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
 }
-.cal-week-header {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--surface-2); border-bottom: 1px solid var(--border);
-  grid-column: 1 / -1; display: contents;
+
+/* Sticky header row — time gutter + day headers */
+.cal-week-header-row {
+  display: grid;
+  grid-template-columns: 52px repeat(7, 1fr);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-.cal-week-time-col { border-right: 1px solid var(--border); }
-.cal-week-day-col {
-  border-right: 1px solid var(--border); display: flex; flex-direction: column;
-  min-height: 600px;
+.cal-week-header-gutter {
+  border-right: 1px solid var(--border);
 }
-.cal-week-day-col:last-child { border-right: none; }
 .cal-week-day-header {
-  padding: 10px 6px; text-align: center; border-bottom: 1px solid var(--border);
-  background: var(--surface-2); position: sticky; top: 0; z-index: 5;
+  padding: 8px 6px; text-align: center;
+  border-right: 1px solid var(--border);
 }
-.cal-week-day-header .day-name { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; }
+.cal-week-day-header:last-child { border-right: none; }
+.cal-week-day-header .day-name {
+  font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase;
+}
 .cal-week-day-header .day-num {
   font-size: 20px; font-weight: 800; color: var(--text); margin-top: 2px;
 }
@@ -527,16 +534,158 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   width: 32px; height: 32px; background: var(--brand); color: #fff; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; margin: 2px auto 0;
 }
-.cal-week-shifts { padding: 4px; flex: 1; }
+.cal-week-day-header.is-holiday .day-num { color: #b45309; }
+[data-theme="dark"] .cal-week-day-header.is-holiday .day-num,
+[data-theme="oled"] .cal-week-day-header.is-holiday .day-num { color: #fbbf24; }
+
+/* Scrollable body: time gutter + 7 day columns */
+.cal-week-body {
+  display: grid;
+  grid-template-columns: 52px repeat(7, 1fr);
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+/* Time gutter */
+.cal-week-time-gutter {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 5;
+}
+.cal-week-hour-label {
+  height: 60px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 2px 6px 0;
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 600;
+  pointer-events: none;
+}
+.cal-week-hour-label:first-child { visibility: hidden; } /* midnight label hidden */
+
+/* Day columns */
+.cal-week-day-col {
+  border-right: 1px solid var(--border);
+  position: relative;
+  cursor: pointer;
+}
+.cal-week-day-col:last-child { border-right: none; }
+.cal-week-day-col.is-holiday { background: rgba(180,130,30,.04); }
+[data-theme="dark"] .cal-week-day-col.is-holiday,
+[data-theme="oled"] .cal-week-day-col.is-holiday { background: rgba(251,191,36,.04); }
+
+/* Hour grid lines inside each day column */
+.cal-week-hour-row {
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.cal-week-hour-row:last-child { border-bottom: none; }
+
+/* The inner relative container that holds hour rows + positioned events */
+.cal-week-col-inner {
+  position: relative;
+  height: 1440px; /* 24h × 60px */
+}
+
+/* Positioned shift blocks */
 .cal-week-shift-card {
-  border-radius: var(--r-md); padding: 6px 8px; margin-bottom: 4px;
-  font-size: 11px; color: #fff; cursor: pointer;
+  position: absolute;
+  left: 3px; right: 3px;
+  border-radius: var(--r-md);
+  padding: 4px 7px;
+  font-size: 11px;
+  color: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  transition: opacity var(--t-fast), box-shadow var(--t-fast);
+  z-index: 2;
+  box-sizing: border-box;
+  min-height: 20px;
+}
+.cal-week-shift-card:hover { opacity: .88; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.cal-week-shift-card.is-oncall {
+  outline: 2px dashed rgba(255,255,255,0.5);
+  outline-offset: -2px;
+}
+.cal-week-shift-card .shift-loc { font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-week-shift-card .shift-time { opacity: .9; font-size: 10px; white-space: nowrap; }
+.cal-week-shift-card .shift-notes { opacity: .8; margin-top: 2px; font-size: 10px; font-style: italic; line-height: 1.3; }
+
+/* Drag-and-drop */
+.cal-week-shift-card { cursor: grab; user-select: none; }
+.cal-week-shift-card.dragging { opacity: .35 !important; cursor: grabbing; }
+.cal-week-shift-ghost { border-radius: var(--r-md); padding: 4px 8px; color: #fff; font-size: 12px; font-weight: 600; overflow: hidden; }
+.cal-week-day-col.drop-target > .cal-week-col-inner { background: var(--accent-light, rgba(79,70,229,.08)); }
+.shift-resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 8px; cursor: ns-resize; border-radius: 0 0 var(--r-md) var(--r-md); }
+.shift-resize-handle:hover { background: rgba(255,255,255,.3); }
+
+/* Keyboard shortcut key badges */
+kbd.kbd-key { display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;font-family:inherit;font-size:12px;font-weight:600;color:var(--text-1);white-space:nowrap; }
+
+/* All-day / no-time shifts — float at top as chips */
+.cal-week-allday-area {
+  padding: 4px 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+.cal-week-allday-chip {
+  border-radius: var(--r-sm);
+  padding: 3px 7px;
+  font-size: 11px;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
   transition: opacity var(--t-fast);
 }
-.cal-week-shift-card:hover { opacity: .85; }
-.cal-week-shift-card .shift-loc { font-weight: 700; margin-bottom: 1px; }
-.cal-week-shift-card .shift-time { opacity: .85; }
-.cal-week-shift-card .shift-notes { opacity: .8; margin-top: 2px; font-style: italic; }
+.cal-week-allday-chip:hover { opacity: .85; }
+
+/* Paste hint */
+.cal-week-paste-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-3);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Current time indicator */
+.cal-week-now-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--brand);
+  z-index: 4;
+  pointer-events: none;
+}
+.cal-week-now-line::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+}
 
 /* ── Shift modal / drawer ─────────────────────────────────── */
 .modal-overlay {
@@ -799,6 +948,19 @@ tr:hover td { background: var(--surface-2); }
 .mobile-nav-dropdown { display: none; }
 
 /* ── Responsive ────────────────────────────────────────────── */
+/* ── Week view scroll wrapper (mobile horizontal scroll) ────────────────────── */
+.cal-week-scroll-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cal-week-scroll-wrap .cal-week-outer {
+  min-width: 560px;
+}
+
 @media (max-width: 768px) {
   /* Hide desktop topbar nav, show hamburger */
   .topbar-nav { display: none; }
@@ -908,15 +1070,6 @@ tr:hover td { background: var(--surface-2); }
 [data-theme="dark"] .cal-cell.is-holiday:hover,
 [data-theme="oled"] .cal-cell.is-holiday:hover {
   background: rgba(251, 191, 36, 0.13);
-}
-
-/* Week view — day column tint */
-.cal-week-day-col.is-holiday {
-  background: rgba(180, 130, 30, 0.06);
-}
-[data-theme="dark"] .cal-week-day-col.is-holiday,
-[data-theme="oled"] .cal-week-day-col.is-holiday {
-  background: rgba(251, 191, 36, 0.07);
 }
 
 /* Week view — header tint for holiday days */

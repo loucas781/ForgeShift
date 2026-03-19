@@ -8,6 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/js/password-policy.js"></script>
   <script>
@@ -65,6 +68,7 @@
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
     .settings-panel { display:none; padding:24px; max-width:700px; }
+    #panel-team { max-width:960px; }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
@@ -141,6 +145,8 @@
 
       /* Invite form grid — stack name + email */
       #panel-team .form-group[style*="grid-column:1/-1"] { grid-column: unset; }
+      /* Stack team layout to single column on narrow screens */
+      #panel-team .team-layout-grid { grid-template-columns: 1fr !important; }
 
       /* Card headers with buttons — allow wrapping */
       .card-header { flex-wrap: wrap; gap: 8px; }
@@ -329,7 +335,7 @@ async function init() {
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
     { id: 'backup', label: 'Backup', roles: ['admin'],
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
-    { id: 'buildinfo', label: 'Build Info', roles: ['admin'],
+    { id: 'buildinfo', label: 'Build Info', roles: ['admin','shift_lead','member'],
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
     { id: 'account', label: 'Account', roles: ['admin','shift_lead','member'],
       icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
@@ -386,6 +392,22 @@ async function init() {
   const hash = window.location.hash.slice(1)
   const validTab = tabs.find(t => t.id === hash)
   showTab(validTab ? hash : tabs[0].id)
+}
+
+// ── Avatar helper — mirrors shell.js avatarEl ─────────────────────────────────
+// Returns an outerHTML string for an avatar element that shows the photo if
+// available, or falls back to an initials badge.
+// size: '' = default (32px), 'sm' = 22px, 'xs' = 20px, 'md' = 28px
+function _avatarHTML(user, size) {
+  const dims = { sm: 22, xs: 20, md: 28, lg: 40 }
+  const px   = dims[size] || 32
+  const fs   = Math.round(px * 0.38)
+  const base = `border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:${px}px;height:${px}px;font-size:${fs}px;font-weight:700;color:#fff`
+  if (user && user.avatar) {
+    return `<div class="avatar" style="${base};background:${user.color||'#4f46e5'}"><img src="${user.avatar}" alt="${user.name||''}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div>`
+  }
+  const initials = user ? (user.initials || (user.name||'?').slice(0,2).toUpperCase()) : '?'
+  return `<div class="avatar" style="${base};background:${(user&&user.color)||'#4f46e5'}">${initials}</div>`
 }
 
 function showTab(id) {
@@ -800,7 +822,7 @@ function renderMyTeamsList() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center" id="myteam-members-${t.id}">
           ${(t.members||[]).filter(m => m.is_active).map(m =>
             `<div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 4px">
-              <div class="avatar" style="background:${m.color};width:22px;height:22px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;flex-shrink:0">${m.initials}</div>
+              ${_avatarHTML(m, 'sm')}
               <span style="font-size:12px;font-weight:500">${m.name}</span>
               <button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>
             </div>`
@@ -883,79 +905,205 @@ async function renderTeamPanel() {
     : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'
 
   el.innerHTML = `
-    <!-- Invite Member card -->
-    <div class="card" style="margin-bottom:24px">
-      <div class="card-body">
-        <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
-        <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Full Name</label>
-            <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
+    <div class="team-layout-grid" style="display:grid;grid-template-columns:1fr 230px;gap:16px;align-items:start">
+
+      <!-- Left column: all team content -->
+      <div>
+
+        <!-- Invite Member card -->
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-body">
+            <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
+            <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Full Name</label>
+                <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input" id="iEmail" placeholder="jane@company.com">
+              </div>
+            </div>
+            <div class="form-group" style="max-width:280px;margin-bottom:20px">
+              <label class="form-label">Role</label>
+              <select class="form-select" id="iRole">
+                <option value="member">Member</option>
+                <option value="shift_lead">Shift Lead</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
+            <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
           </div>
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-input" id="iEmail" placeholder="jane@company.com">
+        </div>
+
+        <!-- Team Members card -->
+        <div class="card">
+          <div class="card-body">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <h2 style="font-size:16px;font-weight:700" id="teamMembersTitle">Team Members</h2>
+              <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
+            </div>
+            <!-- Role tabs -->
+            <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
+            <!-- Tab description -->
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
+            <!-- Members list -->
+            <div id="teamList">Loading…</div>
           </div>
         </div>
-        <div class="form-group" style="max-width:280px;margin-bottom:20px">
-          <label class="form-label">Role</label>
-          <select class="form-select" id="iRole">
-            <option value="member">Member</option>
-            <option value="shift_lead">Shift Lead</option>
-            <option value="admin">Admin</option>
-          </select>
+
+        <div style="margin-top:32px">
+          <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Teams</h2>
+          <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+            Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-secondary btn-sm" onclick="openCreateTeamModal()">+ Create team</button>
+          </div>
+          <div class="card" id="teamsCard">
+            <div class="card-body" id="teamsListEl">Loading…</div>
+          </div>
         </div>
-        <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
-        <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
-      </div>
-    </div>
 
-    <!-- Team Members card -->
-    <div class="card">
-      <div class="card-body">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h2 style="font-size:16px;font-weight:700" id="teamMembersTitle">Team Members</h2>
-          <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
+        <div style="margin-top:32px">
+          <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Export Shifts</h2>
+          <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Download shift data as a CSV file for reporting or integration with other tools.</p>
+          <div class="card">
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end;flex-wrap:wrap">
+                <div>
+                  <label class="form-label">From</label>
+                  <input type="date" class="form-input" id="csvFrom">
+                </div>
+                <div>
+                  <label class="form-label">To</label>
+                  <input type="date" class="form-input" id="csvTo">
+                </div>
+                <div>
+                  <label class="form-label">User</label>
+                  <select class="form-select" id="csvUser"><option value="all">All users</option></select>
+                </div>
+                <div style="padding-bottom:1px">
+                  <button class="btn btn-primary" onclick="doAdminCSVExport()">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    Download CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <!-- Role tabs -->
-        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
-        <!-- Tab description -->
-        <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
-        <!-- Members list -->
-        <div id="teamList">Loading…</div>
-      </div>
-    </div>
 
-    <div style="margin-top:32px">
-      <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Teams</h2>
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-        Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
-      </p>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button class="btn btn-secondary btn-sm" onclick="openCreateTeamModal()">+ Create team</button>
-      </div>
-      <div class="card" id="teamsCard">
-        <div class="card-body" id="teamsListEl">Loading…</div>
-      </div>
-    </div>
+        <div style="margin-top:32px">
+          <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Template Groups</h2>
+          <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+            Organise templates into groups and control which members can see them. Members only see templates belonging to groups they are assigned to. Ungrouped templates are visible to everyone.
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-secondary btn-sm" onclick="openCreateTmplGroupModal()">+ Create group</button>
+          </div>
+          <div class="card">
+            <div class="card-body" id="tmplGroupsListEl">Loading…</div>
+          </div>
+        </div>
 
-    <div style="margin-top:32px">
-      <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Template Groups</h2>
-      <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-        Organise templates into groups and control which members can see them. Members only see templates belonging to groups they are assigned to. Ungrouped templates are visible to everyone.
-      </p>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button class="btn btn-secondary btn-sm" onclick="openCreateTmplGroupModal()">+ Create group</button>
       </div>
-      <div class="card">
-        <div class="card-body" id="tmplGroupsListEl">Loading…</div>
+
+      <!-- Right column: Role Permissions (sticky) -->
+      <div style="position:sticky;top:24px">
+        <div class="card">
+          <div class="card-body" style="padding:16px">
+            <h3 style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text)">Role Permissions</h3>
+
+            <!-- Member -->
+            <div style="margin-bottom:14px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="color:#16a34a;flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.04em">Member</span>
+              </div>
+              <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px">
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#16a34a;flex-shrink:0;margin-top:1px">✓</span>View &amp; manage own shifts</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#16a34a;flex-shrink:0;margin-top:1px">✓</span>Access iCal feed</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#16a34a;flex-shrink:0;margin-top:1px">✓</span>Appearance &amp; preferences</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#16a34a;flex-shrink:0;margin-top:1px">✓</span>Update own profile</li>
+              </ul>
+            </div>
+
+            <div style="border-top:1px solid var(--border);margin-bottom:14px"></div>
+
+            <!-- Shift Lead -->
+            <div style="margin-bottom:14px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="color:var(--blue);flex-shrink:0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em">Shift Lead</span>
+              </div>
+              <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px">
+                <li style="font-size:11px;color:var(--text-3);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--text-3);flex-shrink:0;margin-top:1px">+</span>All Member permissions</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--blue);flex-shrink:0;margin-top:1px">✓</span>View team members' shifts</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--blue);flex-shrink:0;margin-top:1px">✓</span>Create &amp; edit team shifts</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--blue);flex-shrink:0;margin-top:1px">✓</span>Manage own team roster</li>
+              </ul>
+            </div>
+
+            <div style="border-top:1px solid var(--border);margin-bottom:14px"></div>
+
+            <!-- Admin -->
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="color:var(--brand);flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.04em">Admin</span>
+              </div>
+              <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px">
+                <li style="font-size:11px;color:var(--text-3);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--text-3);flex-shrink:0;margin-top:1px">+</span>All Shift Lead permissions</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Invite &amp; manage all users</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Manage locations</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Features &amp; security config</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Audit log &amp; backups</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Email configuration</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
       </div>
+
     </div>`
 
   renderTeamList()
   await loadSettingsTeams()
   await loadTmplGroups()
+
+  // Pre-fill CSV date range (current month)
+  const now   = new Date()
+  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0')
+  const lastDay = new Date(y, now.getMonth()+1, 0).getDate()
+  const fromEl = document.getElementById('csvFrom')
+  const toEl   = document.getElementById('csvTo')
+  if (fromEl) fromEl.value = `${y}-${m}-01`
+  if (toEl)   toEl.value   = `${y}-${m}-${String(lastDay).padStart(2,'0')}`
+
+  // Populate user select for CSV export
+  const csvUserSel = document.getElementById('csvUser')
+  if (csvUserSel) {
+    try {
+      const allUsers = await api('/api/users')
+      allUsers.filter(u => u.is_active).forEach(u => {
+        const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+        csvUserSel.appendChild(o)
+      })
+    } catch {}
+  }
+}
+
+function doAdminCSVExport() {
+  const from = document.getElementById('csvFrom')?.value
+  const to   = document.getElementById('csvTo')?.value
+  const uid  = document.getElementById('csvUser')?.value || 'all'
+  if (!from || !to) { toast('Please select a date range', 'error'); return }
+  const params = new URLSearchParams({ start: from, end: to, user_id: uid })
+  window.location.href = '/api/shifts/export/csv?' + params
 }
 
 let activeRoleTab = 'admin'
@@ -1017,7 +1165,7 @@ function renderTeamListFiltered() {
   el.innerHTML = filtered.map(u => `
     <div class="member-row">
       <div class="member-info">
-        <div class="avatar" style="background:${u.color}">${u.initials}</div>
+        ${_avatarHTML(u)}
         <div style="min-width:0">
           <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
           <div style="font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
@@ -1051,7 +1199,7 @@ function renderTeamsList() {
   el.innerHTML = settingsTeams.map(t => {
     const memberNames = t.members.length
       ? t.members.map(m => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
-          <span style="width:16px;height:16px;border-radius:50%;background:${m.color};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${m.initials}</span>
+          ${_avatarHTML(m, 'xs')}
           ${m.name}</span>`).join('')
       : '<span style="font-size:12px;color:var(--text-3)">No members yet</span>'
     return `<div class="member-row">
@@ -1181,7 +1329,7 @@ function openTeamMembersModal(teamId) {
           ${activeUsers.map(u => `
             <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;transition:background var(--t-fast)" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
               <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer">
-              <div class="avatar" style="width:28px;height:28px;font-size:10px;background:${u.color}">${u.initials}</div>
+              ${_avatarHTML(u, 'md')}
               <div style="flex:1;min-width:0">
                 <div style="font-size:13px;font-weight:500">${u.name}</div>
                 <div style="font-size:11px;color:var(--text-3)">${u.email}</div>
@@ -1237,7 +1385,7 @@ function renderTmplGroupsList() {
     const memberPills = (g.members || []).length
       ? g.members.map(m => `
           <span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
-            <span style="width:16px;height:16px;border-radius:50%;background:${m.color};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${m.initials}</span>
+            ${_avatarHTML(m, 'xs')}
             ${m.name}
           </span>`).join('')
       : '<span style="font-size:12px;color:var(--text-3)">No members assigned</span>'
@@ -1377,7 +1525,7 @@ function openTmplGroupMembersModal(groupId) {
         <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
           <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}
             style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
-          <div class="avatar" style="background:${u.color};width:28px;height:28px;font-size:10px;flex-shrink:0">${u.initials}</div>
+          ${_avatarHTML(u, 'md')}
           <div style="min-width:0">
             <div style="font-weight:600;font-size:13px">${u.name}</div>
             <div style="font-size:11px;color:var(--text-3)">${u.email} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role}</span></div>
@@ -1587,6 +1735,19 @@ async function renderFeaturesPanel() {
     <div class="card section-card" style="margin-bottom:20px">
       <div class="card-header">
         <div>
+          <h3 class="card-title">Drag &amp; Drop</h3>
+          <p style="font-size:12px;color:var(--text-3);margin-top:2px">Allow shift leads and admins to move and resize shifts on the week view calendar by dragging.</p>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="featureDragDropToggle" ${featData.feature_drag_drop ? 'checked' : ''} onchange="toggleFeatureDragDrop(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card section-card" style="margin-bottom:20px">
+      <div class="card-header">
+        <div>
           <h3 class="card-title">Task Notes</h3>
           <p style="font-size:12px;color:var(--text-3);margin-top:2px">Assign a weekly task list to each team member. Useful for rotating duties (e.g. monitoring rounds, desk assignments).</p>
         </div>
@@ -1636,6 +1797,16 @@ function renderTaskListsTable() {
       <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTaskList('${t.id}','${t.name}')">Delete</button>
     </div></td>
   </tr>`).join('')
+}
+
+async function toggleFeatureDragDrop(enabled) {
+  try {
+    await api('/api/features', { method: 'PATCH', body: { feature_drag_drop: enabled } })
+    toast('Drag & drop ' + (enabled ? 'enabled' : 'disabled'), 'success')
+  } catch (err) {
+    toast(err.message, 'error')
+    document.getElementById('featureDragDropToggle').checked = !enabled
+  }
 }
 
 async function toggleFeatureTasks(enabled) {
@@ -1873,28 +2044,139 @@ async function renderSecurityPanel() {
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Passkeys</h3></div>
       <div class="card-body">
-        <p style="font-size:13px;color:var(--text-2);margin-bottom:12px;line-height:1.6">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
           Passkeys let you sign in with Face ID, Touch ID or a device PIN — no password needed.
         </p>
-        ${(location.protocol === 'https:' && window.PublicKeyCredential)
-          ? `<div style="padding:12px 14px;background:var(--green-light);border:1px solid rgba(5,150,105,.3);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--green)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
-                Passkey support is available on this deployment. Passkey registration and sign-in are coming in a future update.
-              </p>
-            </div>`
-          : `<div style="padding:12px 14px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--orange)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
-                Passkey support (WebAuthn) requires the app to be served over HTTPS with a consistent domain name.
-                It will be available once you have deployed behind your Nginx reverse proxy with HTTPS.
-              </p>
-            </div>`
-        }
+        <div id="passkeys-area">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:13px">
+            <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
+            Loading…
+          </div>
+        </div>
       </div>
     </div>`
 
   renderTwoFA()
+  renderPasskeys()
+}
+
+async function renderPasskeys() {
+  const area = document.getElementById('passkeys-area')
+  if (!area) return
+
+  // Browser support check
+  if (!window.PublicKeyCredential) {
+    area.innerHTML = `
+      <div style="padding:12px 14px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--orange)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
+          Passkeys require a modern browser (Chrome 108+, Safari 16+, Firefox 119+) served over HTTPS.
+          Your current browser or connection does not support passkeys.
+        </p>
+      </div>`
+    return
+  }
+
+  async function loadAndRender() {
+    try {
+      const keys = await api('/api/passkeys')
+      const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      const fmt = d => new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })
+
+      const listHtml = keys.length ? keys.map(k => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)" id="passkey-row-${esc(k.id)}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="var(--brand)" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.device_name || 'Passkey')}</div>
+            <div style="font-size:12px;color:var(--text-3)">Added ${fmt(k.created_at)}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);flex-shrink:0" onclick="deletePasskey('${esc(k.id)}')">Remove</button>
+        </div>`).join('') : `<p style="font-size:13px;color:var(--text-3);margin:0 0 16px">No passkeys registered yet.</p>`
+
+      area.innerHTML = `
+        <div id="passkeys-list">${listHtml}</div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:${keys.length ? '16px' : '0'}" onclick="addPasskey()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add passkey
+        </button>`
+    } catch (err) {
+      area.innerHTML = `<p style="font-size:13px;color:var(--red);margin:0">Failed to load passkeys.</p>`
+    }
+  }
+
+  window.addPasskey = async function() {
+    try {
+      const options = await api('/api/passkeys/register-options', { method: 'POST' })
+
+      // Convert base64url strings to ArrayBuffers
+      options.challenge = _b64url(options.challenge)
+      options.user.id   = _b64url(options.user.id)
+      if (options.excludeCredentials) {
+        options.excludeCredentials = options.excludeCredentials.map(c => ({ ...c, id: _b64url(c.id) }))
+      }
+
+      const credential = await navigator.credentials.create({ publicKey: options })
+      if (!credential) return
+
+      const deviceName = await _promptDeviceName()
+
+      await api('/api/passkeys/register-verify', {
+        method: 'POST',
+        body: {
+          deviceName,
+          credential: {
+            id:    credential.id,
+            rawId: _ab2b64url(credential.rawId),
+            type:  credential.type,
+            response: {
+              clientDataJSON:    _ab2b64url(credential.response.clientDataJSON),
+              attestationObject: _ab2b64url(credential.response.attestationObject),
+            },
+          },
+        },
+      })
+      toast('Passkey added', 'success')
+      await loadAndRender()
+    } catch (err) {
+      if (err.name === 'NotAllowedError') return // user cancelled
+      toast(err.message || 'Failed to add passkey', 'error')
+    }
+  }
+
+  window.deletePasskey = async function(id) {
+    if (!confirm('Remove this passkey? You will no longer be able to use it to sign in.')) return
+    try {
+      await api(`/api/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      toast('Passkey removed', 'success')
+      await loadAndRender()
+    } catch (err) {
+      toast(err.message || 'Failed to remove passkey', 'error')
+    }
+  }
+
+  await loadAndRender()
+}
+
+function _b64url(val) {
+  if (!val) return val
+  const str = typeof val === 'string' ? val : val
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+  const bin = atob(base64)
+  const buf = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
+  return buf.buffer
+}
+function _ab2b64url(buf) {
+  const bytes = new Uint8Array(buf)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+async function _promptDeviceName() {
+  return new Promise(resolve => {
+    const name = prompt('Give this passkey a name (e.g. "MacBook Touch ID"):')
+    resolve(name && name.trim() ? name.trim() : 'My passkey')
+  })
 }
 
 async function renderTwoFA() {
@@ -2246,7 +2528,7 @@ async function loadAudit(offset) {
       const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
       return `<tr>
         <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${ts}</td>
-        <td>${e.actor_name ? `<div style="display:flex;align-items:center;gap:6px"><div class="avatar" style="width:20px;height:20px;font-size:9px;background:${e.actor_color||'#4f46e5'}">${e.actor_initials||'?'}</div><span style="font-size:12px">${e.actor_name}</span></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td>${e.actor_name ? `<div style="display:flex;align-items:center;gap:6px">${_avatarHTML({name:e.actor_name,initials:e.actor_initials,color:e.actor_color||'#4f46e5',avatar:e.actor_avatar||null},'xs')}<span style="font-size:12px">${e.actor_name}</span></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
         <td><code style="font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px">${e.action}</code></td>
         <td style="font-size:12px;color:var(--text-3)">${e.entity_name||e.entity_id||'—'}</td>
       </tr>`
@@ -2606,7 +2888,7 @@ async function renderAccountPanel() {
               ${s.isCurrent ? '<span class="badge badge-green" style="font-size:11px">ACTIVE</span>' : ''}
             </div>`).join('') || '<p style="font-size:13px;color:var(--text-3)">No session data available.</p>'}
         </div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="signOutEverywhere()">Sign out everywhere</button>
+        <button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="signOutEverywhere()">Sign out all devices</button>
       </div>
     </div>
 
@@ -2644,9 +2926,9 @@ async function renderAccountPanel() {
 }
 
 async function signOutEverywhere() {
-  if (!confirm('This will sign you out on this browser. Continue?')) return
+  if (!confirm('This will invalidate all active sessions across every device and browser, including this one. Continue?')) return
   try {
-    await api('/api/auth/logout-all', { method: 'POST' })
+    await api('/api/auth/revoke-all', { method: 'POST' })
     window.location.href = '/login.html'
   } catch (err) { toast(err.message, 'error') }
 }

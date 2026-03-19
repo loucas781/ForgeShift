@@ -93,6 +93,8 @@ app.get('/api/config', optionalAuth, (req, res) => {
   const db = require('./db/connection')
   const featureTasksRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
   const featureTasks = featureTasksRow ? featureTasksRow.value === 'true' : false
+  const featureDragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
+  const featureDragDrop = featureDragDropRow ? featureDragDropRow.value !== 'false' : true
   res.json({
     appName:        process.env.APP_NAME      || 'ForgeShift',
     appEnv:         process.env.APP_ENV       || env,
@@ -106,6 +108,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     passwordPolicy: getPasswordPolicy(overrides),
     smtpEnabled:    emailSvc.getSmtpConfig().enabled,
     featureTasks,
+    featureDragDrop,
   })
 })
 
@@ -113,20 +116,33 @@ app.get('/api/config', optionalAuth, (req, res) => {
 app.get('/api/features', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
-  const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
-  res.json({ feature_tasks: row ? row.value === 'true' : false })
+  const tasksRow    = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  const dragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
+  res.json({
+    feature_tasks:     tasksRow    ? tasksRow.value    === 'true'  : false,
+    feature_drag_drop: dragDropRow ? dragDropRow.value !== 'false' : true,
+  })
 })
 app.patch('/api/features', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
-  const { feature_tasks } = req.body
+  const { feature_tasks, feature_drag_drop } = req.body
   if (typeof feature_tasks === 'boolean') {
     db.prepare(`INSERT INTO app_preferences (key, value, updated_at) VALUES ('feature_tasks', ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
       .run(feature_tasks ? 'true' : 'false')
   }
-  const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
-  res.json({ feature_tasks: row ? row.value === 'true' : false })
+  if (typeof feature_drag_drop === 'boolean') {
+    db.prepare(`INSERT INTO app_preferences (key, value, updated_at) VALUES ('feature_drag_drop', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
+      .run(feature_drag_drop ? 'true' : 'false')
+  }
+  const tasksRow    = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  const dragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
+  res.json({
+    feature_tasks:     tasksRow    ? tasksRow.value    === 'true'  : false,
+    feature_drag_drop: dragDropRow ? dragDropRow.value !== 'false' : true,
+  })
 })
 
 // ── Admin: toggle runtime settings ────────────────────────────────────────────
@@ -184,7 +200,7 @@ app.get('/api/audit', requireAuth, (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit || '50'), 200)
   const offset = parseInt(req.query.offset || '0')
   const entries = db.prepare(`
-    SELECT a.*, u.name as actor_name, u.initials as actor_initials, u.color as actor_color
+    SELECT a.*, u.name as actor_name, u.initials as actor_initials, u.color as actor_color, u.avatar as actor_avatar
     FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
     ORDER BY a.created_at DESC LIMIT ? OFFSET ?
   `).all(limit, offset)
@@ -203,6 +219,39 @@ app.get('/api/stats', requireAuth, (req, res) => {
   res.json({ users, shifts, locations, templates })
 })
 
+// ── SSE — Real-time broadcast ──────────────────────────────────────────────────
+const sseClients = new Map()  // userId → Set<res>
+
+function broadcastShiftEvent(type, shift, actorId) {
+  for (const [, clients] of sseClients) {
+    for (const res of clients) {
+      try { res.write(`data: ${JSON.stringify({ type, shift, actorId })}\n\n`) } catch {}
+    }
+  }
+}
+app.locals.broadcastShiftEvent = broadcastShiftEvent
+
+app.get('/api/sse', requireAuth, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+  res.write('data: {"type":"connected"}\n\n')
+
+  const uid = req.user.id
+  if (!sseClients.has(uid)) sseClients.set(uid, new Set())
+  sseClients.get(uid).add(res)
+
+  // Keepalive ping every 25 s to prevent proxy timeouts
+  const ping = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 25000)
+
+  req.on('close', () => {
+    clearInterval(ping)
+    sseClients.get(uid)?.delete(res)
+    if (sseClients.get(uid)?.size === 0) sseClients.delete(uid)
+  })
+})
+
 // ── API Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/auth',             require('./routes/auth'))
 app.use('/api/users',            require('./routes/users'))
@@ -215,6 +264,7 @@ app.use('/api/ical',             require('./routes/ical'))
 app.use('/api/backup',           require('./routes/backup'))
 app.use('/api/tasks',            require('./routes/tasks'))
 app.use('/api/holidays',         require('./routes/holidays'))
+app.use('/api/passkeys',         require('./routes/passkeys'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {

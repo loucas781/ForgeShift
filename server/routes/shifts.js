@@ -37,10 +37,16 @@ router.get('/', requireAuth, (req, res) => {
     if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
 
     if (req.user.role === 'admin') {
-      // no extra filter
+      // no extra filter — admins see all shifts, including individual user views
     } else if (req.user.role === 'shift_lead') {
-      if (!user_id) {
-        const scope = getShiftLeadScope(req.user.id)
+      // Always constrain to team scope whether or not a specific user_id was requested.
+      // This prevents a shift lead querying an out-of-scope user directly via the API.
+      const scope = getShiftLeadScope(req.user.id)
+      if (user_id) {
+        // Specific user requested — must be in scope
+        if (!scope.has(user_id)) return res.status(403).json({ error: 'That user is not in your team.' })
+        // user_id filter already applied to SQL above; no extra IN clause needed
+      } else {
         const placeholders = [...scope].map(() => '?').join(',')
         sql += ` AND s.user_id IN (${placeholders})`
         params.push(...scope)
@@ -54,6 +60,54 @@ router.get('/', requireAuth, (req, res) => {
     res.json(shifts)
   } catch (err) {
     console.error('shifts get:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── GET /api/shifts/export/csv ────────────────────────────────────────────────
+router.get('/export/csv', requireAuth, (req, res) => {
+  try {
+    const { start, end } = req.query
+    let user_id = req.user.id
+    if (req.user.role === 'admin' && req.query.user_id) {
+      user_id = req.query.user_id === 'all' ? null : req.query.user_id
+    } else if (req.user.role === 'shift_lead' && req.query.user_id) {
+      const scope = getShiftLeadScope(req.user.id)
+      if (scope.has(req.query.user_id)) user_id = req.query.user_id
+    }
+
+    let sql = `
+      SELECT s.*, u.name as user_name, l.name as location_name
+      FROM shifts s
+      LEFT JOIN users u ON u.id = s.user_id
+      LEFT JOIN locations l ON l.id = s.location_id
+      WHERE 1=1
+    `
+    const params = []
+    if (start)   { sql += ' AND s.date >= ?'; params.push(start) }
+    if (end)     { sql += ' AND s.date <= ?'; params.push(end) }
+    if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
+    else if (req.user.role !== 'admin') { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
+    sql += ' ORDER BY s.date, u.name'
+
+    const rows = db.prepare(sql).all(...params)
+    const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    const esc = v => `"${(v || '').replace(/"/g, '""')}"`
+    const lines = ['Date,Day,User,Location,Start,End,Hours,Notes,Type']
+    for (const s of rows) {
+      const d = new Date(s.date + 'T00:00:00')
+      const hours = (s.start_time && s.end_time)
+        ? (() => { const [sh,sm] = s.start_time.split(':').map(Number); const [eh,em] = s.end_time.split(':').map(Number); return (((eh*60+em)-(sh*60+sm))/60).toFixed(2) })()
+        : ''
+      const type = s.is_off ? 'Annual Leave' : s.is_oncall ? 'On-call' : 'Shift'
+      lines.push([s.date, DAY_NAMES[d.getDay()], esc(s.user_name||''), esc(s.location_name||''),
+        s.start_time||'', s.end_time||'', hours, esc(s.notes||''), type].join(','))
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="shifts-${new Date().toISOString().slice(0,10)}.csv"`)
+    res.send(lines.join('\r\n'))
+  } catch (err) {
+    console.error('csv export:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -94,11 +148,22 @@ router.post('/', requireAuth, (req, res) => {
       if (!scope.has(user_id)) return res.status(403).json({ error: 'You can only assign shifts to members of your teams.' })
       targetUserId = user_id
     } else {
-      targetUserId = req.user.id
+      // Members cannot create shifts — read-only access
+      return res.status(403).json({ error: 'Members cannot create shifts. Contact your admin or shift lead.' })
     }
 
     const existing = db.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ?').get(targetUserId, date)
     if (existing) return res.status(409).json({ error: 'A shift already exists for this user on this date.' })
+
+    // Time overlap check (skipped when force=true query param is set)
+    if (!req.query.force && start_time && end_time) {
+      const overlap = db.prepare(`
+        SELECT id FROM shifts
+        WHERE user_id = ? AND date = ? AND start_time IS NOT NULL AND end_time IS NOT NULL
+          AND start_time < ? AND end_time > ?
+      `).get(targetUserId, date, end_time, start_time)
+      if (overlap) return res.status(409).json({ error: 'This shift overlaps with an existing shift.', conflict: true })
+    }
 
     const id = uuidv4()
     db.prepare(`
@@ -109,6 +174,7 @@ router.post('/', requireAuth, (req, res) => {
 
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(id)
     audit(req.user.id, 'shift.create', 'shift', id, date)
+    req.app.locals.broadcastShiftEvent?.('shift.create', shift, req.user.id)
     res.status(201).json(shift)
   } catch (err) {
     console.error('shift create:', err.message)
@@ -128,18 +194,21 @@ router.put('/:id', requireAuth, (req, res) => {
       const scope = getShiftLeadScope(req.user.id)
       if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     } else {
-      if (shift.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' })
+      // Members are read-only — they cannot edit shifts
+      return res.status(403).json({ error: 'Members cannot edit shifts. Contact your admin or shift lead.' })
     }
 
-    const { location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
+    const { date: newDate, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
+    const targetDate = newDate || shift.date
     db.prepare(`
-      UPDATE shifts SET location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now')
+      UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now')
       WHERE id=?
-    `).run(location_id || null, start_time || null, end_time || null,
+    `).run(targetDate, location_id || null, start_time || null, end_time || null,
            notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.params.id)
 
     const updated = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
-    audit(req.user.id, 'shift.update', 'shift', req.params.id, shift.date)
+    audit(req.user.id, 'shift.update', 'shift', req.params.id, targetDate)
+    req.app.locals.broadcastShiftEvent?.('shift.update', updated, req.user.id)
     res.json(updated)
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -158,11 +227,13 @@ router.delete('/:id', requireAuth, (req, res) => {
       const scope = getShiftLeadScope(req.user.id)
       if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     } else {
-      if (shift.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' })
+      // Members cannot delete shifts
+      return res.status(403).json({ error: 'Members cannot delete shifts. Contact your admin or shift lead.' })
     }
 
     db.prepare('DELETE FROM shifts WHERE id = ?').run(req.params.id)
     audit(req.user.id, 'shift.delete', 'shift', req.params.id, shift.date)
+    req.app.locals.broadcastShiftEvent?.('shift.delete', { id: req.params.id, date: shift.date }, req.user.id)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
