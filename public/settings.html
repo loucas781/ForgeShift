@@ -67,10 +67,12 @@
     .settings-panel { display:none; padding:24px; max-width:900px; }
     .settings-panel.active { display:block; }
     /* Team panel two-column grid collapses on narrow viewports */
-    /* Team panel responsive grids — collapse to single column on narrow screens */
+    /* All settings 2-column grids collapse to single column on narrow screens */
     @media(max-width:780px) {
+      .settings-2col   { grid-template-columns:1fr !important; }
       .team-top-row    { grid-template-columns:1fr !important; }
       .team-bottom-row { grid-template-columns:1fr !important; }
+      .about-grid      { grid-template-columns:1fr !important; }
     }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
@@ -442,8 +444,9 @@ async function renderPreferencesPanel() {
       These preferences only affect your view — they don't change anything for other users.
     </p>
 
-    <!-- Theme -->
-    <div class="card section-card">
+    <!-- Row 1: Appearance + Calendar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" class="settings-2col">
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header"><h3 class="card-title">Appearance</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
@@ -466,8 +469,9 @@ async function renderPreferencesPanel() {
       </div>
     </div>
 
-    <!-- Calendar display -->
-    <div class="card section-card">
+    <!-- Calendar display (second col of same grid as Appearance) -->
+    </div><!-- end Appearance card -->
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header">
         <h3 class="card-title">Calendar</h3>
         <button class="btn btn-primary btn-sm" onclick="savePrefsPanel()">Save</button>
@@ -521,8 +525,12 @@ async function renderPreferencesPanel() {
       </div>
     </div>
 
-    <!-- Shift defaults -->
-    <div class="card section-card">
+    </div><!-- end Calendar card -->
+    </div><!-- end row 1 grid -->
+
+    <!-- Row 2: Shift Defaults + Holiday Calendars -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" class="settings-2col">
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header">
         <h3 class="card-title">Shift Defaults</h3>
         <button class="btn btn-primary btn-sm" onclick="savePrefsPanel()">Save</button>
@@ -544,8 +552,9 @@ async function renderPreferencesPanel() {
       </div>
     </div>
 
-    <!-- Holiday calendars -->
-    <div class="card section-card">
+    </div><!-- end Shift Defaults card -->
+    <!-- Holiday Calendars (second col) -->
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header">
         <h3 class="card-title">Holiday Calendars</h3>
         <button class="btn btn-primary btn-sm" onclick="savePrefsPanel()">Save</button>
@@ -586,7 +595,8 @@ async function renderPreferencesPanel() {
           <div id="holidayFetchStatus" style="margin-top:10px;font-size:12px;color:var(--text-3);min-height:18px"></div>
         </div>` : ''}
       </div>
-    </div>`
+    </div><!-- end Holiday card -->
+    </div><!-- end row 2 grid -->`
   // Load fetch status asynchronously after panel renders
   setTimeout(loadHolidayStatus, 0)
 }
@@ -887,7 +897,7 @@ async function renderTeamPanel() {
     <div class="team-top-row" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;align-items:start">
 
       <!-- Invite Member card -->
-      <div class="card" style="height:100%">
+      <div class="card">
         <div class="card-body">
           <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
           <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
@@ -1875,7 +1885,8 @@ async function renderSecurityPanel() {
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Security</h2>
 
-    <div class="card section-card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" class="settings-2col">
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header">
         <h3 class="card-title">Password Policy</h3>
         <button class="btn btn-primary btn-sm" onclick="savePasswordPolicy()">Save</button>
@@ -1899,7 +1910,8 @@ async function renderSecurityPanel() {
       </div>
     </div>
 
-    <div class="card section-card">
+    </div><!-- end Password Policy card -->
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header"><h3 class="card-title">HTTPS / Reverse Proxy</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
@@ -1942,7 +1954,11 @@ async function renderSecurityPanel() {
       </div>
     </div>
 
-    <div class="card section-card">
+    </div><!-- end HTTPS card -->
+    </div><!-- end security row 1 grid -->
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" class="settings-2col">
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header"><h3 class="card-title">Two-Factor Authentication (2FA)</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
@@ -1979,7 +1995,8 @@ async function renderSecurityPanel() {
             </div>`
         }
       </div>
-    </div>`
+    </div><!-- end Passkeys card -->
+    </div><!-- end security row 2 grid -->`
 
   renderTwoFA()
 }
@@ -2181,7 +2198,8 @@ async function renderEmailPanel() {
       </div>
     </div>
 
-    <div class="card section-card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" class="settings-2col">
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header"><h3 class="card-title">Registration</h3></div>
       <div class="card-body">
         <div class="pref-row">
@@ -2194,7 +2212,7 @@ async function renderEmailPanel() {
       </div>
     </div>
 
-    <div class="card section-card">
+    <div class="card section-card" style="margin-bottom:0">
       <div class="card-header"><h3 class="card-title">Quick-start guides</h3></div>
       <div class="card-body">
         <div style="display:grid;gap:10px;font-size:12px;color:var(--text-3)">
@@ -2212,7 +2230,8 @@ async function renderEmailPanel() {
           </div>
         </div>
       </div>
-    </div>`
+    </div><!-- end Quick-start card -->
+    </div><!-- end email row grid -->`
 
   // Load current config
   try {
@@ -2723,26 +2742,31 @@ async function renderAboutPanel() {
   // Build the admin-only build info block before the template literal to avoid nesting
   const envBadgeClass = cfg.appEnv === 'production' ? 'red' : cfg.appEnv === 'staging' ? 'orange' : 'green'
   const buildInfoHtml = cfg.user.role === 'admin'
-    ? `<h3 style="font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)">Build Info</h3>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Version</h3></div>
-      <div class="card-body">
-        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
-          <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
-          <span class="badge badge-${envBadgeClass}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
+    ? `<!-- Build Info: Version + Stats side by side -->
+    <div class="about-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;align-items:start">
+
+      <div class="card" style="height:100%">
+        <div class="card-header"><h3 class="card-title">Version</h3></div>
+        <div class="card-body">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
+            <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
+            <span class="badge badge-${envBadgeClass}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
+          </div>
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <tr><td style="color:var(--text-3);padding:9px 0;width:120px;border-bottom:1px solid var(--border)">Version</td><td style="padding:9px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.version}</code></td></tr>
+            <tr><td style="color:var(--text-3);padding:9px 0;border-bottom:1px solid var(--border)">Environment</td><td style="padding:9px 0;border-bottom:1px solid var(--border)">${cfg.appEnv}</td></tr>
+            <tr><td style="color:var(--text-3);padding:9px 0;border-bottom:1px solid var(--border)">App name</td><td style="padding:9px 0;border-bottom:1px solid var(--border)">${cfg.appName || 'ForgeShift'}</td></tr>
+            <tr><td style="color:var(--text-3);padding:9px 0;border-bottom:1px solid var(--border)">Node.js</td><td style="padding:9px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.nodeVersion || 'unknown'}</code></td></tr>
+            <tr><td style="color:var(--text-3);padding:9px 0">Runtime</td><td style="padding:9px 0">Node.js / Express / SQLite</td></tr>
+          </table>
         </div>
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <tr><td style="color:var(--text-3);padding:10px 0;width:160px;border-bottom:1px solid var(--border)">Version string</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.version}</code></td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Environment</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appEnv}</td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">App name</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appName || 'ForgeShift'}</td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Node.js</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.nodeVersion || 'unknown'}</code></td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0">Runtime</td><td style="padding:10px 0">Node.js / Express / SQLite</td></tr>
-        </table>
       </div>
-    </div>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
-      <div class="card-body" id="buildInfoStats"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
+
+      <div class="card" style="height:100%">
+        <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
+        <div class="card-body" id="buildInfoStats"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
+      </div>
+
     </div>`
     : `<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg)">
       <span style="font-size:22px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
@@ -2753,55 +2777,58 @@ async function renderAboutPanel() {
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About</h2>
     ${buildInfoHtml}
 
-    <!-- About section -->
-    <h3 style="font-size:15px;font-weight:700;margin:32px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--border)">ForgeShift</h3>
-    <div class="card section-card">
-      <div class="card-body">
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-          <div style="width:52px;height:52px;flex-shrink:0">
-            <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
-              <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
-              <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
-              <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
-              <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
-              <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/>
-            </svg>
+    <!-- About section: description + tech stack side by side -->
+    <div class="about-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;align-items:start">
+
+      <div class="card" style="height:100%">
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+            <div style="width:44px;height:44px;flex-shrink:0">
+              <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
+                <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
+                <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
+                <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
+                <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
+                <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:17px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
+              <div style="font-size:12px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management</div>
+            </div>
           </div>
-          <div>
-            <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
-            <div style="font-size:13px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management</div>
-          </div>
+          <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:12px">
+            A lightweight, self-hosted workforce scheduling application. Manage shift rotas, create reusable templates, and subscribe to schedules via iCal — no cloud dependency or third-party services.
+          </p>
+          <p style="font-size:13px;color:var(--text-2);line-height:1.6">
+            Designed to run on a single server. Your data stays local and under your control.
+          </p>
         </div>
-        <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
-          ForgeShift is a lightweight, self-hosted workforce scheduling application. It lets teams manage
-          shift rotas, create reusable templates, and subscribe to their schedule via iCal — all without
-          any cloud dependency or third-party services.
-        </p>
-        <p style="font-size:13px;color:var(--text-2);line-height:1.6">
-          Designed to be deployed on a single server, ForgeShift keeps your data local and under your control.
-        </p>
       </div>
-    </div>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Tech Stack</h3></div>
-      <div class="card-body">
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          ${[
-            ['Frontend',  'Vanilla HTML, CSS, JavaScript'],
-            ['Backend',   'Node.js · Express'],
-            ['Database',  'SQLite (better-sqlite3)'],
-            ['Auth',      'Session-based · HMAC-SHA256 pepper'],
-            ['Calendar',  'iCal feed (ical-generator)'],
-            ['Email',     'Nodemailer (optional SMTP)'],
-            ['Deployment','Docker · PM2 · Proxmox LXC'],
-          ].map(([k,v]) => `
-            <tr>
-              <td style="color:var(--text-3);padding:10px 0;width:140px;border-bottom:1px solid var(--border)">${k}</td>
-              <td style="padding:10px 0;border-bottom:1px solid var(--border);font-weight:500">${v}</td>
-            </tr>`).join('')}
-        </table>
+
+      <div class="card" style="height:100%">
+        <div class="card-header"><h3 class="card-title">Tech Stack</h3></div>
+        <div class="card-body">
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            ${[
+              ['Frontend',  'Vanilla HTML, CSS, JavaScript'],
+              ['Backend',   'Node.js · Express'],
+              ['Database',  'SQLite (better-sqlite3)'],
+              ['Auth',      'Session-based · HMAC-SHA256 pepper'],
+              ['Calendar',  'iCal feed (ical-generator)'],
+              ['Email',     'Nodemailer (optional SMTP)'],
+              ['Deployment','Proxmox LXC · PM2'],
+            ].map(([k,v]) => `
+              <tr>
+                <td style="color:var(--text-3);padding:8px 0;width:110px;border-bottom:1px solid var(--border)">${k}</td>
+                <td style="padding:8px 0;border-bottom:1px solid var(--border);font-weight:500">${v}</td>
+              </tr>`).join('')}
+          </table>
+        </div>
       </div>
+
     </div>
+
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Licence &amp; Source</h3></div>
       <div class="card-body">
