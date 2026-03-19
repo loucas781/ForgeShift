@@ -37,16 +37,10 @@ router.get('/', requireAuth, (req, res) => {
     if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
 
     if (req.user.role === 'admin') {
-      // no extra filter — admins see all shifts, including individual user views
+      // no extra filter
     } else if (req.user.role === 'shift_lead') {
-      // Always constrain to team scope whether or not a specific user_id was requested.
-      // This prevents a shift lead querying an out-of-scope user directly via the API.
-      const scope = getShiftLeadScope(req.user.id)
-      if (user_id) {
-        // Specific user requested — must be in scope
-        if (!scope.has(user_id)) return res.status(403).json({ error: 'That user is not in your team.' })
-        // user_id filter already applied to SQL above; no extra IN clause needed
-      } else {
+      if (!user_id) {
+        const scope = getShiftLeadScope(req.user.id)
         const placeholders = [...scope].map(() => '?').join(',')
         sql += ` AND s.user_id IN (${placeholders})`
         params.push(...scope)
@@ -100,8 +94,7 @@ router.post('/', requireAuth, (req, res) => {
       if (!scope.has(user_id)) return res.status(403).json({ error: 'You can only assign shifts to members of your teams.' })
       targetUserId = user_id
     } else {
-      // Members cannot create shifts — read-only access
-      return res.status(403).json({ error: 'Members cannot create shifts. Contact your admin or shift lead.' })
+      targetUserId = req.user.id
     }
 
     const existing = db.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ?').get(targetUserId, date)
@@ -135,8 +128,7 @@ router.put('/:id', requireAuth, (req, res) => {
       const scope = getShiftLeadScope(req.user.id)
       if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     } else {
-      // Members are read-only — they cannot edit shifts
-      return res.status(403).json({ error: 'Members cannot edit shifts. Contact your admin or shift lead.' })
+      if (shift.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' })
     }
 
     const { location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
@@ -166,8 +158,7 @@ router.delete('/:id', requireAuth, (req, res) => {
       const scope = getShiftLeadScope(req.user.id)
       if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     } else {
-      // Members cannot delete shifts
-      return res.status(403).json({ error: 'Members cannot delete shifts. Contact your admin or shift lead.' })
+      if (shift.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' })
     }
 
     db.prepare('DELETE FROM shifts WHERE id = ?').run(req.params.id)

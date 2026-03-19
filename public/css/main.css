@@ -425,10 +425,10 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   cursor: pointer;
 }
 
-.cal-grid { flex: 1; overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
+.cal-grid { flex: 1; overflow: auto; min-height: 0; }
 
 /* Month view */
-.cal-month { display: grid; grid-template-columns: repeat(7,1fr); height: 100%; overflow: auto; }
+.cal-month { display: grid; grid-template-columns: repeat(7,1fr); height: 100%; }
 .cal-day-header {
   padding: 8px 0; text-align: center; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em; color: var(--text-3);
@@ -501,17 +501,22 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 
 /* Week view */
 .cal-week {
-  display: grid;
-  /* 52px time gutter + 7 equal day columns */
-  grid-template-columns: 52px repeat(7, 1fr);
-  width: 100%;
-  border-top: 1px solid var(--border);
+  display: grid; grid-template-columns: 60px repeat(7,1fr);
+  min-height: 100%; border-collapse: collapse;
 }
-
-/* ── Week header row (day name + number) ── */
+.cal-week-header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  grid-column: 1 / -1; display: contents;
+}
+.cal-week-time-col { border-right: 1px solid var(--border); }
+.cal-week-day-col {
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  min-height: 600px;
+}
+.cal-week-day-col:last-child { border-right: none; }
 .cal-week-day-header {
   padding: 10px 6px; text-align: center; border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
   background: var(--surface-2); position: sticky; top: 0; z-index: 5;
 }
 .cal-week-day-header .day-name { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; }
@@ -522,81 +527,16 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   width: 32px; height: 32px; background: var(--brand); color: #fff; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; margin: 2px auto 0;
 }
-
-/* ── Time gutter column ── */
-.cal-week-time-col {
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  padding-top: 0;
-  /* top-left corner cell is handled by the header gutter cell */
-}
-.cal-week-time-label {
-  height: 40px;
-  display: flex; align-items: flex-start; justify-content: flex-end;
-  padding: 2px 6px 0 0;
-  font-size: 10px; color: var(--text-3);
-  flex-shrink: 0;
-}
-
-/* ── Day column ── */
-.cal-week-day-col {
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  position: relative;
-}
-.cal-week-day-col:last-child { border-right: none; }
-
-/* ── Time-grid body: 40px per hour, 7:00–22:00 = 15 rows ── */
-.cal-week-time-body {
-  position: relative;
-  height: 600px; /* 15 hours × 40px */
-  flex-shrink: 0;
-}
-/* Hour lines */
-.cal-week-time-body::before {
-  content: '';
-  position: absolute; inset: 0;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--border) 0px, var(--border) 1px,
-    transparent 1px, transparent 40px
-  );
-  pointer-events: none;
-}
-
-/* ── Shift event block (positioned absolutely within .cal-week-time-body) ── */
+.cal-week-shifts { padding: 4px; flex: 1; }
 .cal-week-shift-card {
-  position: absolute;
-  left: 2px; right: 2px;
-  border-radius: var(--r-md);
-  padding: 3px 6px;
+  border-radius: var(--r-md); padding: 6px 8px; margin-bottom: 4px;
   font-size: 11px; color: #fff; cursor: pointer;
-  overflow: hidden;
   transition: opacity var(--t-fast);
-  box-sizing: border-box;
-  min-height: 18px;
 }
 .cal-week-shift-card:hover { opacity: .85; }
-.cal-week-shift-card .shift-loc { font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-week-shift-card .shift-time { opacity: .9; font-size: 10px; }
-.cal-week-shift-card .shift-notes { opacity: .8; margin-top: 2px; font-size: 10px; font-style: italic; }
-
-/* ── All-day / no-time shifts (stacked at top, above time body) ── */
-.cal-week-allday-area {
-  padding: 3px 4px; display: flex; flex-direction: column; gap: 2px;
-  border-bottom: 1px solid var(--border); min-height: 28px;
-  background: var(--surface);
-}
-.cal-week-allday-card {
-  border-radius: var(--r-sm); padding: 2px 6px;
-  font-size: 11px; color: #fff; cursor: pointer;
-  transition: opacity var(--t-fast);
-}
-.cal-week-allday-card:hover { opacity: .85; }
-.cal-week-allday-card .shift-loc { font-weight: 700; }
-
-/* Paste hint */
-.cal-week-shifts { padding: 4px; flex: 1; }
+.cal-week-shift-card .shift-loc { font-weight: 700; margin-bottom: 1px; }
+.cal-week-shift-card .shift-time { opacity: .85; }
+.cal-week-shift-card .shift-notes { opacity: .8; margin-top: 2px; font-style: italic; }
 
 /* ── Shift modal / drawer ─────────────────────────────────── */
 .modal-overlay {
@@ -859,18 +799,6 @@ tr:hover td { background: var(--surface-2); }
 .mobile-nav-dropdown { display: none; }
 
 /* ── Responsive ────────────────────────────────────────────── */
-/* ── Week view mobile scroll wrapper ──────────────────────────── */
-.cal-week-scroll-wrap {
-  overflow-x: auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  flex: 1;
-  min-height: 0;
-}
-.cal-week-scroll-wrap .cal-week {
-  min-width: 560px; /* ensure 7 readable columns even on small screens */
-}
-
 @media (max-width: 768px) {
   /* Hide desktop topbar nav, show hamburger */
   .topbar-nav { display: none; }

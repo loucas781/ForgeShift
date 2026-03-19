@@ -30,75 +30,6 @@ router.delete('/token', requireAuth, (req, res) => {
   res.json({ ok: true })
 })
 
-// ── UK DST helper ─────────────────────────────────────────────────────────────
-// Returns the UTC offset in hours for Europe/London on a given local date string.
-// UK is UTC+0 (GMT) in winter, UTC+1 (BST) in summer.
-// BST starts: last Sunday in March at 01:00 UTC
-// BST ends:   last Sunday in October at 01:00 UTC
-function getUKOffsetHours(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  // Find last Sunday of March
-  const lastSunMar = lastSundayOf(y, 3)
-  // Find last Sunday of October
-  const lastSunOct = lastSundayOf(y, 10)
-  const date = new Date(y, m - 1, d)
-  if (date >= lastSunMar && date < lastSunOct) return 1  // BST
-  return 0  // GMT
-}
-
-function lastSundayOf(year, month) {
-  // month is 1-based; find last day of that month then step back to Sunday
-  const lastDay = new Date(year, month, 0) // 0th of next month = last day of this month
-  const dayOfWeek = lastDay.getDay() // 0=Sun
-  lastDay.setDate(lastDay.getDate() - dayOfWeek)
-  return lastDay
-}
-
-// Format a local time string (HH:MM) on a date string to an iCal datetime
-// with the correct UTC offset for Europe/London, using TZID form.
-// Returns e.g. "20250406T090000" for DTSTART;TZID=Europe/London
-function fmtLocalDT(dateStr, timeStr) {
-  const datePart = dateStr.replace(/-/g, '')
-  const timePart = timeStr.replace(':', '') + '00'
-  return `${datePart}T${timePart}`
-}
-
-// Build a minimal but correct VTIMEZONE block for Europe/London covering the
-// given set of years. Clients that understand VTIMEZONE will show the correct
-// local time regardless of their own timezone.
-function buildVTimezone(years) {
-  const lines = [
-    'BEGIN:VTIMEZONE',
-    'TZID:Europe/London',
-    'X-LIC-LOCATION:Europe/London',
-  ]
-  for (const y of years) {
-    const bstStart = lastSundayOf(y, 3)
-    const gmtStart = lastSundayOf(y, 10)
-    const fmt = d =>
-      `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}T010000`
-
-    lines.push(
-      'BEGIN:DAYLIGHT',
-      'TZOFFSETFROM:+0000',
-      'TZOFFSETTO:+0100',
-      'TZNAME:BST',
-      `DTSTART:${fmt(bstStart)}`,
-      `RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3`,
-      'END:DAYLIGHT',
-      'BEGIN:STANDARD',
-      'TZOFFSETFROM:+0100',
-      'TZOFFSETTO:+0000',
-      'TZNAME:GMT',
-      `DTSTART:${fmt(gmtStart)}`,
-      `RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10`,
-      'END:STANDARD'
-    )
-  }
-  lines.push('END:VTIMEZONE')
-  return lines
-}
-
 // ── GET /api/ical/feed/:token.ics — public feed ───────────────────────────────
 router.get('/feed/:token', (req, res) => {
   try {
@@ -122,47 +53,28 @@ router.get('/feed/:token', (req, res) => {
     `).all(user.id, past.toISOString().slice(0,10), fut.toISOString().slice(0,10))
 
     const appName = process.env.APP_NAME || 'ForgeShift'
-
-    // Collect years spanned so we can build the VTIMEZONE block
-    const years = new Set(shifts.map(s => Number(s.date.slice(0,4))))
-    if (!years.size) years.add(now.getFullYear())
-
     let cal = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       `PRODID:-//ForgeShift//NONSGML ${appName}//EN`,
       `X-WR-CALNAME:${appName} - ${user.name}`,
-      'X-WR-TIMEZONE:Europe/London',
+      'X-WR-TIMEZONE:UTC',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      ...buildVTimezone(years),
     ]
 
     for (const shift of shifts) {
+      const dtStart = shift.start_time
+        ? shift.date.replace(/-/g,'') + 'T' + shift.start_time.replace(':','') + '00Z'
+        : shift.date.replace(/-/g,'')
+      const dtEnd = shift.end_time
+        ? shift.date.replace(/-/g,'') + 'T' + shift.end_time.replace(':','') + '00Z'
+        : shift.date.replace(/-/g,'')
       const isAllDay = !shift.start_time
 
-      // Annual leave / day-off: emit as a full-day VEVENT so it shows as an
-      // all-day block in external calendars, matching the in-app display.
-      // Regular shifts with times: use TZID=Europe/London local time so DST is
-      // handled correctly — no more hour-ahead events in summer.
-      let dtStart, dtEnd, startProp, endProp
-
-      if (isAllDay) {
-        const datePart = shift.date.replace(/-/g, '')
-        dtStart = datePart
-        dtEnd   = datePart
-        startProp = `DTSTART;VALUE=DATE:${dtStart}`
-        endProp   = `DTEND;VALUE=DATE:${dtEnd}`
-      } else {
-        dtStart   = fmtLocalDT(shift.date, shift.start_time)
-        dtEnd     = fmtLocalDT(shift.date, shift.end_time || shift.start_time)
-        startProp = `DTSTART;TZID=Europe/London:${dtStart}`
-        endProp   = `DTEND;TZID=Europe/London:${dtEnd}`
-      }
-
-      let summary = shift.is_off ? '🏖️ Annual Leave' : `Shift - ${shift.location_name || 'No location'}`
+      let summary = shift.is_off ? '🏖️ Day Off' : `Shift - ${shift.location_name || 'No location'}`
       let desc = []
-      if (shift.location_name)  desc.push(`Location: ${shift.location_name}`)
+      if (shift.location_name) desc.push(`Location: ${shift.location_name}`)
       if (shift.location_address) desc.push(`Address: ${shift.location_address}`)
       if (shift.start_time && shift.end_time) desc.push(`Time: ${shift.start_time} - ${shift.end_time}`)
       if (shift.notes) desc.push(`Notes: ${shift.notes}`)
@@ -170,8 +82,13 @@ router.get('/feed/:token', (req, res) => {
       cal.push('BEGIN:VEVENT')
       cal.push(`UID:forgeshift-shift-${shift.id}@forgeshift`)
       cal.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}Z`)
-      cal.push(startProp)
-      cal.push(endProp)
+      if (isAllDay) {
+        cal.push(`DTSTART;VALUE=DATE:${dtStart}`)
+        cal.push(`DTEND;VALUE=DATE:${dtEnd}`)
+      } else {
+        cal.push(`DTSTART:${dtStart}`)
+        cal.push(`DTEND:${dtEnd}`)
+      }
       cal.push(`SUMMARY:${summary}`)
       if (desc.length) cal.push(`DESCRIPTION:${desc.join('\\n')}`)
       if (shift.location_name) cal.push(`LOCATION:${shift.location_address || shift.location_name}`)
