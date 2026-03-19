@@ -727,6 +727,8 @@ tr:hover td { background: var(--surface-2); }
 .toast.success { background: #065f46; }
 .toast.error   { background: #991b1b; }
 .toast.warning { background: #92400e; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 @keyframes slideUp {
   from { transform: translateY(16px); opacity: 0; }
   to   { transform: none; opacity: 1; }

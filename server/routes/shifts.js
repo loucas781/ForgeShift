@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
 const audit  = require('../audit')
+const { buildHolidayMapServer } = require('../holidays')
 
 // Helper: get IDs of all members in teams owned by a shift_lead (+ themselves)
 function getShiftLeadScope(userId) {
@@ -171,7 +172,7 @@ router.delete('/:id', requireAuth, (req, res) => {
 // ── POST /api/shifts/apply-template ──────────────────────────────────────────
 router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
   try {
-    const { template_id, user_id, week_start } = req.body
+    const { template_id, user_id, week_start, skip_holidays } = req.body
     if (!template_id || !user_id || !week_start)
       return res.status(400).json({ error: 'template_id, user_id and week_start are required.' })
 
@@ -185,8 +186,33 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
     if (!tmpl) return res.status(404).json({ error: 'Template not found' })
 
     const days = db.prepare('SELECT * FROM template_days WHERE template_id = ?').all(template_id)
-    const start = new Date(week_start)
+
+    // Parse week_start as local date components (YYYY-MM-DD) to avoid UTC-offset day drift
+    const [sy, sm, sd] = week_start.split('-').map(Number)
+
+    // Build a Set of bank holiday date strings if the toggle is enabled
+    const bankHolidayDates = new Set()
+    if (skip_holidays) {
+      // 'holidays' is a per-user preference — read from the requesting user's prefs
+      const userRow = db.prepare('SELECT prefs FROM users WHERE id = ?').get(req.user.id)
+      let userPrefs = {}
+      try { userPrefs = JSON.parse(userRow?.prefs || '{}') } catch {}
+      const enabledSets = Array.isArray(userPrefs.holidays) ? userPrefs.holidays : []
+      if (enabledSets.length) {
+        // Collect all years spanned by this week
+        const years = new Set()
+        for (const day of days) {
+          years.add(new Date(sy, sm - 1, sd + day.day_of_week).getFullYear())
+        }
+        for (const yr of years) {
+          const map = buildHolidayMapServer(yr, enabledSets, db)
+          for (const dateStr of Object.keys(map)) bankHolidayDates.add(dateStr)
+        }
+      }
+    }
+
     const created = []
+    const skipped = []
 
     const insert = db.prepare(`
       INSERT OR REPLACE INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, template_id, created_by)
@@ -195,9 +221,18 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
 
     const tx = db.transaction(() => {
       for (const day of days) {
-        const d = new Date(start)
-        d.setDate(d.getDate() + day.day_of_week)
-        const dateStr = d.toISOString().slice(0, 10)
+        // Local-date arithmetic — avoids UTC midnight roll-back on servers behind UTC
+        const target = new Date(sy, sm - 1, sd + day.day_of_week)
+        const yyyy   = target.getFullYear()
+        const mm     = String(target.getMonth() + 1).padStart(2, '0')
+        const dd     = String(target.getDate()).padStart(2, '0')
+        const dateStr = `${yyyy}-${mm}-${dd}`
+
+        if (skip_holidays && bankHolidayDates.has(dateStr)) {
+          skipped.push(dateStr)
+          continue
+        }
+
         const id = uuidv4()
         insert.run(id, user_id, dateStr, day.location_id, day.start_time, day.end_time,
                    day.notes, day.note_color, day.is_off, 0, template_id, req.user.id)
@@ -206,12 +241,11 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
     })
     tx()
 
-    audit(req.user.id, 'shift.template_apply', 'shift', template_id, tmpl.name, { user_id, week_start, days: created.length })
-    res.json({ ok: true, applied: created.length })
+    audit(req.user.id, 'shift.template_apply', 'shift', template_id, tmpl.name, { user_id, week_start, days: created.length, skipped: skipped.length })
+    res.json({ ok: true, applied: created.length, skipped: skipped.length })
   } catch (err) {
     console.error('apply template:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
-
 module.exports = router

@@ -275,6 +275,7 @@ try {
   migrate()
   migrateAdditive()
   migrateTeams()
+  migrateHolidays()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)
@@ -301,4 +302,18 @@ function migrateTeams() {
     CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
   `)
   console.log('✓ Teams schema ready')
+}
+
+// Additive: holiday override storage (safe on existing DBs)
+function migrateHolidays() {
+  const db = require('./connection')
+  db.prepare(`
+    INSERT OR IGNORE INTO app_preferences (key, value, updated_at)
+    VALUES ('holiday_overrides', '{}', datetime('now'))
+  `).run()
+  db.prepare(`
+    INSERT OR IGNORE INTO app_preferences (key, value, updated_at)
+    VALUES ('holiday_last_fetched', '', datetime('now'))
+  `).run()
+  console.log('✓ Holiday overrides schema ready')
 }
