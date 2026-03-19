@@ -193,6 +193,73 @@ function migrateAdditive() {
     db.exec("ALTER TABLE users ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}'")
     console.log('✓ Added prefs column')
   }
+
+  // On-call support
+  const shiftCols = db.prepare("PRAGMA table_info(shifts)").all().map(c => c.name)
+  if (!shiftCols.includes('is_oncall')) {
+    db.exec("ALTER TABLE shifts ADD COLUMN is_oncall INTEGER NOT NULL DEFAULT 0")
+    console.log('✓ Added is_oncall column to shifts')
+  }
+
+  // Task lists feature
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS task_lists (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      color       TEXT NOT NULL DEFAULT '#0052cc',
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS task_assignments (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      task_list_id TEXT NOT NULL REFERENCES task_lists(id) ON DELETE CASCADE,
+      week_start   TEXT NOT NULL,
+      created_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, week_start)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_assignments_user  ON task_assignments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_task_assignments_week  ON task_assignments(week_start);
+  `)
+  console.log('✓ Task lists schema ready')
+
+  // Expand role CHECK to include shift_lead — SQLite can't ALTER constraints
+  // so we check if the constraint is already expanded and rebuild if not
+  const tableSQL = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get()
+  if (tableSQL && !tableSQL.sql.includes('shift_lead')) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users_new (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        email       TEXT NOT NULL UNIQUE,
+        password    TEXT NOT NULL,
+        initials    TEXT NOT NULL,
+        color       TEXT NOT NULL DEFAULT '#0052cc',
+        avatar      TEXT,
+        role        TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','shift_lead','member')),
+        is_active   INTEGER NOT NULL DEFAULT 1,
+        totp_secret TEXT,
+        totp_enabled INTEGER NOT NULL DEFAULT 0,
+        prefs       TEXT NOT NULL DEFAULT '{}',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT OR IGNORE INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+    `)
+    console.log('✓ Expanded users.role CHECK to include shift_lead')
+  }
+
+  // team_owned_by: track which shift_lead owns a team
+  const teamCols = db.prepare("PRAGMA table_info(teams)").all().map(c => c.name)
+  if (!teamCols.includes('owned_by')) {
+    db.exec("ALTER TABLE teams ADD COLUMN owned_by TEXT REFERENCES users(id) ON DELETE SET NULL")
+    console.log('✓ Added owned_by column to teams')
+  }
 }
 
 try {

@@ -373,16 +373,19 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 .badge-green  { background: #d1fae5; color: #065f46; }
 .badge-orange { background: #fef3c7; color: #92400e; }
 .badge-red    { background: #fee2e2; color: #991b1b; }
+.badge-purple { background: #ede9fe; color: #5b21b6; }
 .badge-gray   { background: var(--gray-100); color: var(--gray-600); }
 [data-theme="dark"] .badge-blue   { background: #1e1b4b; color: #a5b4fc; }
 [data-theme="dark"] .badge-green  { background: #064e3b; color: #6ee7b7; }
 [data-theme="dark"] .badge-orange { background: #451a03; color: #fcd34d; }
 [data-theme="dark"] .badge-red    { background: #450a0a; color: #fca5a5; }
+[data-theme="dark"] .badge-purple { background: #2e1065; color: #c4b5fd; }
 [data-theme="dark"] .badge-gray   { background: var(--gray-800); color: var(--gray-400); }
 [data-theme="oled"] .badge-blue   { background: #0d0b2e; color: #a5b4fc; }
 [data-theme="oled"] .badge-green  { background: #022c22; color: #6ee7b7; }
 [data-theme="oled"] .badge-orange { background: #1c0d00; color: #fcd34d; }
 [data-theme="oled"] .badge-red    { background: #1c0202; color: #fca5a5; }
+[data-theme="oled"] .badge-purple { background: #140b30; color: #c4b5fd; }
 [data-theme="oled"] .badge-gray   { background: #1a1a1a; color: var(--gray-400); }
 
 /* ── Calendar ─────────────────────────────────────────────── */
@@ -454,6 +457,47 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 }
 .cal-shift-chip:hover { opacity: .85; }
 .cal-shift-chip.is-off { opacity: .7; font-style: italic; }
+.cal-shift-chip.is-oncall {
+  outline: 2px dashed rgba(255,255,255,0.6);
+  outline-offset: -2px;
+}
+.cal-week-shift-card.is-oncall {
+  outline: 2px dashed rgba(255,255,255,0.5);
+  outline-offset: -2px;
+}
+
+/* ── Task assignment banners ─────────────────────────────────────────────────── */
+.cal-task-banner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.cal-task-banner .task-banner-user { opacity: .7; font-weight: 500; }
+.cal-task-banner.clickable { cursor: pointer; }
+.cal-task-banner.clickable:hover { filter: brightness(1.1); }
+.cal-task-banner.task-banner-empty {
+  background: transparent !important;
+  border-left: 2px dashed var(--border) !important;
+  color: var(--text-3) !important;
+  font-style: italic;
+}
+.cal-task-banner.task-banner-empty:hover {
+  border-color: var(--brand) !important;
+  color: var(--brand) !important;
+}
+.cal-task-banner.week-task-banner {
+  font-size: 11px;
+  padding: 3px 6px;
+}
 
 /* Week view */
 .cal-week {
@@ -580,6 +624,17 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   border: 1px solid var(--border); border-radius: var(--r-md); overflow: visible;
   transition: box-shadow var(--t-fast);
 }
+.day-editor-cell.day-excluded {
+  opacity: .6;
+  border-style: dashed;
+}
+.day-excluded-body {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  font-style: italic;
+}
 /* clip only the body content, not the header button */
 .day-editor-cell-body {
   padding: 8px;
@@ -607,6 +662,19 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 .day-copy-btn:hover { background: var(--surface-3); color: var(--text-1); }
 .day-copy-btn.active { background: var(--primary); color: #fff; }
 .day-copy-btn svg { display: block; }
+
+/* Exclude button — sits in the day header next to copy */
+.day-exclude-btn {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 5px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); transition: background var(--t-fast), color var(--t-fast);
+}
+.day-exclude-btn:hover { background: var(--red-subtle, rgba(220,38,38,.1)); color: var(--red); }
+.day-exclude-btn.excluded { color: var(--green, #16a34a); }
+.day-exclude-btn.excluded:hover { background: var(--green-subtle, rgba(22,163,74,.1)); color: var(--green, #16a34a); }
+.day-exclude-btn svg { display: block; }
 
 /* Inline copy bar — appears between heading and day grid */
 .copy-day-bar {

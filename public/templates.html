@@ -104,6 +104,7 @@ let users = []
 let editingTmplId = null
 let applyingTmplId = null
 let dayConfigs = {} // day_of_week -> { location_id, start_time, end_time, notes, note_color, is_off }
+let excludedDays = new Set() // day indices excluded from this template
 
 const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
@@ -127,9 +128,15 @@ async function loadLocations() {
 }
 
 async function loadUsers() {
-  if (cfg.user.role !== 'admin') { users = [cfg.user]; return }
-  users = await api('/api/users')
   const sel = document.getElementById('applyUser')
+  if (cfg.user.role === 'member') { users = [cfg.user]; return }
+  const allUsers = await api('/api/users')
+  if (cfg.user.role === 'shift_lead') {
+    // Only load members — scope enforced by backend on apply
+    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.id === cfg.user.id))
+  } else {
+    users = allUsers
+  }
   users.filter(u => u.is_active).forEach(u => {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
     sel.appendChild(o)
@@ -147,7 +154,7 @@ function renderTemplateGrid() {
     grid.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12z"/></svg>
       <h3>No templates yet</h3>
-      <p>${cfg.user.role==='admin'?'Click "New Template" to get started':'No templates have been created yet'}</p>
+      <p>${cfg.user.role==='admin'?'Click "New Template" to get started':cfg.user.role==='shift_lead'?'No templates have been created yet — ask an admin to create one':'No templates have been created yet'}</p>
     </div>`
     return
   }
@@ -182,6 +189,9 @@ function renderTemplateGrid() {
         <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTmpl('${t.id}')" title="Delete" style="color:var(--red)">
           <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
         </button>
+      </div>` : cfg.user.role === 'shift_lead' ? `
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
       </div>` : ''
 
     return `<div class="template-card">
@@ -201,6 +211,7 @@ function renderTemplateGrid() {
 function openCreateTmpl() {
   editingTmplId = null
   dayConfigs = {}
+  excludedDays = new Set()
   document.getElementById('tmplModalTitle').textContent = 'New Template'
   document.getElementById('tmplName').value = ''
   document.getElementById('tmplDesc').value = ''
@@ -213,6 +224,12 @@ function openEditTmpl(id) {
   if (!t) return
   editingTmplId = id
   dayConfigs = {}
+  excludedDays = new Set()
+  // Days that exist in the template — all others are considered excluded
+  const existingDayNums = new Set((t.days||[]).map(d => d.day_of_week))
+  for (let i = 0; i < 7; i++) {
+    if (!existingDayNums.has(i)) excludedDays.add(i)
+  }
   ;(t.days||[]).forEach(d => { dayConfigs[d.day_of_week] = { ...d } })
   document.getElementById('tmplModalTitle').textContent = 'Edit Template'
   document.getElementById('tmplName').value = t.name
@@ -231,19 +248,30 @@ function renderDayEditor() {
   grid.innerHTML = ''
   for (let i = 0; i < 7; i++) {
     const cfg_day = dayConfigs[i] || { note_color: '#4f46e5', is_off: 0 }
+    const isExcluded = excludedDays.has(i)
     const cell = document.createElement('div')
-    cell.className = 'day-editor-cell'
+    cell.className = 'day-editor-cell' + (isExcluded ? ' day-excluded' : '')
+    cell.id = `dc_cell_${i}`
     cell.innerHTML = `
       <div class="day-editor-cell-header" id="dc_hdr_${i}">
         <span class="day-label">${DAY_FULL[i]}</span>
-        <button class="day-copy-btn" id="dc_copybtn_${i}" title="Copy this day to other days…">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
-            <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z"/>
-            <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z"/>
-          </svg>
-        </button>
+        <div style="display:flex;gap:4px;align-items:center">
+          ${!isExcluded ? `<button class="day-copy-btn" id="dc_copybtn_${i}" title="Copy this day to other days…">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+              <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z"/>
+              <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z"/>
+            </svg>
+          </button>` : ''}
+          <button class="day-exclude-btn${isExcluded ? ' excluded' : ''}" id="dc_excl_${i}" title="${isExcluded ? 'Include this day' : 'Exclude this day (no shift created)'}">
+            ${isExcluded
+              ? `<svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>`
+              : `<svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`}
+          </button>
+        </div>
       </div>
-      <div class="day-editor-cell-body">
+      ${isExcluded
+        ? `<div class="day-excluded-body"><span>Not included in template</span></div>`
+        : `<div class="day-editor-cell-body">
         <div class="form-group" style="margin-bottom:8px">
           <select class="form-select" id="dc_loc_${i}" style="font-size:11px;padding:5px 8px">
             <option value="">No location</option>
@@ -263,23 +291,43 @@ function renderDayEditor() {
           </label>
           <span style="font-size:10px;color:var(--text-3)">Day off</span>
         </div>
-      </div>`
+      </div>`}
+    `
     grid.appendChild(cell)
 
-    // Wire up copy button
-    const copyBtn = document.getElementById(`dc_copybtn_${i}`)
-    copyBtn.addEventListener('click', e => {
+    // Wire up exclude button
+    const exclBtn = document.getElementById(`dc_excl_${i}`)
+    exclBtn.addEventListener('click', e => {
       e.stopPropagation()
-      openCopyDayMenu(i)
+      toggleDayExclusion(i)
     })
 
-    // Colour picker
-    const colContainer = document.getElementById(`dc_colours_${i}`)
-    let thisColour = cfg_day.note_color || '#4f46e5'
-    renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v })
-    if (!dayConfigs[i]) dayConfigs[i] = {}
-    dayConfigs[i].note_color = thisColour
+    if (!isExcluded) {
+      // Wire up copy button
+      const copyBtn = document.getElementById(`dc_copybtn_${i}`)
+      copyBtn.addEventListener('click', e => {
+        e.stopPropagation()
+        openCopyDayMenu(i)
+      })
+
+      // Colour picker
+      const colContainer = document.getElementById(`dc_colours_${i}`)
+      let thisColour = cfg_day.note_color || '#4f46e5'
+      renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v })
+      if (!dayConfigs[i]) dayConfigs[i] = {}
+      dayConfigs[i].note_color = thisColour
+    }
   }
+}
+
+function toggleDayExclusion(dayIdx) {
+  closeCopyDayMenu()
+  if (excludedDays.has(dayIdx)) {
+    excludedDays.delete(dayIdx)
+  } else {
+    excludedDays.add(dayIdx)
+  }
+  renderDayEditor()
 }
 
 // ── Copy day (inline bar — no floating/positioning needed) ─────────────────────
@@ -380,6 +428,7 @@ async function saveTmpl() {
 
   const days = []
   for (let i = 0; i < 7; i++) {
+    if (excludedDays.has(i)) continue // skip excluded days — no shift will be created for this day
     const dc = dayConfigs[i] || {}
     days.push({
       day_of_week: i,

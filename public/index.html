@@ -102,11 +102,49 @@
         </label>
         <span class="form-label" style="margin:0">Day off / leave</span>
       </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <label class="toggle">
+          <input type="checkbox" id="modalIsOncall">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="form-label" style="margin:0">On-call</span>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveShift()">Save shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task Assignment Modal -->
+<div class="modal-overlay" id="taskAssignModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Assign Task</h3>
+      <button class="modal-close" onclick="closeTaskAssignModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for a specific week.</p>
+      <div class="form-group">
+        <label class="form-label">Team member</label>
+        <select class="form-select" id="taUser"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Week starting (Monday)</label>
+        <input type="date" class="form-input" id="taWeekStart">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Task list</label>
+        <select class="form-select" id="taTaskList">
+          <option value="">— Clear assignment —</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeTaskAssignModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTaskAssignment()">Save</button>
     </div>
   </div>
 </div>
@@ -117,12 +155,16 @@
 'use strict'
 
 let cfg = null
+// Helper: true for admin and shift_lead (both can manage shifts/assignments)
+function canManage() { return cfg && (cfg.user.role === 'admin' || cfg.user.role === 'shift_lead') }
 let prefs = null
 let view = 'month'
 let currentDate = new Date()
 let shifts = []
 let locations = []
 let users = []
+let taskLists = []
+let taskAssignments = []
 let editingShiftId = null
 let selectedColour = '#4f46e5'
 
@@ -140,12 +182,12 @@ async function init() {
 
   view = prefs.defaultView || 'month'
 
-  if (cfg.user.role === 'admin') {
+  if (cfg.user.role === 'admin' || cfg.user.role === 'shift_lead') {
     document.getElementById('userFilterWrap').style.display = 'block'
     document.getElementById('adminUserField').style.display = 'block'
   }
 
-  await Promise.all([loadLocations(), loadUsers(), loadTeams()])
+  await Promise.all([loadLocations(), loadUsers(), loadTeams(), loadTaskLists()])
   renderView()
 
   document.getElementById('prevBtn').addEventListener('click', prev)
@@ -166,23 +208,60 @@ async function loadLocations() {
 }
 
 async function loadUsers() {
-  if (cfg.user.role !== 'admin') { users = [cfg.user]; return }
-  users = await api('/api/users')
+  if (cfg.user.role === 'member') { users = [cfg.user]; return }
+  // admin and shift_lead both load users — backend scopes appropriately for shift_lead via teams
+  const allUsers = await api('/api/users')
+  if (cfg.user.role === 'shift_lead') {
+    // Get team members from the shift_lead's own teams (loaded in loadTeams)
+    // We'll populate after teams load; for now load all active members + self
+    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.id === cfg.user.id))
+  } else {
+    users = allUsers
+  }
   const msel = document.getElementById('modalUser')
   users.filter(u => u.is_active).forEach(u => {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
     msel.appendChild(o)
   })
+  // Also populate task assignment user select
+  const tasel = document.getElementById('taUser')
+  users.filter(u => u.is_active).forEach(u => {
+    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+    tasel.appendChild(o)
+  })
 }
 
 let teams = []
 async function loadTeams() {
-  if (cfg.user.role !== 'admin') return
+  if (cfg.user.role === 'member') return
   try { teams = await api('/api/teams') } catch { teams = [] }
+
+  // For shift_lead: refine the user list to only members across their teams
+  if (cfg.user.role === 'shift_lead' && teams.length) {
+    const teamMemberIds = new Set()
+    teamMemberIds.add(cfg.user.id)
+    teams.forEach(t => (t.members || []).forEach(m => { if (m.is_active) teamMemberIds.add(m.id) }))
+    // Re-filter users to only those in scope, and repopulate selects
+    const allUsers = users  // already loaded in loadUsers
+    users = allUsers.filter(u => teamMemberIds.has(u.id))
+    const msel = document.getElementById('modalUser')
+    msel.innerHTML = ''
+    users.forEach(u => {
+      const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+      msel.appendChild(o)
+    })
+    const tasel = document.getElementById('taUser')
+    tasel.innerHTML = ''
+    users.forEach(u => {
+      const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+      tasel.appendChild(o)
+    })
+  }
+
   const sel = document.getElementById('teamFilter')
   while (sel.options.length > 1) sel.remove(1)
   const allOpt = document.createElement('option')
-  allOpt.value = 'all'; allOpt.textContent = 'All shifts'
+  allOpt.value = 'all'; allOpt.textContent = cfg.user.role === 'admin' ? 'All shifts' : 'All my teams'
   sel.appendChild(allOpt)
   teams.forEach(t => {
     const o = document.createElement('option')
@@ -190,6 +269,20 @@ async function loadTeams() {
     o.textContent = t.name + (t.member_count > 0 ? ' (' + t.member_count + ')' : '')
     sel.appendChild(o)
   })
+}
+
+async function loadTaskLists() {
+  if (!cfg.featureTasks) return
+  try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
+  // Populate task assignment modal select
+  const sel = document.getElementById('taTaskList')
+  if (sel) {
+    while (sel.options.length > 1) sel.remove(1)
+    taskLists.forEach(t => {
+      const o = document.createElement('option'); o.value = t.id; o.textContent = t.name
+      sel.appendChild(o)
+    })
+  }
 }
 
 // ── Holiday map ────────────────────────────────────────────────────────────────
@@ -222,29 +315,62 @@ async function loadShifts() {
   }
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
-  if (cfg.user.role !== 'admin') {
+  const role = cfg.user.role
+
+  if (role === 'member') {
     params.set('user_id', cfg.user.id)
-  } else if (filterVal === '') {
-    params.set('user_id', cfg.user.id)
-  } else if (filterVal === 'all') {
-    // no filter
-  } else if (filterVal.startsWith('team:')) {
-    const teamId = filterVal.slice(5)
-    const team = teams.find(t => t.id === teamId)
-    if (team && team.members.length) {
-      const fetches = team.members.filter(m => m.is_active).map(m => {
-        const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
-        return api('/api/shifts?' + p)
-      })
-      shifts = (await Promise.all(fetches)).flat()
-      return
+  } else if (role === 'admin' || role === 'shift_lead') {
+    if (filterVal === '') {
+      // No filter selected — show own shifts only
+      params.set('user_id', cfg.user.id)
+    } else if (filterVal === 'all') {
+      // Show all shifts in scope (backend enforces scope for shift_lead)
+    } else if (filterVal.startsWith('team:')) {
+      const teamId = filterVal.slice(5)
+      const team = teams.find(t => t.id === teamId)
+      if (team && team.members.length) {
+        const fetches = team.members.filter(m => m.is_active).map(m => {
+          const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
+          return api('/api/shifts?' + p)
+        })
+        shifts = (await Promise.all(fetches)).flat()
+        return
+      }
     }
   }
   shifts = await api('/api/shifts?' + params)
 }
 
+async function loadTaskAssignments() {
+  const weekStart = prefs?.weekStartDay ?? 1
+  let start, end
+  if (view === 'month') {
+    const year  = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const first = new Date(year, month, 1)
+    const last  = new Date(year, month + 1, 0)
+    const startOffset = (first.getDay() - weekStart + 7) % 7
+    start = new Date(year, month, 1 - startOffset)
+    const lastDay = last.getDay()
+    const endOffset = (weekStart + 6 - lastDay + 7) % 7
+    end = new Date(year, month, last.getDate() + endOffset)
+  } else {
+    start = startOfWeek(currentDate, weekStart)
+    end   = new Date(start); end.setDate(end.getDate() + 6)
+  }
+  // Snap start back to Monday for task assignment keying
+  const startDow = start.getDay()
+  const toMon = startDow === 0 ? -6 : 1 - startDow
+  const monStart = new Date(start); monStart.setDate(monStart.getDate() + toMon)
+  const params = new URLSearchParams({ start: toDateStr(monStart), end: toDateStr(end) })
+  if (cfg.user.role === 'member') params.set('user_id', cfg.user.id)
+  // shift_lead and admin: no user_id filter — backend scopes by role
+  try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
+}
+
 async function renderView() {
   await loadShifts()
+  if (cfg.featureTasks && taskLists.length) await loadTaskAssignments()
   updateTitle()
   if (view === 'month') renderMonth()
   else renderWeek()
@@ -286,6 +412,13 @@ function renderMonth() {
   const shiftMap = {}
   shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
+  // Task assignment map: week_start -> [assignment, ...]  (keyed by Monday of that week)
+  const taskMap = {}
+  taskAssignments.forEach(a => {
+    if (!taskMap[a.week_start]) taskMap[a.week_start] = []
+    taskMap[a.week_start].push(a)
+  })
+
   // Build ordered day abbreviations starting from weekStart
   const allAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const dayAbbrs = Array.from({length:7}, (_,i) => allAbbr[(weekStart + i) % 7])
@@ -309,6 +442,30 @@ function renderMonth() {
       html += '<div class="cal-wknum">' + _isoWeekNumber(d) + '</div>'
     }
 
+    // Task banner — shown on the first day of each week (position 0 in the row)
+    let taskBannerHtml = ''
+    if (cfg.featureTasks && taskLists.length && i % 7 === 0) {
+      // Always key by Monday of this row for task assignments
+      const rowMonday = new Date(d)
+      const rowDow = rowMonday.getDay()
+      const toMon = rowDow === 0 ? -6 : 1 - rowDow
+      rowMonday.setDate(rowMonday.getDate() + toMon)
+      const rowWeekStart = toDateStr(rowMonday)
+      const rowAssignments = taskMap[rowWeekStart] || []
+      const clickAttr = canManage()
+        ? `onclick="event.stopPropagation();openTaskAssignModal('${rowWeekStart}')"`
+        : ''
+      if (rowAssignments.length) {
+        taskBannerHtml = rowAssignments.map(a =>
+          `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" title="${a.user_name||''}: ${a.task_list_name}" ${clickAttr}>`+
+          (canManage()?`<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>`:'')+
+          `<span>${a.task_list_name}</span></div>`
+        ).join('')
+      } else if (canManage()) {
+        taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this week">+ Task</div>`
+      }
+    }
+
     const hasPaste = copiedShift && dayShifts.length === 0
 
     html += '<div class="cal-cell' +
@@ -325,12 +482,15 @@ function renderMonth() {
       html += '<div class="cal-holiday-label" title="' + names + '">' + names + '</div>'
     }
 
+    // Task banner (first column of week only)
+    if (taskBannerHtml) html += taskBannerHtml
+
     // Shift chips
     dayShifts.forEach(s => {
       const color = s.location_color || s.note_color || '#4f46e5'
-      const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift')
-      const name  = cfg.user.role === 'admin' && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
-      html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') +
+      const label = s.is_off ? '🏖️ Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
+      const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
         '" style="background:' + color + '"' +
         ' title="' + (s.user_name || '') + ': ' + label + '"' +
         ' onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')"' +
@@ -361,6 +521,10 @@ function renderWeek() {
   const shiftMap = {}
   shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
+  // Task assignment map for this week
+  const wsStr = toDateStr(ws)
+  const weekTaskAssignments = cfg.featureTasks ? (taskAssignments.filter(a => a.week_start === wsStr)) : []
+
   let html = `<div class="cal-week">`
   html += `<div style="border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);padding:10px 4px;"></div>`
   for (let i = 0; i < 7; i++) {
@@ -373,6 +537,28 @@ function renderWeek() {
       <div class="day-num">${d.getDate()}</div>
     </div>`
   }
+
+  // Task row for week view
+  if (cfg.featureTasks && (weekTaskAssignments.length || (canManage() && taskLists.length))) {
+    html += `<div style="border-right:1px solid var(--border);background:var(--surface-2);padding:4px 4px;font-size:10px;color:var(--text-3);display:flex;align-items:center;justify-content:center">Tasks</div>`
+    for (let i = 0; i < 7; i++) {
+      const clickAttr = canManage() && taskLists.length
+        ? `onclick="event.stopPropagation();openTaskAssignModal('${wsStr}')"`
+        : ''
+      html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
+      if (weekTaskAssignments.length) {
+        weekTaskAssignments.forEach(a => {
+          html += `<div class="cal-task-banner week-task-banner${cfg.user.role==='admin'?' clickable':''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" title="${a.user_name||''}: ${a.task_list_name}" ${clickAttr}>`+
+            (canManage()?`<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>`:'')+
+            `<span>${a.task_list_name}</span></div>`
+        })
+      } else if (i === 0 && canManage() && taskLists.length) {
+        html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this week">+ Task</div>`
+      }
+      html += `</div>`
+    }
+  }
+
   html += `<div class="cal-week-time-col" style="padding:8px 4px;font-size:11px;color:var(--text-3)">`
   for (let h = 7; h <= 21; h++) html += `<div style="height:40px;padding-top:2px">${h}:00</div>`
   html += `</div>`
@@ -391,12 +577,12 @@ function renderWeek() {
     }
     dayShifts.forEach(s => {
       const color = s.location_color || s.note_color || '#4f46e5'
-      const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
+      const label = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
       const time  = s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : ''
-      html += `<div class="cal-week-shift-card" style="background:${color}"
+      html += `<div class="cal-week-shift-card${s.is_oncall?' is-oncall':''}" style="background:${color}"
         onclick="event.stopPropagation();openEditModal('${s.id}')"
         oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')">
-        <div class="shift-loc">${cfg.user.role==='admin'?(s.user_name?.split(' ')[0]+': '):''}${label}</div>
+        <div class="shift-loc">${canManage()?(s.user_name?.split(' ')[0]+': '):''}${label}</div>
         ${time ? `<div class="shift-time">${time}</div>` : ''}
         ${s.notes ? `<div class="shift-notes">${s.notes.slice(0,60)}${s.notes.length>60?'…':''}</div>` : ''}
       </div>`
@@ -455,7 +641,7 @@ function copyShift(id) {
     note_color:  s.note_color,
     is_off:      s.is_off,
   }
-  if (cfg.user.role === 'admin') copiedShift.user_id = s.user_id
+  if (canManage()) copiedShift.user_id = s.user_id
   updatePasteHint()
   renderView()
   toast('Shift copied — click an empty day to paste', 'success', 2500)
@@ -549,8 +735,9 @@ function openCreateModal(date) {
   document.getElementById('modalEnd').value   = prefs?.defaultShiftEnd   || ''
   document.getElementById('modalNotes').value = ''
   document.getElementById('modalIsOff').checked = false
+  document.getElementById('modalIsOncall').checked = false
   document.getElementById('deleteShiftBtn').style.display = 'none'
-  if (cfg.user.role === 'admin') document.getElementById('modalUser').value = ''
+  if (canManage()) document.getElementById('modalUser').value = ''
   setupColourPicker()
   document.getElementById('shiftModal').classList.add('open')
 }
@@ -567,8 +754,9 @@ function openEditModal(id) {
   document.getElementById('modalEnd').value   = s.end_time || ''
   document.getElementById('modalNotes').value = s.notes || ''
   document.getElementById('modalIsOff').checked = !!s.is_off
+  document.getElementById('modalIsOncall').checked = !!s.is_oncall
   document.getElementById('deleteShiftBtn').style.display = 'flex'
-  if (cfg.user.role === 'admin') document.getElementById('modalUser').value = s.user_id
+  if (canManage()) document.getElementById('modalUser').value = s.user_id
   setupColourPicker()
   document.getElementById('shiftModal').classList.add('open')
 }
@@ -592,8 +780,9 @@ async function saveShift() {
     notes:       document.getElementById('modalNotes').value.trim() || null,
     note_color:  selectedColour,
     is_off:      document.getElementById('modalIsOff').checked,
+    is_oncall:   document.getElementById('modalIsOncall').checked,
   }
-  if (cfg.user.role === 'admin') {
+  if (canManage()) {
     body.user_id = document.getElementById('modalUser').value || cfg.user.id
   }
   try {
@@ -627,6 +816,46 @@ async function deleteShift() {
 document.getElementById('shiftModal').addEventListener('click', e => {
   if (e.target === document.getElementById('shiftModal')) closeModal()
 })
+
+document.getElementById('taskAssignModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('taskAssignModal')) closeTaskAssignModal()
+})
+
+// ── Task Assignment Modal ──────────────────────────────────────────────────────
+function openTaskAssignModal(weekStart, userId) {
+  // Ensure weekStart is the Monday of that week for consistent keying
+  let ws = new Date(weekStart)
+  const dow = ws.getDay()
+  const diff = dow === 0 ? -6 : 1 - dow // shift sunday back 6, else back to monday
+  ws.setDate(ws.getDate() + diff)
+  const wsStr = toDateStr(ws)
+
+  const sel = document.getElementById('taUser')
+  if (userId && sel) sel.value = userId
+  document.getElementById('taWeekStart').value = wsStr
+  // Pre-select current assignment if exists
+  const existing = taskAssignments.find(a => a.week_start === wsStr)
+  const taSel = document.getElementById('taTaskList')
+  if (taSel) taSel.value = existing ? existing.task_list_id : ''
+  document.getElementById('taskAssignModal').classList.add('open')
+}
+
+function closeTaskAssignModal() {
+  document.getElementById('taskAssignModal').classList.remove('open')
+}
+
+async function saveTaskAssignment() {
+  const user_id     = document.getElementById('taUser').value
+  const week_start  = document.getElementById('taWeekStart').value
+  const task_list_id = document.getElementById('taTaskList').value || null
+  if (!user_id || !week_start) { toast('Please select a user and week', 'error'); return }
+  try {
+    await api('/api/tasks/assignments', { method: 'POST', body: { user_id, week_start, task_list_id } })
+    toast(task_list_id ? 'Task assigned' : 'Assignment cleared', 'success')
+    closeTaskAssignModal()
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
 
 init()
 </script>

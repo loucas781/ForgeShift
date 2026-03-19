@@ -105,7 +105,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req, res) => {
     const vals    = []
     if (name?.trim())       { updates.push('name = ?, initials = ?'); vals.push(name.trim(), getInitials(name.trim())) }
     if (email?.trim())      { updates.push('email = ?'); vals.push(email.trim().toLowerCase()) }
-    if (role)               { updates.push('role = ?'); vals.push(role) }
+    if (role)               { updates.push('role = ?'); vals.push(['admin','shift_lead','member'].includes(role) ? role : 'member') }
     if (is_active !== undefined) { updates.push('is_active = ?'); vals.push(is_active ? 1 : 0) }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' })
 

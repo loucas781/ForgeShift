@@ -89,6 +89,10 @@ app.get('/api/config', optionalAuth, (req, res) => {
     const db = require('./db/connection')
     user = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(req.user.id) || null
   }
+  // Load feature flags from app_preferences
+  const db = require('./db/connection')
+  const featureTasksRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  const featureTasks = featureTasksRow ? featureTasksRow.value === 'true' : false
   res.json({
     appName:        process.env.APP_NAME      || 'ForgeShift',
     appEnv:         process.env.APP_ENV       || env,
@@ -100,7 +104,28 @@ app.get('/api/config', optionalAuth, (req, res) => {
     cookieSecure:   process.env.COOKIE_SECURE === 'true',
     passwordPolicy: getPasswordPolicy(overrides),
     smtpEnabled:    emailSvc.getSmtpConfig().enabled,
+    featureTasks,
   })
+})
+
+// ── GET/PATCH /api/features — admin feature flag management ───────────────────
+app.get('/api/features', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const db = require('./db/connection')
+  const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  res.json({ feature_tasks: row ? row.value === 'true' : false })
+})
+app.patch('/api/features', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const db = require('./db/connection')
+  const { feature_tasks } = req.body
+  if (typeof feature_tasks === 'boolean') {
+    db.prepare(`INSERT INTO app_preferences (key, value, updated_at) VALUES ('feature_tasks', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
+      .run(feature_tasks ? 'true' : 'false')
+  }
+  const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
+  res.json({ feature_tasks: row ? row.value === 'true' : false })
 })
 
 // ── Admin: toggle runtime settings ────────────────────────────────────────────
@@ -175,6 +200,7 @@ app.use('/api/locations', require('./routes/locations'))
 app.use('/api/teams',     require('./routes/teams'))
 app.use('/api/ical',      require('./routes/ical'))
 app.use('/api/backup',    require('./routes/backup'))
+app.use('/api/tasks',     require('./routes/tasks'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {

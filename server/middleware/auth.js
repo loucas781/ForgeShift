@@ -31,4 +31,11 @@ function requireAdmin(req, res, next) {
   next()
 }
 
-module.exports = { requireAuth, optionalAuth, requireAdmin }
+// Passes for admin or shift_lead
+function requireShiftLead(req, res, next) {
+  if (!req.user || !['admin', 'shift_lead'].includes(req.user.role))
+    return res.status(403).json({ error: 'Insufficient permissions' })
+  next()
+}
+
+module.exports = { requireAuth, optionalAuth, requireAdmin, requireShiftLead }
