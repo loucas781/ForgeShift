@@ -880,6 +880,13 @@ tr:hover td { background: var(--surface-2); }
   }
   .cal-month .cal-cell { min-height: 64px; padding: 4px; }
   .cal-month .cal-cell-date { font-size: 11px; width: 20px; height: 20px; }
+
+  /* Toast — full width on small screens */
+  .toast-container { left: 12px; right: 12px; bottom: 16px; }
+  .toast { min-width: 0; max-width: 100%; width: 100%; }
+
+  /* Env badge — smaller, doesn't overlap toast */
+  .env-badge { bottom: 64px; right: 12px; }
 }
 
 /* ── Holiday cell tints & labels ───────────────────────────────────────────── */

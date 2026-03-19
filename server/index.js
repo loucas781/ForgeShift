@@ -102,6 +102,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     user,
     allowSignup:    (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
     cookieSecure:   process.env.COOKIE_SECURE === 'true',
+    trustProxy:     process.env.TRUST_PROXY   === 'true',
     passwordPolicy: getPasswordPolicy(overrides),
     smtpEnabled:    emailSvc.getSmtpConfig().enabled,
     featureTasks,
@@ -137,8 +138,19 @@ app.patch('/api/config', requireAuth, (req, res) => {
     overrides.COOKIE_SECURE = req.body.cookieSecure ? 'true' : 'false'
     process.env.COOKIE_SECURE = overrides.COOKIE_SECURE
   }
+  if (typeof req.body.trustProxy === 'boolean') {
+    overrides.TRUST_PROXY = req.body.trustProxy ? 'true' : 'false'
+    process.env.TRUST_PROXY = overrides.TRUST_PROXY
+    // Apply immediately to Express — no restart needed
+    req.app.set('trust proxy', req.body.trustProxy ? 1 : 0)
+  }
   saveOverrides(overrides)
-  res.json({ ok: true, allowSignup: overrides.ALLOW_SIGNUP !== 'false', cookieSecure: process.env.COOKIE_SECURE === 'true' })
+  res.json({
+    ok: true,
+    allowSignup:  overrides.ALLOW_SIGNUP   !== 'false',
+    cookieSecure: process.env.COOKIE_SECURE === 'true',
+    trustProxy:   process.env.TRUST_PROXY   === 'true',
+  })
 })
 
 // ── PATCH /api/config/password-policy — admin: update password policy ─────────
