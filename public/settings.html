@@ -64,8 +64,10 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
-    .settings-panel { display:none; padding:24px; max-width:700px; }
+    .settings-panel { display:none; padding:24px; max-width:900px; }
     .settings-panel.active { display:block; }
+    /* Team panel two-column grid collapses on narrow viewports */
+    @media(max-width:860px) { .team-panel-grid { grid-template-columns:1fr !important; } }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
     .pref-row:last-child { border-bottom:none; }
@@ -305,16 +307,20 @@ async function init() {
   const isShiftLead = cfg.user.role === 'shift_lead'
 
   const ALL_TABS = [
-    { id: 'appearance', label: 'Appearance', roles: ['admin','shift_lead','member'],
-      icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-    { id: 'ical', label: 'Calendar Feed', roles: ['admin','shift_lead','member'],
-      icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
+    // ── Personal (all roles) ─────────────────────────────────────────────────
+    // Appearance + Preferences merged: theme choice is just another personal pref
     { id: 'preferences', label: 'Preferences', roles: ['admin','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
+    { id: 'ical', label: 'Calendar Feed', roles: ['admin','shift_lead','member'],
+      icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
+    { id: 'account', label: 'Account', roles: ['admin','shift_lead','member'],
+      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
 
+    // ── Shift Lead ───────────────────────────────────────────────────────────
     { id: 'my-teams', label: 'My Teams', roles: ['shift_lead'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
+    // ── Admin ────────────────────────────────────────────────────────────────
     { id: 'team', label: 'Team', roles: ['admin'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
     { id: 'locations', label: 'Locations', roles: ['admin'],
@@ -325,14 +331,10 @@ async function init() {
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
     { id: 'email', label: 'Email', roles: ['admin'],
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
-    { id: 'audit', label: 'Audit Log', roles: ['admin'],
-      icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
-    { id: 'backup', label: 'Backup', roles: ['admin'],
+    // Audit Log + Backup merged into Data
+    { id: 'data', label: 'Data', roles: ['admin'],
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
-    { id: 'buildinfo', label: 'Build Info', roles: ['admin','shift_lead','member'],
-      icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'account', label: 'Account', roles: ['admin','shift_lead','member'],
-      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+    // Build Info + About merged into About
     { id: 'about', label: 'About', roles: ['admin','shift_lead','member'],
       icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
@@ -366,20 +368,17 @@ async function init() {
   // Wire password indicator for Edit User modal
   euPwIndicator = document.getElementById('euPwIndicatorWrap')
   await Promise.all([
-    renderAppearancePanel(),
+    renderPreferencesPanel(),   // includes Appearance (theme) section
     renderIcalPanel(),
-    renderPreferencesPanel(),
+    renderAccountPanel(),
     isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
     isAdmin ? renderTeamPanel() : Promise.resolve(),
     isAdmin ? renderLocationsPanel() : Promise.resolve(),
     isAdmin ? renderFeaturesPanel() : Promise.resolve(),
     isAdmin ? renderSecurityPanel() : Promise.resolve(),
     isAdmin ? renderEmailPanel() : Promise.resolve(),
-    isAdmin ? renderAuditPanel() : Promise.resolve(),
-    isAdmin ? renderBackupPanel() : Promise.resolve(),
-    isAdmin ? renderBuildInfoPanel() : Promise.resolve(),
-    renderAccountPanel(),
-    renderAboutPanel(),
+    isAdmin ? renderDataPanel() : Promise.resolve(),   // merged Audit + Backup
+    renderAboutPanel(),                                // merged BuildInfo + About
   ])
 
   // Show first tab (or hash)
@@ -405,35 +404,7 @@ async function loadUsers() { users = await api('/api/users') }
 async function loadLocations() { locations = await api('/api/locations') }
 
 // ── Appearance panel ───────────────────────────────────────────────────────────
-async function renderAppearancePanel() {
-  const el = document.getElementById('panel-appearance')
-  const currentTheme = localStorage.getItem('fs-theme') || 'system'
-  el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Appearance</h2>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Theme</h3></div>
-      <div class="card-body">
-        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-          Choose how ForgeShift looks. System mode follows your OS light/dark preference automatically.
-        </p>
-        <div class="theme-grid" id="themeGrid">
-          ${[
-            { id:'system', label:'System',    emoji:'🖥️', bg:'linear-gradient(135deg,#fff 50%,#1e293b 50%)', border:'var(--border)' },
-            { id:'light',  label:'Light',     emoji:'☀️', bg:'#f3f4f6',  border:'#e5e7eb' },
-            { id:'dark',   label:'Dark',      emoji:'🌙', bg:'#0f172a',  border:'#1e293b' },
-            { id:'oled',   label:'OLED Black',emoji:'⬛', bg:'#000000',  border:'#0d0d0d' },
-          ].map(t => `
-            <div class="theme-option${currentTheme===t.id?' active':''}" id="themeOpt-${t.id}" onclick="pickTheme('${t.id}')">
-              <div class="theme-swatch" style="background:${t.bg};border-color:${t.border}"></div>
-              <span>${t.emoji} ${t.label}</span>
-            </div>`).join('')}
-        </div>
-        <p style="font-size:12px;color:var(--text-3);margin-top:12px">
-          Current: <strong id="currentThemeName">${currentTheme}</strong>
-        </p>
-      </div>
-    </div>`
-}
+// renderAppearancePanel removed — merged into renderPreferencesPanel
 
 function pickTheme(theme) {
   // Apply immediately
@@ -459,12 +430,38 @@ async function renderPreferencesPanel() {
   const el = document.getElementById('panel-preferences')
   if (!el) return
   const p = getPrefs()
+  const currentTheme = localStorage.getItem('fs-theme') || 'system'
 
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Preferences</h2>
     <p style="font-size:13px;color:var(--text-3);margin-bottom:20px;margin-top:-12px">
       These preferences only affect your view — they don't change anything for other users.
     </p>
+
+    <!-- Theme -->
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Appearance</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+          Choose how ForgeShift looks. System mode follows your OS light/dark preference automatically.
+        </p>
+        <div class="theme-grid" id="themeGrid">
+          ${[
+            { id:'system', label:'System',    emoji:'🖥️', bg:'linear-gradient(135deg,#fff 50%,#1e293b 50%)', border:'var(--border)' },
+            { id:'light',  label:'Light',     emoji:'☀️', bg:'#f3f4f6',  border:'#e5e7eb' },
+            { id:'dark',   label:'Dark',      emoji:'🌙', bg:'#0f172a',  border:'#1e293b' },
+            { id:'oled',   label:'OLED Black',emoji:'⬛', bg:'#000000',  border:'#0d0d0d' },
+          ].map(t => \`
+            <div class="theme-option\${currentTheme===t.id?' active':''}" id="themeOpt-\${t.id}" onclick="pickTheme('\${t.id}')">
+              <div class="theme-swatch" style="background:\${t.bg};border-color:\${t.border}"></div>
+              <span>\${t.emoji} \${t.label}</span>
+            </div>\`).join('')}
+        </div>
+        <p style="font-size:12px;color:var(--text-3);margin-top:12px">
+          Current: <strong id="currentThemeName">${currentTheme}</strong>
+        </p>
+      </div>
+    </div>
 
     <!-- Calendar display -->
     <div class="card section-card">
@@ -883,6 +880,9 @@ async function renderTeamPanel() {
     : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'
 
   el.innerHTML = `
+    <div class="team-panel-grid" style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
+    <div><!-- left column: invite + members -->
+
     <!-- Invite Member card -->
     <div class="card" style="margin-bottom:24px">
       <div class="card-body">
@@ -951,7 +951,91 @@ async function renderTeamPanel() {
       <div class="card">
         <div class="card-body" id="tmplGroupsListEl">Loading…</div>
       </div>
-    </div>`
+    </div>
+
+    </div><!-- end left column -->
+
+    <!-- Right column: Role permissions reference -->
+    <div style="position:sticky;top:80px">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Role Permissions</h3>
+        </div>
+        <div class="card-body" style="padding:0">
+          <p style="font-size:12px;color:var(--text-3);padding:12px 16px 8px;margin:0;line-height:1.5">
+            What each role can and cannot do in ForgeShift.
+          </p>
+
+          ${[
+            {
+              role: 'Admin',
+              color: '#dc2626',
+              badge: 'badge-red',
+              items: [
+                { can: true,  text: 'View all shifts & rotas' },
+                { can: true,  text: 'Create, edit & delete any shift' },
+                { can: true,  text: 'Apply templates to any user' },
+                { can: true,  text: 'Assign tasks to any user' },
+                { can: true,  text: 'Create & edit task lists' },
+                { can: true,  text: 'Manage team members & roles' },
+                { can: true,  text: 'Create & manage locations' },
+                { can: true,  text: 'Create & manage templates' },
+                { can: true,  text: 'Access all settings' },
+                { can: true,  text: 'Export & restore backups' },
+                { can: true,  text: 'View audit log' },
+              ]
+            },
+            {
+              role: 'Shift Lead',
+              color: '#d97706',
+              badge: 'badge-orange',
+              items: [
+                { can: true,  text: 'View shifts for their teams' },
+                { can: true,  text: 'Create & edit shifts for team members' },
+                { can: true,  text: 'Apply templates to team members' },
+                { can: true,  text: 'Assign tasks to team members' },
+                { can: false, text: 'Create or edit task lists' },
+                { can: true,  text: 'Manage their own teams' },
+                { can: false, text: 'Create or edit locations' },
+                { can: false, text: 'Manage members outside their team' },
+                { can: false, text: 'Access admin settings' },
+                { can: false, text: 'Export or restore backups' },
+              ]
+            },
+            {
+              role: 'Member',
+              color: '#059669',
+              badge: 'badge-green',
+              items: [
+                { can: true,  text: 'View their own shifts' },
+                { can: false, text: 'Create, edit or delete shifts' },
+                { can: false, text: 'View other users\' shifts' },
+                { can: false, text: 'Assign tasks' },
+                { can: true,  text: 'Subscribe to their iCal feed' },
+                { can: true,  text: 'Edit their profile & password' },
+                { can: true,  text: 'Set personal preferences' },
+                { can: false, text: 'Access any admin settings' },
+              ]
+            },
+          ].map(r => \`
+            <div style="border-top:1px solid var(--border);padding:14px 16px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                <span class="badge \${r.badge}" style="font-size:11px">\${r.role}</span>
+              </div>
+              <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px">
+                \${r.items.map(i => \`
+                  <li style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:\${i.can ? 'var(--text-2)' : 'var(--text-3)'}">
+                    <span style="flex-shrink:0;margin-top:1px;font-size:13px">\${i.can ? '✓' : '✗'}</span>
+                    <span style="\${i.can ? '' : 'text-decoration:line-through;opacity:.6'}">\${i.text}</span>
+                  </li>\`).join('')}
+              </ul>
+            </div>
+          \`).join('')}
+        </div>
+      </div>
+    </div><!-- end right column -->
+
+    </div><!-- end grid -->`
 
   renderTeamList()
   await loadSettingsTeams()
@@ -2216,10 +2300,28 @@ async function setAllowSignup(val) {
 }
 
 // ── Audit log panel ────────────────────────────────────────────────────────────
+// ── Data panel (merged Audit Log + Backup) ────────────────────────────────────
+async function renderDataPanel() {
+  const el = document.getElementById('panel-data')
+  if (!el) return
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Data</h2>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:24px;margin-top:-12px">Manage your audit trail and create or restore backups.</div>
+    <!-- Audit Log section -->
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)">Audit Log</h3>
+    <div id="panel-audit"></div>
+    <!-- Backup section -->
+    <h3 style="font-size:15px;font-weight:700;margin:32px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--border)">Backup &amp; Restore</h3>
+    <div id="panel-backup"></div>
+  `
+  await renderAuditPanel()
+  await renderBackupPanel()
+}
+
 async function renderAuditPanel() {
   const el = document.getElementById('panel-audit')
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Audit Log</h2>
+    <!-- Audit content (heading provided by parent Data panel) -->
     <div class="card">
       <div class="table-wrap">
         <table>
@@ -2289,13 +2391,13 @@ async function renderBackupPanel() {
   } catch {}
 
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Backup &amp; Restore</h2>
+    <!-- Backup content (heading provided by parent Data panel) -->
 
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Export Backup</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
-          Downloads a single <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.fsbackup</code>
+          Downloads a <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.fsbackup.zip</code>
           file containing your entire database — users, locations, shift templates, shifts, iCal tokens, and preferences.
         </p>
         <div class="backup-meta">
@@ -2318,7 +2420,7 @@ async function renderBackupPanel() {
       <div class="card-header"><h3 class="card-title">Restore from Backup</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-2);margin-bottom:8px;line-height:1.6">
-          Upload a <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.fsbackup</code> file to restore data.
+          Upload a <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.fsbackup.zip</code> file to restore data.
           Restore is <strong>additive</strong> — existing records are updated with backup values and records not in the backup are left untouched.
         </p>
         <div style="padding:10px 14px;background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.3);border-radius:var(--r-md);font-size:12px;color:var(--orange,#e07b00);margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
@@ -2327,9 +2429,9 @@ async function renderBackupPanel() {
         </div>
         <div class="backup-drop-zone" id="backupDropZone">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p>Drop a <strong>.fsbackup</strong> file here, or click to browse</p>
+          <p>Drop a <strong>.fsbackup.zip</strong> file here, or click to browse</p>
           <small>Maximum 256 MB</small>
-          <input type="file" id="backupFileInput" accept=".fsbackup,application/octet-stream" style="display:none" />
+          <input type="file" id="backupFileInput" accept=".zip,application/zip,application/octet-stream" style="display:none" />
         </div>
         <div id="backupPreviewArea" style="margin-top:16px;display:none"></div>
         <div id="backupResultArea"  style="margin-top:16px;display:none"></div>
@@ -2353,7 +2455,7 @@ async function renderBackupPanel() {
       const blob = await resp.blob()
       const cd   = resp.headers.get('Content-Disposition') || ''
       const fnMatch = cd.match(/filename="([^"]+)"/)
-      const filename = fnMatch ? fnMatch[1] : 'forgeshift-backup.fsbackup'
+      const filename = fnMatch ? fnMatch[1] : 'forgeshift-backup.fsbackup.zip'
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href = url; a.download = filename
@@ -2390,101 +2492,74 @@ async function renderBackupPanel() {
     if (file) handleRestoreFile(file)
   })
 
-  // ── Parse backup file and show preview ─────────────────────────────────────
+  // ── Parse backup file and show confirmation ────────────────────────────────
+  // The new backup format is a .fsbackup.zip containing manifest.json + avatars/.
+  // We can't parse the zip client-side without a library, so we validate the
+  // filename/type and show a simple confirmation before uploading to the server.
   function handleRestoreFile(file) {
     const previewArea = document.getElementById('backupPreviewArea')
     const resultArea  = document.getElementById('backupResultArea')
     resultArea.style.display = 'none'
     resultArea.innerHTML = ''
 
-    if (!file.name.endsWith('.fsbackup') && file.type !== 'application/octet-stream' && file.type !== '') {
+    const validName = file.name.endsWith('.fsbackup.zip') || file.name.endsWith('.zip')
+    if (!validName) {
       previewArea.style.display = 'block'
-      previewArea.innerHTML = `<div class="backup-result-err">Not a valid backup file. Please select a <code>.fsbackup</code> file.</div>`
+      previewArea.innerHTML = `<div class="backup-result-err">Not a valid backup file. Please select a <code>.fsbackup.zip</code> file exported from ForgeShift.</div>`
       return
     }
 
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+
     previewArea.style.display = 'block'
-    previewArea.innerHTML = `<div class="backup-progress"><svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg> Reading backup file…</div>`
+    previewArea.innerHTML = `
+      <div class="restore-preview">
+        <h5>Backup File</h5>
+        <div class="restore-row"><span>Filename</span><span>${esc(file.name)}</span></div>
+        <div class="restore-row"><span>File size</span><span>${fileSizeMB} MB</span></div>
+        <div class="restore-row"><span>Last modified</span><span>${new Date(file.lastModified).toLocaleString()}</span></div>
+      </div>
+      <div style="padding:10px 14px;background:rgba(0,82,204,.06);border:1px solid rgba(0,82,204,.2);border-radius:var(--r-md);font-size:12px;color:var(--brand);margin-bottom:16px">
+        Restore is <strong>additive</strong>: existing records will be updated with values from the backup. Records not in the backup will not be touched. Profile photos will be restored. No data will be deleted.
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary" id="backupRestoreConfirmBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.73"/></svg>
+          Restore Now
+        </button>
+        <button class="btn btn-secondary" id="backupRestoreCancelBtn">Cancel</button>
+        <span style="font-size:12px;color:var(--text-3)">Export a fresh backup first if unsure</span>
+      </div>`
 
-    const reader = new FileReader()
-    reader.onerror = () => { previewArea.innerHTML = `<div class="backup-result-err">Failed to read file.</div>` }
-    reader.onload = ev => {
-      let manifest
-      try { manifest = JSON.parse(ev.target.result) } catch {
-        previewArea.innerHTML = `<div class="backup-result-err">File could not be parsed. Make sure it is a valid <code>.fsbackup</code> file and has not been modified.</div>`
-        return
-      }
-
-      if (manifest.format !== 'forgeshift-backup') {
-        previewArea.innerHTML = `<div class="backup-result-err">Not a ForgeShift backup file.</div>`
-        return
-      }
-      if (manifest.version > 1) {
-        previewArea.innerHTML = `<div class="backup-result-err">This backup was created with a newer version of ForgeShift (format v${manifest.version}). Please upgrade first.</div>`
-        return
-      }
-
-      const t = manifest.tables || {}
-      const exportedAt = manifest.exported_at ? new Date(manifest.exported_at).toLocaleString() : 'unknown'
-      const instance   = manifest.instance || 'unknown'
-      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
-
-      previewArea.innerHTML = `
-        <div class="restore-preview">
-          <h5>Backup Details</h5>
-          <div class="restore-row"><span>Exported at</span><span>${esc(exportedAt)}</span></div>
-          <div class="restore-row"><span>Source instance</span><span>${esc(instance)}</span></div>
-          <div class="restore-row"><span>File size</span><span>${fileSizeMB} MB</span></div>
-        </div>
-        <div class="restore-preview">
-          <h5>Contents</h5>
-          <div class="restore-row"><span>Users</span><span>${(t.users||[]).length}</span></div>
-          <div class="restore-row"><span>Locations</span><span>${(t.locations||[]).length}</span></div>
-          <div class="restore-row"><span>Shift Templates</span><span>${(t.shift_templates||[]).length}</span></div>
-          <div class="restore-row"><span>Template Days</span><span>${(t.template_days||[]).length}</span></div>
-          <div class="restore-row"><span>Shifts</span><span>${(t.shifts||[]).length}</span></div>
-          <div class="restore-row"><span>Preferences</span><span>${(t.app_preferences||[]).length}</span></div>
-        </div>
-        <div style="padding:10px 14px;background:rgba(0,82,204,.06);border:1px solid rgba(0,82,204,.2);border-radius:var(--r-md);font-size:12px;color:var(--brand);margin-bottom:16px">
-          Restore is <strong>additive</strong>: existing records will be updated with values from the backup, and records not present in the backup will not be touched. No data will be deleted.
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-primary" id="backupRestoreConfirmBtn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.73"/></svg>
-            Restore Now
-          </button>
-          <button class="btn btn-secondary" id="backupRestoreCancelBtn">Cancel</button>
-          <span style="font-size:12px;color:var(--text-3)">Export a fresh backup first if unsure</span>
-        </div>`
-
-      document.getElementById('backupRestoreCancelBtn').addEventListener('click', () => {
-        previewArea.style.display = 'none'
-        previewArea.innerHTML = ''
-        fileInput.value = ''
-      })
-      document.getElementById('backupRestoreConfirmBtn').addEventListener('click', () => {
-        doRestore(ev.target.result)
-      })
-    }
-    reader.readAsText(file)
+    document.getElementById('backupRestoreCancelBtn').addEventListener('click', () => {
+      previewArea.style.display = 'none'
+      previewArea.innerHTML = ''
+      fileInput.value = ''
+    })
+    document.getElementById('backupRestoreConfirmBtn').addEventListener('click', () => {
+      doRestore(file)
+    })
   }
 
   // ── Send restore to server ──────────────────────────────────────────────────
-  async function doRestore(rawJson) {
+  async function doRestore(file) {
     const previewArea = document.getElementById('backupPreviewArea')
     const resultArea  = document.getElementById('backupResultArea')
 
     previewArea.innerHTML = `<div class="backup-progress">
       <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
-      Restoring — writing to database. Do not close this page…
+      Restoring — uploading and writing to database. Do not close this page…
     </div>`
 
     try {
+      const formData = new FormData()
+      formData.append('backup', file)
+
       const resp = await fetch('/api/backup/restore', {
-        method:  'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body:    rawJson,
+        method: 'POST',
+        body:   formData,
         credentials: 'include',
+        // No Content-Type header — browser sets it with boundary for multipart
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.error || 'Restore failed')
@@ -2502,6 +2577,7 @@ async function renderBackupPanel() {
             <div class="restore-row"><span>Shift Templates</span><span>${s.templates ?? 0}</span></div>
             <div class="restore-row"><span>Template Days</span><span>${s.templateDays ?? 0}</span></div>
             <div class="restore-row"><span>Shifts</span><span>${s.shifts ?? 0}</span></div>
+            <div class="restore-row"><span>Profile Photos</span><span>${s.avatars ?? 0}</span></div>
           </div>
           <div style="margin-top:12px;font-size:12px;color:var(--text-2)">
             Source: ${esc(data.instance || 'unknown')} · Exported ${data.exported_at ? new Date(data.exported_at).toLocaleString() : ''}
@@ -2517,65 +2593,7 @@ async function renderBackupPanel() {
 }
 
 // ── Build Info panel ──────────────────────────────────────────────────────────
-async function renderBuildInfoPanel() {
-  const el = document.getElementById('panel-buildinfo')
-  el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Build Info</h2>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Version</h3></div>
-      <div class="card-body">
-        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
-          <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
-          <span class="badge badge-${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
-        </div>
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <tr>
-            <td style="color:var(--text-3);padding:10px 0;width:160px;border-bottom:1px solid var(--border)">Version string</td>
-            <td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.version}</code></td>
-          </tr>
-          <tr>
-            <td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Environment</td>
-            <td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appEnv}</td>
-          </tr>
-          <tr>
-            <td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">App name</td>
-            <td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appName || 'ForgeShift'}</td>
-          </tr>
-          <tr>
-            <td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Node.js</td>
-            <td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.nodeVersion || 'unknown'}</code></td>
-          </tr>
-          <tr>
-            <td style="color:var(--text-3);padding:10px 0">Runtime</td>
-            <td style="padding:10px 0">Node.js / Express / SQLite</td>
-          </tr>
-        </table>
-      </div>
-    </div>
-    <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
-      <div class="card-body" id="buildInfoStats">
-        <div style="color:var(--text-3);font-size:13px">Loading…</div>
-      </div>
-    </div>`
-
-  try {
-    const stats = await api('/api/stats')
-    document.getElementById('buildInfoStats').innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
-        ${[
-          { label: 'Active Users',  value: stats.users },
-          { label: 'Shifts',        value: stats.shifts },
-          { label: 'Locations',     value: stats.locations },
-          { label: 'Templates',     value: stats.templates },
-        ].map(s => `
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
-            <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
-          </div>`).join('')}
-      </div>`
-  } catch {}
-}
+// renderBuildInfoPanel removed — merged into renderAboutPanel
 
 // ── Account panel ─────────────────────────────────────────────────────────────
 async function renderAccountPanel() {
@@ -2699,7 +2717,40 @@ async function doDeleteAccount() {
 async function renderAboutPanel() {
   const el = document.getElementById('panel-about')
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About ForgeShift</h2>
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About</h2>
+    <!-- Build info section: admin only — version table + stats need admin API access -->
+    \${cfg.user.role === 'admin' ? \`
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)">Build Info</h3>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Version</h3></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
+          <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v\${cfg.version}</span>
+          <span class="badge badge-\${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">\${cfg.appEnv.toUpperCase()}</span>
+        </div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr><td style="color:var(--text-3);padding:10px 0;width:160px;border-bottom:1px solid var(--border)">Version string</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">\${cfg.version}</code></td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Environment</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">\${cfg.appEnv}</td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">App name</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">\${cfg.appName || 'ForgeShift'}</td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Node.js</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">\${cfg.nodeVersion || 'unknown'}</code></td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0">Runtime</td><td style="padding:10px 0">Node.js / Express / SQLite</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
+      <div class="card-body" id="buildInfoStats"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
+    </div>
+    \` : \`
+    <!-- Non-admin: show version badge only, no internal stats -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg)">
+      <span style="font-size:22px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v\${cfg.version}</span>
+      <span class="badge badge-\${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">\${cfg.appEnv.toUpperCase()}</span>
+    </div>
+    \`}
+
+    <!-- About section -->
+    <h3 style="font-size:15px;font-weight:700;margin:32px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--border)">ForgeShift</h3>
     <div class="card section-card">
       <div class="card-body">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
@@ -2756,6 +2807,25 @@ async function renderAboutPanel() {
         </p>
       </div>
     </div>`
+
+  // Load instance stats asynchronously — admin only (API enforces this too)
+  if (cfg.user.role === 'admin') try {
+    const stats = await api('/api/stats')
+    const statsEl = document.getElementById('buildInfoStats')
+    if (statsEl) statsEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
+        ${[
+          { label: 'Active Users',  value: stats.users },
+          { label: 'Shifts',        value: stats.shifts },
+          { label: 'Locations',     value: stats.locations },
+          { label: 'Templates',     value: stats.templates },
+        ].map(s => `
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
+            <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
+          </div>`).join('')}
+      </div>`
+  } catch {}
 }
 
 // Close modals on overlay click
