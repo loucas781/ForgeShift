@@ -203,6 +203,39 @@ app.get('/api/stats', requireAuth, (req, res) => {
   res.json({ users, shifts, locations, templates })
 })
 
+// ── SSE — Real-time broadcast ──────────────────────────────────────────────────
+const sseClients = new Map()  // userId → Set<res>
+
+function broadcastShiftEvent(type, shift, actorId) {
+  for (const [, clients] of sseClients) {
+    for (const res of clients) {
+      try { res.write(`data: ${JSON.stringify({ type, shift, actorId })}\n\n`) } catch {}
+    }
+  }
+}
+app.locals.broadcastShiftEvent = broadcastShiftEvent
+
+app.get('/api/sse', requireAuth, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+  res.write('data: {"type":"connected"}\n\n')
+
+  const uid = req.user.id
+  if (!sseClients.has(uid)) sseClients.set(uid, new Set())
+  sseClients.get(uid).add(res)
+
+  // Keepalive ping every 25 s to prevent proxy timeouts
+  const ping = setInterval(() => { try { res.write(': ping\n\n') } catch {} }, 25000)
+
+  req.on('close', () => {
+    clearInterval(ping)
+    sseClients.get(uid)?.delete(res)
+    if (sseClients.get(uid)?.size === 0) sseClients.delete(uid)
+  })
+})
+
 // ── API Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/auth',             require('./routes/auth'))
 app.use('/api/users',            require('./routes/users'))

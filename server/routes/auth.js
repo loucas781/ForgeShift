@@ -29,7 +29,7 @@ function cookieOpts() {
 }
 function makeToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role },
+    { id: user.id, email: user.email, name: user.name, role: user.role, tv: user.token_version || 0 },
     process.env.JWT_SECRET,
     { expiresIn: `${process.env.COOKIE_MAX_AGE_HOURS || 72}h` }
   )
@@ -377,6 +377,14 @@ router.get('/export', requireAuth, (req, res) => {
     console.error('export error:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
+})
+
+// ── POST /api/auth/revoke-all — invalidate all JWTs for this user ─────────────
+router.post('/revoke-all', requireAuth, (req, res) => {
+  db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.user.id)
+  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+  audit(req.user.id, 'user.revoke_all', 'user', req.user.id, req.user.name)
+  res.json({ ok: true })
 })
 
 // ── DELETE /api/auth/account — permanently delete current user's account ──────

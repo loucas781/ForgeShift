@@ -1,0 +1,12 @@
+{
+  "name": "ForgeShift",
+  "short_name": "ForgeShift",
+  "description": "Self-hosted shift rota management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

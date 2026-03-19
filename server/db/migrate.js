@@ -343,6 +343,15 @@ function migrateAdditive() {
     CREATE INDEX IF NOT EXISTS idx_utg_group ON user_template_groups(group_id);
   `)
   console.log('✓ Template groups schema ready')
+
+  // Session invalidation: token_version for JWT revocation across all devices
+  {
+    const tvCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name)
+    if (!tvCols.includes('token_version')) {
+      db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+      console.log('✓ Added token_version column to users')
+    }
+  }
 }
 
 try {

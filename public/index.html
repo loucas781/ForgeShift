@@ -8,6 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <script>
     (function(){
       var t = localStorage.getItem("fs-theme") || "system"
@@ -38,7 +41,16 @@
               <option value="">My shifts</option>
             </select>
           </div>
-          <div class="cal-view-tabs" style="margin-left:auto">
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+            <span id="hoursStat" style="font-size:12px;color:var(--text-3);white-space:nowrap"></span>
+            <button id="csvExportBtn" class="btn btn-ghost btn-sm" style="display:none;gap:4px" onclick="exportCSV()" title="Export CSV">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              CSV
+            </button>
+            <button class="btn btn-ghost btn-sm" style="font-size:16px;padding:4px 8px;line-height:1" onclick="toggleKbdHelp()" title="Keyboard shortcuts">?</button>
+            <div id="liveIndicator" style="display:none;width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0" title="Live updates connected"></div>
+          </div>
+          <div class="cal-view-tabs">
             <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')">
               <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
               <span>Month</span>
@@ -169,6 +181,26 @@
   <div id="taskDetailLocation" style="font-size:12px;color:var(--text-3);display:none"></div>
 </div>
 
+<!-- Keyboard Shortcuts Help Overlay -->
+<div id="kbdHelpOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;min-width:320px;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0;font-size:15px;font-weight:700">Keyboard Shortcuts</h3>
+      <button onclick="toggleKbdHelp()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-3);padding:0;line-height:1">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px">
+      <kbd class="kbd-key">←</kbd><span style="color:var(--text-2)">Previous week / month</span>
+      <kbd class="kbd-key">→</kbd><span style="color:var(--text-2)">Next week / month</span>
+      <kbd class="kbd-key">T</kbd><span style="color:var(--text-2)">Go to today</span>
+      <kbd class="kbd-key">W</kbd><span style="color:var(--text-2)">Switch to week view</span>
+      <kbd class="kbd-key">M</kbd><span style="color:var(--text-2)">Switch to month view</span>
+      <kbd class="kbd-key">N</kbd><span style="color:var(--text-2)">New shift (today)</span>
+      <kbd class="kbd-key">Esc</kbd><span style="color:var(--text-2)">Close modal / overlay</span>
+      <kbd class="kbd-key">?</kbd><span style="color:var(--text-2)">Toggle this help panel</span>
+    </div>
+  </div>
+</div>
+
 <script src="/js/shell.js"></script>
 <script src="/js/prefs.js"></script>
 <script>
@@ -215,6 +247,9 @@ async function init() {
 
   // Context menu: dismiss on outside click
   document.addEventListener('click', () => dismissContextMenu())
+
+  // Real-time SSE
+  connectSSE()
 }
 
 async function loadLocations() {
@@ -421,6 +456,13 @@ async function renderView() {
   document.getElementById('tabWeek').className  = 'cal-view-tab' + (view==='week'?' active':'')
   // Update copy indicator
   updatePasteHint()
+  // Hours summary
+  updateHoursStat()
+  // Drag-and-drop (week view only, re-attach after each render)
+  if (view === 'week') _initDragDrop()
+  // CSV export button visibility (managers only)
+  const csvBtn = document.getElementById('csvExportBtn')
+  if (csvBtn) csvBtn.style.display = canManage() ? 'inline-flex' : 'none'
 }
 
 function updateTitle() {
@@ -701,6 +743,7 @@ function renderWeek() {
           <div class="shift-loc">${prefix}${label}</div>
           ${showTime ? `<div class="shift-time">${timeStr}</div>` : ''}
           ${showNotes ? `<div class="shift-notes">${s.notes.slice(0, 50)}${s.notes.length > 50 ? '…' : ''}</div>` : ''}
+          ${canManage() ? '<div class="shift-resize-handle"></div>' : ''}
         </div>`
       } else {
         // No time — floating all-day chip near top (below holiday label if present)
@@ -1204,6 +1247,327 @@ async function saveTaskAssignment() {
     // Re-open so they can keep adding
     openTaskAssignModal(dates[0], user_id)
   } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Hours summary ──────────────────────────────────────────────────────────────
+function calcHours(shiftsArr) {
+  return shiftsArr.reduce((total, s) => {
+    if (!s.start_time || !s.end_time || s.is_off) return total
+    return total + (_timeToMins(s.end_time) - _timeToMins(s.start_time)) / 60
+  }, 0)
+}
+
+function updateHoursStat() {
+  const el = document.getElementById('hoursStat')
+  if (!el) return
+  const h = calcHours(shifts)
+  const label = view === 'week' ? 'this week' : 'this month'
+  el.textContent = h > 0 ? `${h % 1 === 0 ? h : h.toFixed(1)} hrs ${label}` : ''
+}
+
+// ── CSV Export ─────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const weekStart = prefs?.weekStartDay ?? 1
+  let start, end
+  if (view === 'month') {
+    const year  = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const first = new Date(year, month, 1)
+    const last  = new Date(year, month + 1, 0)
+    const startOffset = (first.getDay() - weekStart + 7) % 7
+    start = new Date(year, month, 1 - startOffset)
+    const lastDay = last.getDay()
+    const endOffset = (weekStart + 6 - lastDay + 7) % 7
+    end = new Date(year, month, last.getDate() + endOffset)
+  } else {
+    start = startOfWeek(currentDate, weekStart)
+    end   = new Date(start); end.setDate(end.getDate() + 6)
+  }
+  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  if (filterVal.startsWith('user:')) params.set('user_id', filterVal.slice(5))
+  else if (filterVal === 'all' && cfg.user.role === 'admin') params.set('user_id', 'all')
+  window.location.href = '/api/shifts/export/csv?' + params
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+function toggleKbdHelp() {
+  const el = document.getElementById('kbdHelpOverlay')
+  const isOpen = el.style.display === 'flex'
+  el.style.display = isOpen ? 'none' : 'flex'
+}
+
+document.addEventListener('keydown', e => {
+  // Ignore if typing in an input/textarea
+  const tag = document.activeElement?.tagName?.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+  // Ignore if any modal is open
+  const modalOpen = document.querySelector('.modal-overlay.open')
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      if (!modalOpen) { e.preventDefault(); prev() }
+      break
+    case 'ArrowRight':
+      if (!modalOpen) { e.preventDefault(); next() }
+      break
+    case 't': case 'T':
+      if (!modalOpen) goToday()
+      break
+    case 'w': case 'W':
+      if (!modalOpen) setView('week')
+      break
+    case 'm': case 'M':
+      if (!modalOpen) setView('month')
+      break
+    case 'n': case 'N':
+      if (!modalOpen) openCreateModal(toDateStr(new Date()))
+      break
+    case 'Escape':
+      if (document.getElementById('kbdHelpOverlay').style.display === 'flex') {
+        toggleKbdHelp()
+      } else if (modalOpen) {
+        if (modalOpen.id === 'shiftModal') closeModal()
+        else if (modalOpen.id === 'taskAssignModal') closeTaskAssignModal()
+      }
+      break
+    case '?':
+      if (!modalOpen) toggleKbdHelp()
+      break
+  }
+})
+
+document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('kbdHelpOverlay')) toggleKbdHelp()
+})
+
+// ── Real-time SSE ──────────────────────────────────────────────────────────────
+let _sseConn = null
+function connectSSE() {
+  if (_sseConn) return
+  _sseConn = new EventSource('/api/sse')
+  _sseConn.onopen = () => {
+    const dot = document.getElementById('liveIndicator')
+    if (dot) dot.style.display = 'block'
+  }
+  _sseConn.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (['shift.create','shift.update','shift.delete'].includes(msg.type)) {
+        // Skip if the current user made this change (already re-rendered after saveShift)
+        if (msg.actorId !== cfg?.user?.id) renderView()
+      }
+    } catch {}
+  }
+  _sseConn.onerror = () => {
+    const dot = document.getElementById('liveIndicator')
+    if (dot) dot.style.display = 'none'
+    _sseConn?.close()
+    _sseConn = null
+    setTimeout(connectSSE, 5000)
+  }
+}
+
+// ── Shift conflict handling ────────────────────────────────────────────────────
+let _conflictBody = null
+async function saveShiftForce() {
+  if (!_conflictBody) return
+  const body = _conflictBody
+  _conflictBody = null
+  const warn = document.getElementById('conflictWarning')
+  if (warn) warn.remove()
+  try {
+    const url = editingShiftId ? `/api/shifts/${editingShiftId}?force=true` : '/api/shifts?force=true'
+    const method = editingShiftId ? 'PUT' : 'POST'
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(async r => { if (!r.ok) { const d = await r.json(); throw new Error(d.error || `HTTP ${r.status}`) }; return r.json() })
+    toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+    closeModal()
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// Override saveShift (defined above) with conflict-aware version
+async function saveShift() {
+  const body = {
+    date:        document.getElementById('modalDate').value,
+    location_id: document.getElementById('modalLocation').value || null,
+    start_time:  document.getElementById('modalStart').value || null,
+    end_time:    document.getElementById('modalEnd').value || null,
+    notes:       document.getElementById('modalNotes').value.trim() || null,
+    note_color:  selectedColour,
+    is_off:      document.getElementById('modalIsOff').checked,
+    is_oncall:   document.getElementById('modalIsOncall').checked,
+  }
+  if (canManage()) body.user_id = document.getElementById('modalUser').value || cfg.user.id
+
+  // Remove any existing conflict warning
+  document.getElementById('conflictWarning')?.remove()
+
+  const url    = editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts'
+  const method = editingShiftId ? 'PUT' : 'POST'
+  try {
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const d = await r.json()
+    if (!r.ok) {
+      if (r.status === 409 && d.conflict) {
+        // Show inline conflict warning with "Save anyway" option
+        _conflictBody = body
+        const footer = document.querySelector('#shiftModal .modal-footer')
+        const warn = document.createElement('div')
+        warn.id = 'conflictWarning'
+        warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
+        warn.innerHTML = `<span>⚠️ ${d.error}</span><button class="btn btn-sm" style="background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px" onclick="saveShiftForce()">Save anyway</button>`
+        footer.insertAdjacentElement('beforebegin', warn)
+        return
+      }
+      throw new Error(d.error || `HTTP ${r.status}`)
+    }
+    toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+    closeModal()
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Drag-and-drop (week view) ──────────────────────────────────────────────────
+let _drag = null  // { shiftId, date, start_time, end_time, durationMins, ghost, colInnerTop, mode }
+
+function _initDragDrop() {
+  const grid = document.getElementById('calGrid')
+  if (!grid || !canManage()) return
+
+  grid.addEventListener('pointerdown', e => {
+    const card = e.target.closest('.cal-week-shift-card')
+    const handle = e.target.closest('.shift-resize-handle')
+    if (!card) return
+
+    // Determine shift id from onclick attribute
+    const onclickStr = card.getAttribute('onclick') || ''
+    const idMatch = onclickStr.match(/openEditModal\('([^']+)'\)/)
+    if (!idMatch) return
+
+    const shiftId = idMatch[1]
+    const shift = shifts.find(s => s.id === shiftId)
+    if (!shift || !shift.start_time) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    card.setPointerCapture(e.pointerId)
+
+    const startMins = _timeToMins(shift.start_time)
+    const endMins   = _timeToMins(shift.end_time || shift.start_time)
+    const mode = handle ? 'resize' : 'move'
+
+    // Ghost element
+    const ghost = card.cloneNode(true)
+    ghost.className = 'cal-week-shift-ghost'
+    ghost.style.cssText = `position:fixed;pointer-events:none;opacity:.8;z-index:1000;width:${card.offsetWidth}px;height:${card.offsetHeight}px;left:${card.getBoundingClientRect().left}px;top:${card.getBoundingClientRect().top}px;background:${card.style.background};border-radius:6px;padding:4px 8px;box-shadow:0 4px 16px rgba(0,0,0,.3)`
+    document.body.appendChild(ghost)
+
+    card.style.opacity = '.35'
+    card.classList.add('dragging')
+
+    // Find the col-inner for this card to get its bounding rect
+    const colInner = card.closest('.cal-week-col-inner')
+    const colInnerRect = colInner?.getBoundingClientRect()
+
+    _drag = {
+      shiftId, shift, mode,
+      startMins, endMins,
+      durationMins: endMins - startMins,
+      ghost, card, colInner, colInnerRect,
+      originX: e.clientX, originY: e.clientY,
+      currentDate: shift.date,
+    }
+  })
+
+  grid.addEventListener('pointermove', e => {
+    if (!_drag) return
+    e.preventDefault()
+
+    _drag.ghost.style.left = (e.clientX - 10) + 'px'
+    _drag.ghost.style.top  = (e.clientY - 10) + 'px'
+
+    // Find target day column
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const targetCol = el?.closest('.cal-week-day-col')
+    const targetColInner = el?.closest('.cal-week-col-inner') || targetCol?.querySelector('.cal-week-col-inner')
+
+    // Highlight drop target
+    document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
+    if (targetCol) targetCol.classList.add('drop-target')
+
+    if (!targetColInner) return
+    const rect = targetColInner.getBoundingClientRect()
+    const relY  = e.clientY - rect.top
+    const snapped = Math.round(relY / 15) * 15  // snap to 15-min
+
+    if (_drag.mode === 'resize') {
+      const newEndMins = Math.max(_drag.startMins + 15, Math.min(snapped, 1440))
+      _drag.previewEnd = newEndMins
+    } else {
+      const newStartMins = Math.max(0, Math.min(snapped, 1440 - _drag.durationMins))
+      _drag.previewStart = newStartMins
+
+      // Determine new date from column position
+      if (targetCol) {
+        const onclickAttr = targetCol.getAttribute('onclick') || ''
+        const dateMatch = onclickAttr.match(/handleCellClick\('([^']+)'\)/)
+        if (dateMatch) _drag.currentDate = dateMatch[1]
+      }
+    }
+  })
+
+  grid.addEventListener('pointerup', async e => {
+    if (!_drag) return
+    const { shiftId, shift, mode, startMins, endMins, durationMins, ghost, card, previewStart, previewEnd, currentDate } = _drag
+    _drag = null
+
+    ghost.remove()
+    card.style.opacity = ''
+    card.classList.remove('dragging')
+    document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
+
+    const minsToTime = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+
+    let newStart = shift.start_time
+    let newEnd   = shift.end_time
+    let newDate  = currentDate
+
+    if (mode === 'resize' && previewEnd !== undefined) {
+      newEnd = minsToTime(previewEnd)
+    } else if (mode === 'move' && previewStart !== undefined) {
+      newStart = minsToTime(previewStart)
+      newEnd   = minsToTime(previewStart + durationMins)
+    }
+
+    // Only save if something actually changed
+    if (newStart === shift.start_time && newEnd === shift.end_time && newDate === shift.date) return
+
+    try {
+      await api(`/api/shifts/${shiftId}`, { method: 'PUT', body: {
+        date: newDate,
+        location_id: shift.location_id,
+        start_time: newStart,
+        end_time: newEnd,
+        notes: shift.notes,
+        note_color: shift.note_color,
+        is_off: shift.is_off,
+        is_oncall: shift.is_oncall,
+      }})
+      renderView()
+    } catch (err) { toast(err.message, 'error'); renderView() }
+  })
+
+  // Pointercancel — abort drag
+  grid.addEventListener('pointercancel', () => {
+    if (!_drag) return
+    _drag.ghost.remove()
+    _drag.card.style.opacity = ''
+    _drag.card.classList.remove('dragging')
+    document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
+    _drag = null
+  })
 }
 
 init()

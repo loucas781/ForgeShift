@@ -622,6 +622,17 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 .cal-week-shift-card .shift-time { opacity: .9; font-size: 10px; white-space: nowrap; }
 .cal-week-shift-card .shift-notes { opacity: .8; margin-top: 2px; font-size: 10px; font-style: italic; line-height: 1.3; }
 
+/* Drag-and-drop */
+.cal-week-shift-card { cursor: grab; user-select: none; }
+.cal-week-shift-card.dragging { opacity: .35 !important; cursor: grabbing; }
+.cal-week-shift-ghost { border-radius: var(--r-md); padding: 4px 8px; color: #fff; font-size: 12px; font-weight: 600; overflow: hidden; }
+.cal-week-day-col.drop-target > .cal-week-col-inner { background: var(--accent-light, rgba(79,70,229,.08)); }
+.shift-resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 8px; cursor: ns-resize; border-radius: 0 0 var(--r-md) var(--r-md); }
+.shift-resize-handle:hover { background: rgba(255,255,255,.3); }
+
+/* Keyboard shortcut key badges */
+kbd.kbd-key { display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;font-family:inherit;font-size:12px;font-weight:600;color:var(--text-1);white-space:nowrap; }
+
 /* All-day / no-time shifts — float at top as chips */
 .cal-week-allday-area {
   padding: 4px 3px;

@@ -359,6 +359,11 @@ const NOTE_COLOURS = [
   { value: '#6b7280', label: 'Gray' },
 ]
 
+// ── PWA — Service Worker registration ──────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
+}
+
 function renderColourPicker(container, value, onChange) {
   container.className = 'colour-picker'
   NOTE_COLOURS.forEach(c => {

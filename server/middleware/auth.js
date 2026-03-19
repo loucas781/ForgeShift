@@ -1,5 +1,6 @@
 'use strict'
 const jwt = require('jsonwebtoken')
+const db  = require('../db/connection')
 
 function requireAuth(req, res, next) {
   const token = req.cookies?.token
@@ -9,6 +10,13 @@ function requireAuth(req, res, next) {
   }
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET)
+    // Validate token_version to support "sign out all devices"
+    const row = db.prepare('SELECT token_version FROM users WHERE id = ?').get(req.user.id)
+    if (!row || (row.token_version || 0) !== (req.user.tv || 0)) {
+      res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+      if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
+      return res.redirect('/login.html')
+    }
     next()
   } catch (err) {
     res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })

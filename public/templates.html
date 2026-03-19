@@ -8,6 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <script>
     (function(){
       var t = localStorage.getItem("fs-theme") || "system"
@@ -83,25 +86,32 @@
       <button class="modal-close" onclick="closeApplyModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Apply this template to a team member for a specific week.</p>
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Apply this template to one or more team members for a specific week.</p>
       <div class="form-group">
-        <label class="form-label">Team member</label>
-        <select class="form-select" id="applyUser"></select>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="form-label" style="margin:0">Team members</label>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="applySelectAll(true)" style="font-size:11px;padding:2px 8px">All</button>
+            <button class="btn btn-ghost btn-sm" onclick="applySelectAll(false)" style="font-size:11px;padding:2px 8px">None</button>
+          </div>
+        </div>
+        <div id="applyUserList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;gap:4px"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Week starting (Monday)</label>
         <input type="date" class="form-input" id="applyWeekStart">
       </div>
-      <div class="form-group" style="margin-bottom:0">
+      <div class="form-group">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
           <input type="checkbox" id="applySkipHolidays" checked style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
           <span style="font-size:13px;color:var(--text-2)">Skip bank holidays <span style="color:var(--text-3)">(days that fall on a bank holiday will not be created)</span></span>
         </label>
       </div>
+      <div id="applyProgress" style="display:none;font-size:13px;color:var(--text-2);padding:8px 0"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeApplyModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="doApplyTmpl()">Apply template</button>
+      <button class="btn btn-primary" id="applyBtn" onclick="doApplyTmpl()">Apply template</button>
     </div>
   </div>
 </div>
@@ -152,19 +162,13 @@ async function loadLocations() {
 }
 
 async function loadUsers() {
-  const sel = document.getElementById('applyUser')
   if (cfg.user.role === 'member') { users = [cfg.user]; return }
   const allUsers = await api('/api/users')
   if (cfg.user.role === 'shift_lead') {
-    // Only load members — scope enforced by backend on apply
     users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.id === cfg.user.id))
   } else {
-    users = allUsers
+    users = allUsers.filter(u => u.is_active)
   }
-  users.filter(u => u.is_active).forEach(u => {
-    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-    sel.appendChild(o)
-  })
 }
 
 async function loadTemplates() {
@@ -650,34 +654,67 @@ async function duplicateTmpl(id) {
 }
 
 // ── Apply Template ─────────────────────────────────────────────────────────────
+function _buildApplyUserList() {
+  const container = document.getElementById('applyUserList')
+  container.innerHTML = users.map(u =>
+    `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 2px;border-radius:4px">
+      <input type="checkbox" class="apply-user-cb" data-uid="${u.id}"
+        style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0">
+      <span style="font-size:13px;color:var(--text-1)">${u.name}</span>
+    </label>`
+  ).join('')
+  // Pre-check first user
+  const first = container.querySelector('.apply-user-cb')
+  if (first) first.checked = true
+}
+
+function applySelectAll(checked) {
+  document.querySelectorAll('.apply-user-cb').forEach(cb => { cb.checked = checked })
+}
+
 function openApplyTmpl(id) {
   applyingTmplId = id
   const d = new Date()
-  const day = d.getDay() // 0=Sun, 1=Mon … 6=Sat
-  // Go back to the Monday of the *current* week (Sunday wraps back 6 days)
+  const day = d.getDay()
   const toMon = (day === 0) ? -6 : 1 - day
   d.setDate(d.getDate() + toMon)
   document.getElementById('applyWeekStart').value = toDateStr(d)
+  document.getElementById('applyProgress').style.display = 'none'
+  _buildApplyUserList()
   document.getElementById('applyModal').classList.add('open')
 }
 
 function closeApplyModal() { document.getElementById('applyModal').classList.remove('open') }
 
 async function doApplyTmpl() {
-  const user_id       = document.getElementById('applyUser').value
   const week_start    = document.getElementById('applyWeekStart').value
   const skip_holidays = document.getElementById('applySkipHolidays').checked
-  if (!user_id || !week_start) { toast('Please select a user and week', 'error'); return }
-  try {
-    const r = await api('/api/shifts/apply-template', {
-      method: 'POST', body: { template_id: applyingTmplId, user_id, week_start, skip_holidays }
-    })
-    const skippedMsg = r.skipped > 0 ? `, ${r.skipped} skipped (bank holiday)` : ''
-    toast(`Template applied — ${r.applied} shifts created${skippedMsg}`, 'success')
-    closeApplyModal()
-  } catch (err) {
-    toast(err.message, 'error')
+  const selectedIds   = [...document.querySelectorAll('.apply-user-cb:checked')].map(cb => cb.dataset.uid)
+  if (!selectedIds.length) { toast('Please select at least one team member', 'error'); return }
+  if (!week_start) { toast('Please select a week', 'error'); return }
+
+  const btn = document.getElementById('applyBtn')
+  btn.disabled = true
+  const progressEl = document.getElementById('applyProgress')
+  progressEl.style.display = ''
+  progressEl.textContent = `Applying to 0 / ${selectedIds.length}…`
+
+  let applied = 0; let skipped = 0; let errors = 0
+  for (let i = 0; i < selectedIds.length; i++) {
+    progressEl.textContent = `Applying to ${i + 1} / ${selectedIds.length}…`
+    try {
+      const r = await api('/api/shifts/apply-template', {
+        method: 'POST', body: { template_id: applyingTmplId, user_id: selectedIds[i], week_start, skip_holidays }
+      })
+      applied += r.applied; skipped += r.skipped
+    } catch { errors++ }
   }
+
+  btn.disabled = false
+  progressEl.style.display = 'none'
+  const msg = `Template applied to ${selectedIds.length - errors} user${selectedIds.length - errors !== 1 ? 's' : ''} — ${applied} shifts created${skipped ? `, ${skipped} skipped (holiday)` : ''}${errors ? `, ${errors} failed` : ''}`
+  toast(msg, errors > 0 ? 'error' : 'success', 4000)
+  closeApplyModal()
 }
 
 // Close modals on overlay click
