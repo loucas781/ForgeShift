@@ -1,0 +1,16 @@
+node_modules/
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store
+uploads/
+
+# Environment files — NEVER commit these
+.env
+.env.*
+!.env.example
+
+# Runtime overrides (toggled via Settings UI)
+.runtime-overrides.json
