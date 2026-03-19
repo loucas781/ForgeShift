@@ -168,7 +168,40 @@ router.post('/assignments', requireAuth, requireShiftLead, (req, res) => {
   }
 })
 
-// ── DELETE /api/tasks/assignments/:id — remove a single assignment ─────────────
+// ── POST /api/tasks/assignments/bulk — assign a task list to multiple dates ────
+// Body: { user_id, task_list_id, dates: ['YYYY-MM-DD', ...] }
+// Skips silently any date that already has this user+list combo (idempotent).
+router.post('/assignments/bulk', requireAuth, requireShiftLead, (req, res) => {
+  try {
+    const { user_id, task_list_id, dates } = req.body
+    if (!user_id || !task_list_id) return res.status(400).json({ error: 'user_id and task_list_id are required.' })
+    if (!Array.isArray(dates) || !dates.length) return res.status(400).json({ error: 'dates must be a non-empty array.' })
+
+    const insert = db.prepare(
+      'INSERT OR IGNORE INTO task_assignments (id, user_id, task_list_id, date, created_by) VALUES (?,?,?,?,?)'
+    )
+    const created = []
+    const bulkTx = db.transaction(() => {
+      for (const date of dates) {
+        const id = uuidv4()
+        const info = insert.run(id, user_id, task_list_id, date, req.user.id)
+        if (info.changes > 0) created.push({ id, date })
+      }
+    })
+    bulkTx()
+
+    if (created.length) {
+      audit(req.user.id, 'task_assignment.bulk_create', 'task_assignment', user_id,
+        `${created.length} date(s)`, { task_list_id, dates: created.map(c => c.date) })
+    }
+    res.status(201).json({ created: created.length, skipped: dates.length - created.length })
+  } catch (err) {
+    console.error('assignment bulk create:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+
 router.delete('/assignments/:id', requireAuth, requireShiftLead, (req, res) => {
   try {
     const a = db.prepare('SELECT * FROM task_assignments WHERE id = ?').get(req.params.id)
