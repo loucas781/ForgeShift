@@ -136,27 +136,6 @@
   </div>
 </div>
 
-<!-- Invite User Modal -->
-<div class="modal-overlay" id="inviteModal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 class="modal-title" id="inviteModalTitle">Create User</h3>
-      <button class="modal-close" onclick="closeInviteModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Full name</label><input type="text" class="form-input" id="iName"></div>
-      <div class="form-group"><label class="form-label">Email address</label><input type="email" class="form-input" id="iEmail"></div>
-      <div class="form-group"><label class="form-label">Role</label>
-        <select class="form-select" id="iRole"><option value="member">Member</option><option value="shift_lead">Shift Lead</option><option value="admin">Admin</option></select>
-      </div>
-      <div id="inviteResult" style="display:none;padding:12px 14px;border-radius:var(--r-md);font-size:13px;margin-top:4px"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeInviteModal()">Close</button>
-      <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInvite()">Create account</button>
-    </div>
-  </div>
-</div>
 
 <!-- Edit User Modal -->
 <div class="modal-overlay" id="editUserModal">
@@ -829,16 +808,62 @@ async function removeMyTeamMember(teamId, userId) {
 
 async function renderTeamPanel() {
   const el = document.getElementById('panel-team')
+  // Check SMTP and signup status
+  let smtpEnabled = false
+  let signupEnabled = false
+  try {
+    const [smtp, appCfg] = await Promise.all([api('/api/email/status'), api('/api/config')])
+    smtpEnabled = !!smtp.enabled
+    signupEnabled = appCfg.allowSignup !== false
+  } catch {}
+
+  const smtpNote = smtpEnabled
+    ? 'An invitation email will be sent to the new member.'
+    : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'
+
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Members</h2>
-    <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-      Individual accounts. Each person can have their own rota independently, or be added to a team.
-    </p>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button class="btn btn-primary btn-sm" onclick="openInviteModal()">+ Create user</button>
+    <!-- Invite Member card -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-body">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-input" id="iEmail" placeholder="jane@company.com">
+          </div>
+        </div>
+        <div class="form-group" style="max-width:280px;margin-bottom:20px">
+          <label class="form-label">Role</label>
+          <select class="form-select" id="iRole">
+            <option value="member">Member</option>
+            <option value="shift_lead">Shift Lead</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
+        <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
+      </div>
     </div>
-    <div class="card" id="teamCard">
-      <div class="card-body" id="teamList">Loading…</div>
+
+    <!-- Team Members card -->
+    <div class="card">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="font-size:16px;font-weight:700" id="teamMembersTitle">Team Members</h2>
+          <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
+        </div>
+        <!-- Role tabs -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
+        <!-- Tab description -->
+        <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
+        <!-- Members list -->
+        <div id="teamList">Loading…</div>
+      </div>
     </div>
 
     <div style="margin-top:32px">
@@ -853,8 +878,85 @@ async function renderTeamPanel() {
         <div class="card-body" id="teamsListEl">Loading…</div>
       </div>
     </div>`
+
   renderTeamList()
   await loadSettingsTeams()
+}
+
+let activeRoleTab = 'admin'
+
+function renderTeamTabs() {
+  const bar = document.getElementById('roleTabBar')
+  const desc = document.getElementById('roleTabDesc')
+  const title = document.getElementById('teamMembersTitle')
+  if (!bar) return
+
+  const roleCounts = { admin: 0, shift_lead: 0, member: 0 }
+  users.forEach(u => { if (roleCounts[u.role] !== undefined) roleCounts[u.role]++ })
+
+  const tabs = [
+    { key: 'admin',      label: 'Administrators', icon: '🛡', desc: 'Full access to all settings and shift management.' },
+    { key: 'shift_lead', label: 'Shift Leads',    icon: '👥', desc: 'Can create and manage shifts for their assigned teams.' },
+    { key: 'member',     label: 'Members',        icon: '👤', desc: 'Can view their own schedule and manage their profile.' },
+  ]
+
+  // Ensure activeRoleTab is valid
+  if (!tabs.find(t => t.key === activeRoleTab)) activeRoleTab = 'admin'
+
+  bar.innerHTML = tabs.map(t => {
+    const active = t.key === activeRoleTab
+    return `<button onclick="switchRoleTab('${t.key}')" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 14px;border:none;background:none;cursor:pointer;
+      font-size:13px;font-weight:${active ? '600' : '500'};
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s
+    ">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">${t.key === 'admin' ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' : t.key === 'shift_lead' ? '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' : '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'}
+      </svg>
+      ${t.label} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${roleCounts[t.key]}</span>
+    </button>`
+  }).join('')
+
+  const current = tabs.find(t => t.key === activeRoleTab)
+  if (desc && current) desc.textContent = current.desc
+  const total = users.length
+  if (title) title.textContent = `Team Members (${total})`
+}
+
+function switchRoleTab(role) {
+  activeRoleTab = role
+  renderTeamTabs()
+  renderTeamListFiltered()
+}
+
+function renderTeamListFiltered() {
+  const el = document.getElementById('teamList')
+  if (!el) return
+  const filtered = users.filter(u => u.role === activeRoleTab)
+  if (!filtered.length) {
+    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${activeRoleTab === 'shift_lead' ? 'shift leads' : activeRoleTab + 's'} yet.</p>`
+    return
+  }
+  el.innerHTML = filtered.map(u => `
+    <div class="member-row">
+      <div class="member-info">
+        <div class="avatar" style="background:${u.color}">${u.initials}</div>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
+          <div style="font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
+      </div>
+      <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="getResetLink('${u.id}','${u.name}')">Reset link</button>
+        ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}','${u.name}')">Delete</button>` : ''}
+      </div>
+    </div>`).join('')
 }
 
 async function loadSettingsTeams() {
@@ -1035,56 +1137,25 @@ async function saveTeamMembers(teamId) {
 }
 
 function renderTeamList() {
-  const el = document.getElementById('teamList')
-  if (!el) return
-  if (!users.length) { el.innerHTML = '<p style="color:var(--text-3);font-size:13px">No users yet.</p>'; return }
-  el.innerHTML = users.map(u => `
-    <div class="member-row">
-      <div class="member-info">
-        <div class="avatar" style="background:${u.color}">${u.initials}</div>
-        <div style="min-width:0">
-          <div style="font-weight:600;font-size:13px">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
-          <div style="font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <span class="badge badge-${u.role==='admin'?'blue':u.role==='shift_lead'?'purple':'gray'}">${u.role === 'shift_lead' ? 'Shift Lead' : u.role}</span>
-        <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
-      </div>
-      <div class="member-actions">
-        <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
-        <button class="btn btn-ghost btn-sm" onclick="getResetLink('${u.id}','${u.name}')">Reset link</button>
-        ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}','${u.name}')">Delete</button>` : ''}
-      </div>
-    </div>`).join('')
+  renderTeamTabs()
+  renderTeamListFiltered()
 }
 
-// ── Invite modal ───────────────────────────────────────────────────────────────
-function openInviteModal() {
-  document.getElementById('iName').value = ''
-  document.getElementById('iEmail').value = ''
-  document.getElementById('iRole').value = 'member'
-  document.getElementById('inviteResult').style.cssText = 'display:none!important'
-  document.getElementById('inviteSubmitBtn').style.display = 'inline-flex'
-  document.getElementById('inviteModal').classList.add('open')
-}
-function closeInviteModal() {
-  document.getElementById('inviteModal').classList.remove('open')
-  loadUsers().then(renderTeamList)
-}
-async function doInvite() {
-  const name  = document.getElementById('iName').value.trim()
-  const email = document.getElementById('iEmail').value.trim()
-  const role  = document.getElementById('iRole').value
+// ── Inline invite (new Team panel) ────────────────────────────────────────────
+async function doInviteInline() {
+  const name  = document.getElementById('iName')?.value.trim()
+  const email = document.getElementById('iEmail')?.value.trim()
+  const role  = document.getElementById('iRole')?.value
+  const resultEl = document.getElementById('inviteResult')
+  const submitBtn = document.getElementById('inviteSubmitBtn')
   if (!name || !email) { toast('Name and email are required', 'error'); return }
   try {
     const r = await api('/api/auth/invite', { method: 'POST', body: { name, email, role } })
-    const resultEl = document.getElementById('inviteResult')
     if (r.emailSent) {
-      resultEl.style.cssText = 'display:block;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#065f46'
+      resultEl.style.cssText = 'display:block;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);border-radius:var(--r-md);padding:12px 14px;font-size:13px;color:#065f46;margin-bottom:12px'
       resultEl.innerHTML = `✓ Account created for <strong>${name}</strong>. An invitation email has been sent to <strong>${email}</strong>.`
     } else {
-      resultEl.style.cssText = 'display:block'
+      resultEl.style.cssText = 'display:block;margin-bottom:12px'
       resultEl.innerHTML = `
         <div style="background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.3);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
           ✓ Account created for <strong>${name}</strong>.
@@ -1098,8 +1169,25 @@ async function doInvite() {
           <div style="font-size:11px;color:var(--text-3);margin-top:6px">The user should change this password after first login.</div>
         </div>`
     }
-    document.getElementById('inviteSubmitBtn').style.display = 'none'
+    if (submitBtn) submitBtn.style.display = 'none'
+    // Add "Invite another" reset
+    const anotherBtn = document.createElement('button')
+    anotherBtn.className = 'btn btn-secondary btn-sm'
+    anotherBtn.textContent = '+ Invite another'
+    anotherBtn.style.marginTop = '10px'
+    anotherBtn.onclick = () => {
+      resultEl.style.display = 'none'
+      resultEl.innerHTML = ''
+      if (submitBtn) submitBtn.style.display = ''
+      anotherBtn.remove()
+    }
+    resultEl.appendChild(anotherBtn)
+    // Clear fields
+    if (document.getElementById('iName')) document.getElementById('iName').value = ''
+    if (document.getElementById('iEmail')) document.getElementById('iEmail').value = ''
     toast('User created', 'success')
+    await loadUsers()
+    renderTeamList()
   } catch (err) { toast(err.message, 'error') }
 }
 
@@ -2317,7 +2405,7 @@ async function renderAboutPanel() {
 }
 
 // Close modals on overlay click
-['inviteModal','editUserModal','locModal'].forEach(id => {
+['editUserModal','locModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) document.getElementById(id).classList.remove('open') })
 })
 

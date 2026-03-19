@@ -343,7 +343,11 @@ const DAY_ABBR   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function toDateStr(d) {
-  return d.toISOString().slice(0, 10)
+  // Use local date components to avoid UTC offset shifting the date (e.g. BST UTC+1)
+  const y  = d.getFullYear()
+  const m  = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
 }
 
 function parseDate(s) {
