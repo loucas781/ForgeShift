@@ -201,7 +201,38 @@ function migrateAdditive() {
     console.log('✓ Added is_oncall column to shifts')
   }
 
-  // Task lists feature
+  // Migrate task_assignments: rename week_start -> date if the old schema is present.
+  // This MUST run before the CREATE TABLE IF NOT EXISTS block so the table is in the
+  // correct shape before any code tries to reference the 'date' column.
+  {
+    const taskAssignCols = db.prepare("PRAGMA table_info(task_assignments)").all().map(c => c.name)
+    if (taskAssignCols.includes('week_start') && !taskAssignCols.includes('date')) {
+      console.log('Migrating task_assignments week_start -> date...')
+      db.pragma('foreign_keys = OFF')
+      try {
+        db.exec(`CREATE TABLE task_assignments_new (
+          id           TEXT PRIMARY KEY,
+          user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          task_list_id TEXT NOT NULL REFERENCES task_lists(id) ON DELETE CASCADE,
+          date         TEXT NOT NULL,
+          created_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (user_id, task_list_id, date)
+        )`)
+        db.exec(`INSERT INTO task_assignments_new (id, user_id, task_list_id, date, created_by, created_at)
+          SELECT id, user_id, task_list_id, week_start, created_by, created_at FROM task_assignments`)
+        db.exec(`DROP TABLE task_assignments`)
+        db.exec(`ALTER TABLE task_assignments_new RENAME TO task_assignments`)
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id)`)
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_task_assignments_date ON task_assignments(date)`)
+        console.log('✓ Migrated task_assignments week_start -> date')
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
+    }
+  }
+
+  // Task lists feature — safe to run after the migration above has fixed any old schema
   db.exec(`
     CREATE TABLE IF NOT EXISTS task_lists (
       id          TEXT PRIMARY KEY,
@@ -238,36 +269,6 @@ function migrateAdditive() {
   if (!taskListCols.includes('location_id')) {
     db.exec("ALTER TABLE task_lists ADD COLUMN location_id TEXT REFERENCES locations(id) ON DELETE SET NULL")
     console.log('✓ Added location_id to task_lists')
-  }
-
-  // Migrate task_assignments: rename week_start -> date if the old schema is present
-  const taskAssignCols = db.prepare("PRAGMA table_info(task_assignments)").all().map(c => c.name)
-  if (taskAssignCols.includes('week_start') && !taskAssignCols.includes('date')) {
-    db.pragma('foreign_keys = OFF')
-    try {
-      db.exec(`
-        BEGIN;
-        CREATE TABLE task_assignments_new (
-          id           TEXT PRIMARY KEY,
-          user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          task_list_id TEXT NOT NULL REFERENCES task_lists(id) ON DELETE CASCADE,
-          date         TEXT NOT NULL,
-          created_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
-          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-          UNIQUE (user_id, task_list_id, date)
-        );
-        INSERT INTO task_assignments_new (id, user_id, task_list_id, date, created_by, created_at)
-          SELECT id, user_id, task_list_id, week_start, created_by, created_at FROM task_assignments;
-        DROP TABLE task_assignments;
-        ALTER TABLE task_assignments_new RENAME TO task_assignments;
-        CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id);
-        CREATE INDEX IF NOT EXISTS idx_task_assignments_date ON task_assignments(date);
-        COMMIT;
-      `)
-      console.log('✓ Migrated task_assignments week_start -> date')
-    } finally {
-      db.pragma('foreign_keys = ON')
-    }
   }
 
   // Expand role CHECK to include shift_lead — SQLite can't ALTER constraints

@@ -13,7 +13,14 @@ router.get('/token', requireAuth, (req, res) => {
     db.prepare('INSERT INTO ical_tokens (id, user_id, token) VALUES (?,?,?)').run(uuidv4(), req.user.id, token)
     row = db.prepare('SELECT * FROM ical_tokens WHERE user_id = ?').get(req.user.id)
   }
-  const base = process.env.APP_URL || 'http://localhost:3000'
+  // Derive base URL from the incoming request when behind a trusted reverse proxy,
+  // so the feed URL reflects the public HTTPS domain rather than the internal LAN address.
+  let base = process.env.APP_URL || 'http://localhost:3000'
+  if (process.env.TRUST_PROXY === 'true') {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol
+    const host  = req.headers['x-forwarded-host']  || req.headers['host']
+    if (host) base = `${proto}://${host}`
+  }
   res.json({ token: row.token, feedUrl: `${base}/api/ical/feed/${row.token}.ics` })
 })
 

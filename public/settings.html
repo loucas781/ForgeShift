@@ -117,6 +117,65 @@
       }
       .settings-tab { padding: 10px 10px; font-size: 12px; }
       .member-actions { padding-left:0; }
+
+      /* Settings panels get proper padding on mobile */
+      .settings-panel { padding: 16px; }
+
+      /* Pref rows — stack label and control vertically on very small screens */
+      .pref-row { flex-wrap: wrap; gap: 10px; }
+      .pref-row .pref-info { min-width: 0; width: 100%; }
+
+      /* Member rows — keep horizontal but allow wrapping gracefully */
+      .member-row { align-items: flex-start; }
+
+      /* Copy URL row — stack on mobile so the input + button don't get crushed */
+      .copy-url-row { flex-direction: column; gap: 8px; }
+      .copy-url-row input { width: 100%; font-size: 12px; }
+      .copy-url-row .btn { width: 100%; justify-content: center; }
+
+      /* 2-column grids collapse to single column */
+      [style*="grid-template-columns:1fr 1fr"],
+      [style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* Invite form grid — stack name + email */
+      #panel-team .form-group[style*="grid-column:1/-1"] { grid-column: unset; }
+
+      /* Card headers with buttons — allow wrapping */
+      .card-header { flex-wrap: wrap; gap: 8px; }
+
+      /* Backup meta grid — 2 columns max on mobile */
+      .backup-meta { grid-template-columns: repeat(2, 1fr) !important; }
+
+      /* Prevent long monospace strings (URLs, tokens) from overflowing */
+      .form-input[readonly], code { word-break: break-all; }
+
+      /* Theme grid — 2 cols on mobile */
+      .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .theme-option { min-width: 0; }
+
+      /* Button groups in settings — wrap and full width where needed */
+      .policy-row { flex-wrap: wrap; }
+
+      /* Audit log table — allow horizontal scroll */
+      #panel-audit .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+      /* iCal action buttons — stack on mobile */
+      #icalContent [style*="display:flex;gap:8px;flex-wrap:wrap"] { flex-direction: column; }
+      #icalContent [style*="display:flex;gap:8px;flex-wrap:wrap"] .btn { width: 100%; justify-content: center; }
+
+      /* SMTP grid — full width on mobile */
+      #panel-email [style*="display:grid"] { grid-template-columns: 1fr !important; }
+      #panel-email [style*="grid-column:1/-1"] { grid-column: unset !important; }
+
+      /* Security / features pref rows with choice buttons — wrap the button group */
+      [style*="display:flex;gap:4px"] .pref-choice-btn,
+      [style*="display:flex;gap:6px"] .pref-choice-btn { padding: 5px 10px; font-size: 11px; }
+
+      /* Ensure modal footer buttons don't overflow */
+      .modal-footer { flex-wrap: wrap; }
+      .modal-footer .btn { flex: 1; min-width: 0; justify-content: center; }
     }
   </style>
 </head>
@@ -1754,11 +1813,44 @@ async function renderSecurityPanel() {
     </div>
 
     <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Session</h3></div>
+      <div class="card-header"><h3 class="card-title">HTTPS / Reverse Proxy</h3></div>
       <div class="card-body">
-        <div class="policy-row">
-          <div class="pref-info"><strong>HTTPS-only cookies</strong><span>Set Secure flag on session cookie — only enable when running behind HTTPS</span></div>
-          <label class="toggle"><input type="checkbox" id="cookieSecureToggle" ${c.cookieSecure?'checked':''} onchange="toggleCookieSecure(this.checked)"><span class="toggle-slider"></span></label>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+          Configure these once you are running behind a reverse proxy (e.g. Nginx Proxy Manager) with a valid SSL certificate.<br>
+          <strong style="color:var(--text-2)">Do not enable Secure Cookies on plain HTTP — it will lock everyone out.</strong>
+        </p>
+
+        <div style="border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:12px">
+          <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600;font-size:13px;margin-bottom:3px">Secure Cookies</div>
+              ${c.cookieSecure
+                ? `<div style="font-size:12px;color:var(--green)">🔒 Enabled — HTTPS only</div>`
+                : `<div style="font-size:12px;color:var(--text-3)">✕ Disabled — cookies sent over HTTP</div>`
+              }
+            </div>
+            <button class="btn btn-sm ${c.cookieSecure ? 'btn-danger' : 'btn-primary'}" id="cookieSecureBtn"
+              onclick="toggleCookieSecure(${!c.cookieSecure})">
+              ${c.cookieSecure ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden">
+          <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600;font-size:13px;margin-bottom:3px">Trust Reverse Proxy</div>
+              ${c.trustProxy
+                ? `<div style="font-size:12px;color:var(--green)">✔ Enabled — X-Forwarded-* headers trusted</div>`
+                : `<div style="font-size:12px;color:var(--text-3)">✕ Disabled — enable when behind Nginx/Caddy etc.</div>`
+              }
+            </div>
+            <button class="btn btn-sm ${c.trustProxy ? 'btn-danger' : 'btn-primary'}" id="trustProxyBtn"
+              style="${c.trustProxy ? '' : 'background:var(--brand);'}"
+              onclick="toggleTrustProxy(${!c.trustProxy})">
+              ${c.trustProxy ? 'Disable' : 'Enable'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1784,13 +1876,21 @@ async function renderSecurityPanel() {
         <p style="font-size:13px;color:var(--text-2);margin-bottom:12px;line-height:1.6">
           Passkeys let you sign in with Face ID, Touch ID or a device PIN — no password needed.
         </p>
-        <div style="padding:12px 14px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--orange)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
-            Passkey support (WebAuthn) requires the app to be served over HTTPS with a consistent domain name.
-            It will be available once you have deployed to staging or production behind your Nginx proxy.
-          </p>
-        </div>
+        ${(location.protocol === 'https:' && window.PublicKeyCredential)
+          ? `<div style="padding:12px 14px;background:var(--green-light);border:1px solid rgba(5,150,105,.3);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--green)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
+                Passkey support is available on this deployment. Passkey registration and sign-in are coming in a future update.
+              </p>
+            </div>`
+          : `<div style="padding:12px 14px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);display:flex;gap:12px;align-items:flex-start">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="var(--orange)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <p style="margin:0;font-size:13px;color:var(--text-2);line-height:1.5">
+                Passkey support (WebAuthn) requires the app to be served over HTTPS with a consistent domain name.
+                It will be available once you have deployed behind your Nginx reverse proxy with HTTPS.
+              </p>
+            </div>`
+        }
       </div>
     </div>`
 
@@ -1909,10 +2009,29 @@ async function savePasswordPolicy() {
 }
 
 async function toggleCookieSecure(val) {
+  const btn = document.getElementById('cookieSecureBtn')
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…' }
   try {
     await api('/api/config', { method: 'PATCH', body: { cookieSecure: val } })
+    toast('Setting saved — reload to apply', 'success')
+    await renderSecurityPanel()
+  } catch (err) {
+    toast(err.message, 'error')
+    if (btn) { btn.disabled = false }
+  }
+}
+
+async function toggleTrustProxy(val) {
+  const btn = document.getElementById('trustProxyBtn')
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…' }
+  try {
+    await api('/api/config', { method: 'PATCH', body: { trustProxy: val } })
     toast('Setting saved', 'success')
-  } catch (err) { toast(err.message, 'error') }
+    await renderSecurityPanel()
+  } catch (err) {
+    toast(err.message, 'error')
+    if (btn) { btn.disabled = false }
+  }
 }
 
 // ── Email / SMTP panel ─────────────────────────────────────────────────────────

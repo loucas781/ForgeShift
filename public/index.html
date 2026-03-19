@@ -126,14 +126,21 @@
       <button class="modal-close" onclick="closeTaskAssignModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign one or more task lists to a team member for a specific day.</p>
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for one or more days this week.</p>
       <div class="form-group">
         <label class="form-label">Team member</label>
         <select class="form-select" id="taUser"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Date</label>
-        <input type="date" class="form-input" id="taDate">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="form-label" style="margin:0">Days</label>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('weekdays')" style="font-size:11px;padding:2px 8px">Weekdays</button>
+            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('all')" style="font-size:11px;padding:2px 8px">All week</button>
+            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('none')" style="font-size:11px;padding:2px 8px">Clear</button>
+          </div>
+        </div>
+        <div id="taDayPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Task list</label>
@@ -141,9 +148,9 @@
           <option value="">— Select a task list —</option>
         </select>
       </div>
-      <!-- Current assignments for selected user+date -->
+      <!-- Current assignments for the selected user across this week -->
       <div id="taCurrentAssignments" style="display:none;margin-top:4px">
-        <label class="form-label" style="margin-bottom:6px">Assigned on this day</label>
+        <label class="form-label" style="margin-bottom:6px">Already assigned this week</label>
         <div id="taAssignmentList" style="display:flex;flex-direction:column;gap:4px"></div>
       </div>
     </div>
@@ -878,33 +885,117 @@ function hideTaskPopover() {
 }
 
 // ── Task Assignment Modal ──────────────────────────────────────────────────────
+// _taWeekDates: array of 7 date strings [Mon..Sun] for the current modal week
+let _taWeekDates = []
+
 function openTaskAssignModal(dateStr, userId) {
-  document.getElementById('taskAssignModalTitle').textContent = 'Assign Task — ' + dateStr
+  // Derive the Monday of the week containing dateStr
+  const clicked  = new Date(dateStr)
+  const dow      = clicked.getDay()
+  const toMon    = dow === 0 ? -6 : 1 - dow
+  const monday   = new Date(clicked); monday.setDate(monday.getDate() + toMon)
+
+  // Build the 7 dates for this week (Mon–Sun) as date strings
+  _taWeekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday); d.setDate(d.getDate() + i); return toDateStr(d)
+  })
+
+  // Title: week range
+  const we = new Date(monday); we.setDate(we.getDate() + 6)
+  document.getElementById('taskAssignModalTitle').textContent =
+    'Assign Task — ' + monday.getDate() + ' ' + MONTH_NAMES[monday.getMonth()].slice(0,3) +
+    ' – ' + we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3)
+
+  // Populate user select value
   const sel = document.getElementById('taUser')
   if (userId && sel) sel.value = userId
-  document.getElementById('taDate').value = dateStr
-  // Reset task list select
+
+  // Build day-of-week pill checkboxes
+  _buildDayPicker(dateStr)
+
+  // Reset task list
   const taSel = document.getElementById('taTaskList')
   if (taSel) taSel.value = ''
-  // Render current assignments for this date
-  _renderCurrentAssignments(dateStr, sel ? sel.value : null)
-  // Re-render when user changes
-  if (sel) sel.onchange = () => _renderCurrentAssignments(document.getElementById('taDate').value, sel.value)
+
+  // Render existing assignments for user across this week
+  _renderCurrentAssignments(sel ? sel.value : null)
+  if (sel) sel.onchange = () => _renderCurrentAssignments(sel.value)
+
   document.getElementById('taskAssignModal').classList.add('open')
 }
 
-function _renderCurrentAssignments(dateStr, userId) {
+const _DAY_ABBRS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+
+function _buildDayPicker(preselectedDate) {
+  const container = document.getElementById('taDayPicker')
+  container.innerHTML = _taWeekDates.map((ds, i) => {
+    const checked = ds === preselectedDate
+    const isWeekend = i >= 5  // Sat, Sun
+    return `<label style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
+      <input type="checkbox" class="ta-day-cb" data-date="${ds}" ${checked ? 'checked' : ''}
+        style="display:none" onchange="_updateDayPillStyle(this)">
+      <span class="ta-day-pill" data-date="${ds}"
+        style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;
+               border:2px solid ${checked ? 'var(--accent)' : 'var(--border)'};
+               background:${checked ? 'var(--accent)' : 'transparent'};
+               color:${checked ? '#fff' : (isWeekend ? 'var(--text-3)' : 'var(--text-1)')};
+               font-size:11px;font-weight:600;transition:all .15s;cursor:pointer"
+        onclick="_toggleDayPill('${ds}')">
+        ${_DAY_ABBRS[i]}<br><span style="font-size:10px;font-weight:400">${new Date(ds + 'T00:00:00').getDate()}</span>
+      </span>
+    </label>`
+  }).join('')
+}
+
+function _toggleDayPill(ds) {
+  const cb = document.querySelector(`.ta-day-cb[data-date="${ds}"]`)
+  if (!cb) return
+  cb.checked = !cb.checked
+  _updateDayPillStyle(cb)
+}
+
+function _updateDayPillStyle(cb) {
+  const pill = document.querySelector(`.ta-day-pill[data-date="${cb.dataset.date}"]`)
+  if (!pill) return
+  const i = _taWeekDates.indexOf(cb.dataset.date)
+  const isWeekend = i >= 5
+  pill.style.border      = `2px solid ${cb.checked ? 'var(--accent)' : 'var(--border)'}`
+  pill.style.background  = cb.checked ? 'var(--accent)' : 'transparent'
+  pill.style.color       = cb.checked ? '#fff' : (isWeekend ? 'var(--text-3)' : 'var(--text-1)')
+}
+
+function taSelectDays(mode) {
+  _taWeekDates.forEach((ds, i) => {
+    const cb = document.querySelector(`.ta-day-cb[data-date="${ds}"]`)
+    if (!cb) return
+    if      (mode === 'all')      cb.checked = true
+    else if (mode === 'weekdays') cb.checked = i < 5
+    else if (mode === 'none')     cb.checked = false
+    _updateDayPillStyle(cb)
+  })
+}
+
+function _renderCurrentAssignments(userId) {
   const container = document.getElementById('taCurrentAssignments')
   const list      = document.getElementById('taAssignmentList')
-  const existing  = taskAssignments.filter(a => a.date === dateStr && (!userId || a.user_id === userId))
+  const existing  = taskAssignments.filter(a =>
+    _taWeekDates.includes(a.date) && (!userId || a.user_id === userId)
+  )
   if (!existing.length) { container.style.display = 'none'; return }
   container.style.display = ''
-  list.innerHTML = existing.map(a =>
-    `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:${a.task_list_color||'#0052cc'}18;border-left:3px solid ${a.task_list_color||'#0052cc'}">
-      <span style="font-size:13px;color:${a.task_list_color||'#0052cc'};font-weight:600">${a.task_list_name}</span>
-      <button style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-3);padding:0 2px;line-height:1" title="Remove" onclick="removeTaskAssignment('${a.id}','${dateStr}','${a.user_id}')">✕</button>
-    </div>`
-  ).join('')
+  // Group by date for readability
+  const byDate = {}
+  existing.forEach(a => { if (!byDate[a.date]) byDate[a.date] = []; byDate[a.date].push(a) })
+  list.innerHTML = _taWeekDates.filter(ds => byDate[ds]).map(ds => {
+    const dayLabel = _DAY_ABBRS[_taWeekDates.indexOf(ds)]
+    return byDate[ds].map(a =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:${a.task_list_color||'#0052cc'}18;border-left:3px solid ${a.task_list_color||'#0052cc'}">
+        <span style="font-size:13px;color:${a.task_list_color||'#0052cc'};font-weight:600">${dayLabel} — ${a.task_list_name}</span>
+        <button style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-3);padding:0 2px;line-height:1" title="Remove"
+          onclick="removeTaskAssignment('${a.id}','${ds}','${a.user_id}')">✕</button>
+      </div>`
+    ).join('')
+  }).join('')
 }
 
 function closeTaskAssignModal() {
@@ -918,23 +1009,29 @@ async function removeTaskAssignment(id, dateStr, userId) {
     await api(`/api/tasks/assignments/${id}`, { method: 'DELETE' })
     toast('Assignment removed', 'success')
     await renderView()
-    // Re-open to reflect changes
+    // Re-open on same week (use any date from that week)
     openTaskAssignModal(dateStr, userId)
   } catch (err) { toast(err.message, 'error') }
 }
 
 async function saveTaskAssignment() {
-  const user_id     = document.getElementById('taUser').value
-  const date        = document.getElementById('taDate').value
+  const user_id      = document.getElementById('taUser').value
   const task_list_id = document.getElementById('taTaskList').value
-  if (!user_id || !date)        { toast('Please select a user and date', 'error'); return }
-  if (!task_list_id)            { toast('Please select a task list', 'error'); return }
+  if (!user_id)       { toast('Please select a team member', 'error'); return }
+  if (!task_list_id)  { toast('Please select a task list', 'error'); return }
+
+  const dates = _taWeekDates.filter(ds => {
+    const cb = document.querySelector(`.ta-day-cb[data-date="${ds}"]`)
+    return cb && cb.checked
+  })
+  if (!dates.length) { toast('Please select at least one day', 'error'); return }
+
   try {
-    await api('/api/tasks/assignments', { method: 'POST', body: { user_id, date, task_list_id } })
-    toast('Task assigned', 'success')
-    // Refresh and re-open so they can keep adding
+    await api('/api/tasks/assignments/bulk', { method: 'POST', body: { user_id, task_list_id, dates } })
+    toast(dates.length === 1 ? 'Task assigned' : `Task assigned for ${dates.length} days`, 'success')
     await renderView()
-    openTaskAssignModal(date, user_id)
+    // Re-open so they can keep adding
+    openTaskAssignModal(dates[0], user_id)
   } catch (err) { toast(err.message, 'error') }
 }
 
