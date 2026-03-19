@@ -564,8 +564,7 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: 0 6px;
-  margin-top: -8px;
+  padding: 2px 6px 0;
   font-size: 10px;
   color: var(--text-3);
   font-weight: 600;

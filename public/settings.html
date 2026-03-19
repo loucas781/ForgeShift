@@ -404,7 +404,7 @@ function _avatarHTML(user, size) {
   return `<div class="avatar" style="${base};background:${(user&&user.color)||'#4f46e5'}">${initials}</div>`
 }
 
-
+function showTab(id) {
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'))
   document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'))
   const panel = document.getElementById('panel-' + id)

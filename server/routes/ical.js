@@ -30,22 +30,6 @@ router.delete('/token', requireAuth, (req, res) => {
   res.json({ ok: true })
 })
 
-// ── UK DST helper ─────────────────────────────────────────────────────────────
-// Returns the UTC offset in hours for Europe/London on a given local date string.
-// UK is UTC+0 (GMT) in winter, UTC+1 (BST) in summer.
-// BST starts: last Sunday in March at 01:00 UTC
-// BST ends:   last Sunday in October at 01:00 UTC
-function getUKOffsetHours(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  // Find last Sunday of March
-  const lastSunMar = lastSundayOf(y, 3)
-  // Find last Sunday of October
-  const lastSunOct = lastSundayOf(y, 10)
-  const date = new Date(y, m - 1, d)
-  if (date >= lastSunMar && date < lastSunOct) return 1  // BST
-  return 0  // GMT
-}
-
 function lastSundayOf(year, month) {
   // month is 1-based; find last day of that month then step back to Sunday
   const lastDay = new Date(year, month, 0) // 0th of next month = last day of this month
@@ -63,40 +47,32 @@ function fmtLocalDT(dateStr, timeStr) {
   return `${datePart}T${timePart}`
 }
 
-// Build a minimal but correct VTIMEZONE block for Europe/London covering the
-// given set of years. Clients that understand VTIMEZONE will show the correct
-// local time regardless of their own timezone.
-function buildVTimezone(years) {
-  const lines = [
+// Build a correct VTIMEZONE block for Europe/London.
+// A single DAYLIGHT + STANDARD pair with RRULE covers all years.
+// Clients that understand VTIMEZONE will show the correct local time.
+function buildVTimezone() {
+  return [
     'BEGIN:VTIMEZONE',
     'TZID:Europe/London',
     'X-LIC-LOCATION:Europe/London',
+    // BST (summer): last Sunday in March at 01:00 UTC (UTC+0 → UTC+1)
+    'BEGIN:DAYLIGHT',
+    'TZOFFSETFROM:+0000',
+    'TZOFFSETTO:+0100',
+    'TZNAME:BST',
+    'DTSTART:19700329T010000',
+    'RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3',
+    'END:DAYLIGHT',
+    // GMT (winter): last Sunday in October at 02:00 BST (UTC+1 → UTC+0)
+    'BEGIN:STANDARD',
+    'TZOFFSETFROM:+0100',
+    'TZOFFSETTO:+0000',
+    'TZNAME:GMT',
+    'DTSTART:19701025T020000',
+    'RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10',
+    'END:STANDARD',
+    'END:VTIMEZONE',
   ]
-  for (const y of years) {
-    const bstStart = lastSundayOf(y, 3)
-    const gmtStart = lastSundayOf(y, 10)
-    const fmt = d =>
-      `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}T010000`
-
-    lines.push(
-      'BEGIN:DAYLIGHT',
-      'TZOFFSETFROM:+0000',
-      'TZOFFSETTO:+0100',
-      'TZNAME:BST',
-      `DTSTART:${fmt(bstStart)}`,
-      `RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3`,
-      'END:DAYLIGHT',
-      'BEGIN:STANDARD',
-      'TZOFFSETFROM:+0100',
-      'TZOFFSETTO:+0000',
-      'TZNAME:GMT',
-      `DTSTART:${fmt(gmtStart)}`,
-      `RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10`,
-      'END:STANDARD'
-    )
-  }
-  lines.push('END:VTIMEZONE')
-  return lines
 }
 
 // ── GET /api/ical/feed/:token.ics — public feed ───────────────────────────────
@@ -123,10 +99,6 @@ router.get('/feed/:token', (req, res) => {
 
     const appName = process.env.APP_NAME || 'ForgeShift'
 
-    // Collect years spanned so we can build the VTIMEZONE block
-    const years = new Set(shifts.map(s => Number(s.date.slice(0,4))))
-    if (!years.size) years.add(now.getFullYear())
-
     let cal = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -135,7 +107,7 @@ router.get('/feed/:token', (req, res) => {
       'X-WR-TIMEZONE:Europe/London',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      ...buildVTimezone(years),
+      ...buildVTimezone(),
     ]
 
     for (const shift of shifts) {
