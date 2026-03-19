@@ -451,11 +451,10 @@ async function renderPreferencesPanel() {
             { id:'light',  label:'Light',     emoji:'☀️', bg:'#f3f4f6',  border:'#e5e7eb' },
             { id:'dark',   label:'Dark',      emoji:'🌙', bg:'#0f172a',  border:'#1e293b' },
             { id:'oled',   label:'OLED Black',emoji:'⬛', bg:'#000000',  border:'#0d0d0d' },
-          ].map(t => \`
-            <div class="theme-option\${currentTheme===t.id?' active':''}" id="themeOpt-\${t.id}" onclick="pickTheme('\${t.id}')">
-              <div class="theme-swatch" style="background:\${t.bg};border-color:\${t.border}"></div>
-              <span>\${t.emoji} \${t.label}</span>
-            </div>\`).join('')}
+          ].map(t => '<div class="theme-option' + (currentTheme===t.id?' active':'') + '" id="themeOpt-' + t.id + '" onclick="pickTheme(\'' + t.id + '\')">'
+            + '<div class="theme-swatch" style="background:' + t.bg + ';border-color:' + t.border + '"></div>'
+            + '<span>' + t.emoji + ' ' + t.label + '</span>'
+            + '</div>').join('')}
         </div>
         <p style="font-size:12px;color:var(--text-3);margin-top:12px">
           Current: <strong id="currentThemeName">${currentTheme}</strong>
@@ -1017,20 +1016,20 @@ async function renderTeamPanel() {
                 { can: false, text: 'Access any admin settings' },
               ]
             },
-          ].map(r => \`
-            <div style="border-top:1px solid var(--border);padding:14px 16px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-                <span class="badge \${r.badge}" style="font-size:11px">\${r.role}</span>
-              </div>
-              <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px">
-                \${r.items.map(i => \`
-                  <li style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:\${i.can ? 'var(--text-2)' : 'var(--text-3)'}">
-                    <span style="flex-shrink:0;margin-top:1px;font-size:13px">\${i.can ? '✓' : '✗'}</span>
-                    <span style="\${i.can ? '' : 'text-decoration:line-through;opacity:.6'}">\${i.text}</span>
-                  </li>\`).join('')}
-              </ul>
-            </div>
-          \`).join('')}
+          ].map(r => {
+            const itemsHtml = r.items.map(i =>
+              '<li style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:' + (i.can ? 'var(--text-2)' : 'var(--text-3)') + '">'
+              + '<span style="flex-shrink:0;margin-top:1px;font-size:13px">' + (i.can ? '✓' : '✗') + '</span>'
+              + '<span style="' + (i.can ? '' : 'text-decoration:line-through;opacity:.6') + '">' + i.text + '</span>'
+              + '</li>'
+            ).join('')
+            return '<div style="border-top:1px solid var(--border);padding:14px 16px">'
+              + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+              + '<span class="badge ' + r.badge + '" style="font-size:11px">' + r.role + '</span>'
+              + '</div>'
+              + '<ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px">' + itemsHtml + '</ul>'
+              + '</div>'
+          }).join('')}
         </div>
       </div>
     </div><!-- end right column -->
@@ -2716,23 +2715,23 @@ async function doDeleteAccount() {
 // ── About panel ───────────────────────────────────────────────────────────────
 async function renderAboutPanel() {
   const el = document.getElementById('panel-about')
-  el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About</h2>
-    <!-- Build info section: admin only — version table + stats need admin API access -->
-    \${cfg.user.role === 'admin' ? \`
-    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)">Build Info</h3>
+
+  // Build the admin-only build info block before the template literal to avoid nesting
+  const envBadgeClass = cfg.appEnv === 'production' ? 'red' : cfg.appEnv === 'staging' ? 'orange' : 'green'
+  const buildInfoHtml = cfg.user.role === 'admin'
+    ? `<h3 style="font-size:15px;font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)">Build Info</h3>
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Version</h3></div>
       <div class="card-body">
         <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
-          <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v\${cfg.version}</span>
-          <span class="badge badge-\${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">\${cfg.appEnv.toUpperCase()}</span>
+          <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
+          <span class="badge badge-${envBadgeClass}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
         </div>
         <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <tr><td style="color:var(--text-3);padding:10px 0;width:160px;border-bottom:1px solid var(--border)">Version string</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">\${cfg.version}</code></td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Environment</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">\${cfg.appEnv}</td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">App name</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">\${cfg.appName || 'ForgeShift'}</td></tr>
-          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Node.js</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">\${cfg.nodeVersion || 'unknown'}</code></td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;width:160px;border-bottom:1px solid var(--border)">Version string</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.version}</code></td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Environment</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appEnv}</td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">App name</td><td style="padding:10px 0;border-bottom:1px solid var(--border)">${cfg.appName || 'ForgeShift'}</td></tr>
+          <tr><td style="color:var(--text-3);padding:10px 0;border-bottom:1px solid var(--border)">Node.js</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><code style="font-family:var(--mono);background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px">${cfg.nodeVersion || 'unknown'}</code></td></tr>
           <tr><td style="color:var(--text-3);padding:10px 0">Runtime</td><td style="padding:10px 0">Node.js / Express / SQLite</td></tr>
         </table>
       </div>
@@ -2740,14 +2739,15 @@ async function renderAboutPanel() {
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
       <div class="card-body" id="buildInfoStats"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
-    </div>
-    \` : \`
-    <!-- Non-admin: show version badge only, no internal stats -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg)">
-      <span style="font-size:22px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v\${cfg.version}</span>
-      <span class="badge badge-\${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">\${cfg.appEnv.toUpperCase()}</span>
-    </div>
-    \`}
+    </div>`
+    : `<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:14px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg)">
+      <span style="font-size:22px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
+      <span class="badge badge-${envBadgeClass}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
+    </div>`
+
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About</h2>
+    ${buildInfoHtml}
 
     <!-- About section -->
     <h3 style="font-size:15px;font-weight:700;margin:32px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--border)">ForgeShift</h3>
