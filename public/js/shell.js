@@ -203,18 +203,9 @@ function renderShell(cfg, activePage) {
     mobileNav.className = 'mobile-nav-dropdown'
     topbar.parentNode.insertBefore(mobileNav, topbar.nextSibling)
   }
-  // Build avatar HTML for mobile header — uses avatarEl() so photos show correctly
-  const mobileAvatarEl = avatarEl(cfg.user)
-  mobileAvatarEl.style.width  = '36px'
-  mobileAvatarEl.style.height = '36px'
-  mobileAvatarEl.style.fontSize = '13px'
-  mobileAvatarEl.style.fontWeight = '700'
-  mobileAvatarEl.style.flexShrink = '0'
-  const mobileAvatarHtml = mobileAvatarEl.outerHTML
-
   mobileNav.innerHTML = `
     <div class="mobile-nav-user-header">
-      ${mobileAvatarHtml}
+      <div class="avatar" style="background:${cfg.user.color};width:36px;height:36px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;flex-shrink:0">${cfg.user.initials}</div>
       <div style="min-width:0">
         <div style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cfg.user.name}</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cfg.user.email}</div>
