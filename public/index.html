@@ -122,31 +122,44 @@
 <div class="modal-overlay" id="taskAssignModal">
   <div class="modal">
     <div class="modal-header">
-      <h3 class="modal-title">Assign Task</h3>
+      <h3 class="modal-title" id="taskAssignModalTitle">Assign Task</h3>
       <button class="modal-close" onclick="closeTaskAssignModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for a specific week.</p>
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign one or more task lists to a team member for a specific day.</p>
       <div class="form-group">
         <label class="form-label">Team member</label>
         <select class="form-select" id="taUser"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Week starting (Monday)</label>
-        <input type="date" class="form-input" id="taWeekStart">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="taDate">
       </div>
       <div class="form-group">
         <label class="form-label">Task list</label>
         <select class="form-select" id="taTaskList">
-          <option value="">— Clear assignment —</option>
+          <option value="">— Select a task list —</option>
         </select>
+      </div>
+      <!-- Current assignments for selected user+date -->
+      <div id="taCurrentAssignments" style="display:none;margin-top:4px">
+        <label class="form-label" style="margin-bottom:6px">Assigned on this day</label>
+        <div id="taAssignmentList" style="display:flex;flex-direction:column;gap:4px"></div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeTaskAssignModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTaskAssignment()">Save</button>
+      <button class="btn btn-primary" onclick="saveTaskAssignment()">Add assignment</button>
     </div>
   </div>
+</div>
+
+<!-- Task Detail Popover -->
+<div id="taskDetailPopover" style="display:none;position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px 16px;min-width:220px;max-width:320px;pointer-events:none">
+  <div id="taskDetailName" style="font-weight:700;font-size:14px;margin-bottom:4px"></div>
+  <div id="taskDetailUser" style="font-size:12px;color:var(--text-3);margin-bottom:8px"></div>
+  <div id="taskDetailDesc" style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:8px;display:none"></div>
+  <div id="taskDetailLocation" style="font-size:12px;color:var(--text-3);display:none"></div>
 </div>
 
 <script src="/js/shell.js"></script>
@@ -358,13 +371,8 @@ async function loadTaskAssignments() {
     start = startOfWeek(currentDate, weekStart)
     end   = new Date(start); end.setDate(end.getDate() + 6)
   }
-  // Snap start back to Monday for task assignment keying
-  const startDow = start.getDay()
-  const toMon = startDow === 0 ? -6 : 1 - startDow
-  const monStart = new Date(start); monStart.setDate(monStart.getDate() + toMon)
-  const params = new URLSearchParams({ start: toDateStr(monStart), end: toDateStr(end) })
+  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   if (cfg.user.role === 'member') params.set('user_id', cfg.user.id)
-  // shift_lead and admin: no user_id filter — backend scopes by role
   try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
 }
 
@@ -412,11 +420,11 @@ function renderMonth() {
   const shiftMap = {}
   shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
-  // Task assignment map: week_start -> [assignment, ...]  (keyed by Monday of that week)
+  // Task assignment map: date -> [assignment, ...]
   const taskMap = {}
   taskAssignments.forEach(a => {
-    if (!taskMap[a.week_start]) taskMap[a.week_start] = []
-    taskMap[a.week_start].push(a)
+    if (!taskMap[a.date]) taskMap[a.date] = []
+    taskMap[a.date].push(a)
   })
 
   // Build ordered day abbreviations starting from weekStart
@@ -442,27 +450,23 @@ function renderMonth() {
       html += '<div class="cal-wknum">' + _isoWeekNumber(d) + '</div>'
     }
 
-    // Task banner — shown on the first day of each week (position 0 in the row)
+    // Task banner — shown on every day that has assignments (or + Task prompt for managers)
     let taskBannerHtml = ''
-    if (cfg.featureTasks && taskLists.length && i % 7 === 0) {
-      // Always key by Monday of this row for task assignments
-      const rowMonday = new Date(d)
-      const rowDow = rowMonday.getDay()
-      const toMon = rowDow === 0 ? -6 : 1 - rowDow
-      rowMonday.setDate(rowMonday.getDate() + toMon)
-      const rowWeekStart = toDateStr(rowMonday)
-      const rowAssignments = taskMap[rowWeekStart] || []
+    if (cfg.featureTasks && taskLists.length) {
+      const dayAssignments = taskMap[ds] || []
       const clickAttr = canManage()
-        ? `onclick="event.stopPropagation();openTaskAssignModal('${rowWeekStart}')"`
+        ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
-      if (rowAssignments.length) {
-        taskBannerHtml = rowAssignments.map(a =>
-          `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" title="${a.user_name||''}: ${a.task_list_name}" ${clickAttr}>`+
-          (canManage()?`<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>`:'')+
-          `<span>${a.task_list_name}</span></div>`
-        ).join('')
+      if (dayAssignments.length) {
+        taskBannerHtml = dayAssignments.map(a => {
+          const safeData = encodeURIComponent(JSON.stringify(a))
+          return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" ` +
+            `onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()" ${canManage() ? clickAttr : ''}>` +
+            (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
+            `<span>${a.task_list_name}</span></div>`
+        }).join('')
       } else if (canManage()) {
-        taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this week">+ Task</div>`
+        taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
     }
 
@@ -521,9 +525,18 @@ function renderWeek() {
   const shiftMap = {}
   shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
-  // Task assignment map for this week
-  const wsStr = toDateStr(ws)
-  const weekTaskAssignments = cfg.featureTasks ? (taskAssignments.filter(a => a.week_start === wsStr)) : []
+  // Task assignment map for this week: date -> [assignments]
+  const taskMap = {}
+  if (cfg.featureTasks) {
+    taskAssignments.forEach(a => {
+      if (!taskMap[a.date]) taskMap[a.date] = []
+      taskMap[a.date].push(a)
+    })
+  }
+  // Check if any day in this week has tasks (to decide whether to show the row)
+  const weekHasTasks = cfg.featureTasks && (
+    taskLists.length > 0 || Object.keys(taskMap).some(d => d >= toDateStr(ws) && d <= toDateStr(new Date(ws.getTime() + 6*86400000)))
+  )
 
   let html = `<div class="cal-week">`
   html += `<div style="border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);padding:10px 4px;"></div>`
@@ -538,22 +551,27 @@ function renderWeek() {
     </div>`
   }
 
-  // Task row for week view
-  if (cfg.featureTasks && (weekTaskAssignments.length || (canManage() && taskLists.length))) {
+  // Task row for week view — one cell per day
+  if (cfg.featureTasks && (weekHasTasks || canManage())) {
     html += `<div style="border-right:1px solid var(--border);background:var(--surface-2);padding:4px 4px;font-size:10px;color:var(--text-3);display:flex;align-items:center;justify-content:center">Tasks</div>`
     for (let i = 0; i < 7; i++) {
+      const d  = new Date(ws); d.setDate(d.getDate() + i)
+      const ds = toDateStr(d)
+      const dayAssignments = taskMap[ds] || []
       const clickAttr = canManage() && taskLists.length
-        ? `onclick="event.stopPropagation();openTaskAssignModal('${wsStr}')"`
+        ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
-      if (weekTaskAssignments.length) {
-        weekTaskAssignments.forEach(a => {
-          html += `<div class="cal-task-banner week-task-banner${cfg.user.role==='admin'?' clickable':''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" title="${a.user_name||''}: ${a.task_list_name}" ${clickAttr}>`+
-            (canManage()?`<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>`:'')+
+      if (dayAssignments.length) {
+        dayAssignments.forEach(a => {
+          const safeData = encodeURIComponent(JSON.stringify(a))
+          html += `<div class="cal-task-banner week-task-banner${canManage() ? ' clickable' : ''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" ` +
+            `onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()" ${canManage() ? clickAttr : ''}>` +
+            (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         })
-      } else if (i === 0 && canManage() && taskLists.length) {
-        html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this week">+ Task</div>`
+      } else if (canManage() && taskLists.length) {
+        html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
       html += `</div>`
     }
@@ -821,39 +839,102 @@ document.getElementById('taskAssignModal').addEventListener('click', e => {
   if (e.target === document.getElementById('taskAssignModal')) closeTaskAssignModal()
 })
 
-// ── Task Assignment Modal ──────────────────────────────────────────────────────
-function openTaskAssignModal(weekStart, userId) {
-  // Ensure weekStart is the Monday of that week for consistent keying
-  let ws = new Date(weekStart)
-  const dow = ws.getDay()
-  const diff = dow === 0 ? -6 : 1 - dow // shift sunday back 6, else back to monday
-  ws.setDate(ws.getDate() + diff)
-  const wsStr = toDateStr(ws)
+// ── Popover helpers ────────────────────────────────────────────────────────────
+function decodeData(encoded) {
+  try { return JSON.parse(decodeURIComponent(encoded)) } catch { return null }
+}
+let _popoverTimer = null
+function showTaskPopover(event, a) {
+  if (!a) return
+  clearTimeout(_popoverTimer)
+  const pop = document.getElementById('taskDetailPopover')
+  document.getElementById('taskDetailName').textContent = a.task_list_name || ''
+  document.getElementById('taskDetailUser').textContent = a.user_name || ''
+  const descEl = document.getElementById('taskDetailDesc')
+  if (a.task_list_description) {
+    descEl.textContent = a.task_list_description
+    descEl.style.display = ''
+  } else {
+    descEl.style.display = 'none'
+  }
+  const locEl = document.getElementById('taskDetailLocation')
+  if (a.location_name) {
+    locEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:${a.location_color||'#888'};flex-shrink:0"></span>${a.location_name}</span>`
+    locEl.style.display = ''
+  } else {
+    locEl.style.display = 'none'
+  }
+  // Position near the cursor
+  const x = Math.min(event.clientX + 12, window.innerWidth - 340)
+  const y = Math.min(event.clientY + 12, window.innerHeight - 160)
+  pop.style.left = x + 'px'
+  pop.style.top  = y + 'px'
+  pop.style.display = ''
+}
+function hideTaskPopover() {
+  _popoverTimer = setTimeout(() => {
+    document.getElementById('taskDetailPopover').style.display = 'none'
+  }, 80)
+}
 
+// ── Task Assignment Modal ──────────────────────────────────────────────────────
+function openTaskAssignModal(dateStr, userId) {
+  document.getElementById('taskAssignModalTitle').textContent = 'Assign Task — ' + dateStr
   const sel = document.getElementById('taUser')
   if (userId && sel) sel.value = userId
-  document.getElementById('taWeekStart').value = wsStr
-  // Pre-select current assignment if exists
-  const existing = taskAssignments.find(a => a.week_start === wsStr)
+  document.getElementById('taDate').value = dateStr
+  // Reset task list select
   const taSel = document.getElementById('taTaskList')
-  if (taSel) taSel.value = existing ? existing.task_list_id : ''
+  if (taSel) taSel.value = ''
+  // Render current assignments for this date
+  _renderCurrentAssignments(dateStr, sel ? sel.value : null)
+  // Re-render when user changes
+  if (sel) sel.onchange = () => _renderCurrentAssignments(document.getElementById('taDate').value, sel.value)
   document.getElementById('taskAssignModal').classList.add('open')
 }
 
+function _renderCurrentAssignments(dateStr, userId) {
+  const container = document.getElementById('taCurrentAssignments')
+  const list      = document.getElementById('taAssignmentList')
+  const existing  = taskAssignments.filter(a => a.date === dateStr && (!userId || a.user_id === userId))
+  if (!existing.length) { container.style.display = 'none'; return }
+  container.style.display = ''
+  list.innerHTML = existing.map(a =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:${a.task_list_color||'#0052cc'}18;border-left:3px solid ${a.task_list_color||'#0052cc'}">
+      <span style="font-size:13px;color:${a.task_list_color||'#0052cc'};font-weight:600">${a.task_list_name}</span>
+      <button style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-3);padding:0 2px;line-height:1" title="Remove" onclick="removeTaskAssignment('${a.id}','${dateStr}','${a.user_id}')">✕</button>
+    </div>`
+  ).join('')
+}
+
 function closeTaskAssignModal() {
+  const sel = document.getElementById('taUser')
+  if (sel) sel.onchange = null
   document.getElementById('taskAssignModal').classList.remove('open')
+}
+
+async function removeTaskAssignment(id, dateStr, userId) {
+  try {
+    await api(`/api/tasks/assignments/${id}`, { method: 'DELETE' })
+    toast('Assignment removed', 'success')
+    await renderView()
+    // Re-open to reflect changes
+    openTaskAssignModal(dateStr, userId)
+  } catch (err) { toast(err.message, 'error') }
 }
 
 async function saveTaskAssignment() {
   const user_id     = document.getElementById('taUser').value
-  const week_start  = document.getElementById('taWeekStart').value
-  const task_list_id = document.getElementById('taTaskList').value || null
-  if (!user_id || !week_start) { toast('Please select a user and week', 'error'); return }
+  const date        = document.getElementById('taDate').value
+  const task_list_id = document.getElementById('taTaskList').value
+  if (!user_id || !date)        { toast('Please select a user and date', 'error'); return }
+  if (!task_list_id)            { toast('Please select a task list', 'error'); return }
   try {
-    await api('/api/tasks/assignments', { method: 'POST', body: { user_id, week_start, task_list_id } })
-    toast(task_list_id ? 'Task assigned' : 'Assignment cleared', 'success')
-    closeTaskAssignModal()
-    renderView()
+    await api('/api/tasks/assignments', { method: 'POST', body: { user_id, date, task_list_id } })
+    toast('Task assigned', 'success')
+    // Refresh and re-open so they can keep adding
+    await renderView()
+    openTaskAssignModal(date, user_id)
   } catch (err) { toast(err.message, 'error') }
 }
 

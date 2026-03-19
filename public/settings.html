@@ -197,6 +197,8 @@
     </div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="tlName" placeholder="e.g. Monitoring Round"></div>
+      <div class="form-group"><label class="form-label">Description <span style="color:var(--text-3);font-weight:400">(optional)</span></label><textarea class="form-input" id="tlDescription" rows="3" placeholder="Describe what this task list involves…" style="resize:vertical;min-height:72px"></textarea></div>
+      <div class="form-group"><label class="form-label">Linked location <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlLocation"><option value="">— None —</option></select></div>
       <div class="form-group"><label class="form-label">Colour</label><div id="tlColourPicker"></div></div>
     </div>
     <div class="modal-footer">
@@ -1544,7 +1546,7 @@ async function renderFeaturesPanel() {
         </div>
         <div class="card-body" style="padding:0">
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Colour</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
             <tbody id="taskListsBody"></tbody>
           </table></div>
         </div>
@@ -1562,11 +1564,13 @@ function renderTaskListsTable() {
   const tbody = document.getElementById('taskListsBody')
   if (!tbody) return
   if (!taskLists.length) {
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
     return
   }
   tbody.innerHTML = taskLists.map(t => `<tr>
     <td style="font-weight:600">${t.name}</td>
+    <td style="color:var(--text-2);font-size:13px;max-width:260px">${t.description ? `<span title="${t.description.replace(/"/g,'&quot;')}">${t.description.length>80?t.description.slice(0,80)+'…':t.description}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+    <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:${t.location_color||'#888'};flex-shrink:0"></span>${t.location_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
     <td><div style="width:20px;height:20px;border-radius:50%;background:${t.color};border:1px solid var(--border)"></div></td>
     <td><div style="display:flex;gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
@@ -1590,6 +1594,8 @@ function openCreateTaskList() {
   editingTaskListId = null; tlColour = '#4f46e5'
   document.getElementById('taskListModalTitle').textContent = 'Add Task List'
   document.getElementById('tlName').value = ''
+  document.getElementById('tlDescription').value = ''
+  _populateTlLocationSelect(null)
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
 }
@@ -1598,8 +1604,19 @@ function openEditTaskList(id) {
   editingTaskListId = id; tlColour = t.color || '#4f46e5'
   document.getElementById('taskListModalTitle').textContent = 'Edit Task List'
   document.getElementById('tlName').value = t.name
+  document.getElementById('tlDescription').value = t.description || ''
+  _populateTlLocationSelect(t.location_id)
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
+}
+function _populateTlLocationSelect(selectedId) {
+  const sel = document.getElementById('tlLocation')
+  if (!sel) return
+  // locations is already loaded in renderLocationsPanel — fetch fresh if needed
+  api('/api/locations').then(locs => {
+    sel.innerHTML = '<option value="">— None —</option>' +
+      locs.map(l => `<option value="${l.id}"${l.id === selectedId ? ' selected' : ''}>${l.name}</option>`).join('')
+  }).catch(() => {})
 }
 function closeTaskListModal() { document.getElementById('taskListModal').classList.remove('open') }
 function setupTlColour() {
@@ -1608,10 +1625,12 @@ function setupTlColour() {
 }
 async function saveTaskList() {
   const name = document.getElementById('tlName').value.trim()
+  const description = document.getElementById('tlDescription').value.trim() || null
+  const location_id = document.getElementById('tlLocation').value || null
   if (!name) { toast('Name required', 'error'); return }
   try {
-    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour } })
-    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour } })
+    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, location_id } })
+    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, location_id } })
     closeTaskListModal()
     await loadTaskLists(); renderTaskListsTable()
     toast('Task list saved', 'success')
