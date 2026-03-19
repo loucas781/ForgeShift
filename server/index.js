@@ -61,8 +61,7 @@ const app = express()
 
 app.use(express.json({ limit: '5mb' }))
 app.use(express.urlencoded({ extended: false }))
-// Raw text body parser for backup restore (accepts large .fsbackup files)
-app.use('/api/backup/restore', express.text({ limit: '256mb', type: 'text/plain' }))
+// Note: /api/backup/restore uses multer (multipart/form-data) — no special body parser needed here
 app.use(cookieParser())
 
 app.use((req, res, next) => {
