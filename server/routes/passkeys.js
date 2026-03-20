@@ -131,14 +131,13 @@ router.post('/register-verify', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Verification failed' })
     }
 
-    const { credential: cred } = verification.registrationInfo
-    const credId = Buffer.isBuffer(cred.id) ? cred.id.toString('base64url') : cred.id
-    const pubKey = Buffer.isBuffer(cred.publicKey) ? cred.publicKey.toString('base64') : Buffer.from(cred.publicKey).toString('base64')
+    const { credentialID, credentialPublicKey, counter } = verification.registrationInfo
+    const pubKey = Buffer.from(credentialPublicKey).toString('base64')
 
     db.prepare(`
       INSERT INTO passkey_credentials (id, user_id, public_key, counter, device_name)
       VALUES (?, ?, ?, ?, ?)
-    `).run(credId, req.user.id, pubKey, cred.counter || 0, deviceName || null)
+    `).run(credentialID, req.user.id, pubKey, counter || 0, deviceName || null)
 
     res.json({ ok: true })
   } catch (err) {
