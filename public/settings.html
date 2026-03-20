@@ -148,6 +148,13 @@
       /* Stack team layout to single column on narrow screens */
       #panel-team .team-layout-grid { grid-template-columns: 1fr !important; }
 
+      /* Role tab bar: scroll horizontally instead of clipping on narrow screens */
+      #roleTabBar { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+      #roleTabBar::-webkit-scrollbar { display: none; }
+
+      /* Export Shifts grid — stack all fields to single column */
+      #panel-team [style*="grid-template-columns:1fr 1fr auto auto"] { grid-template-columns: 1fr !important; }
+
       /* Card headers with buttons — allow wrapping */
       .card-header { flex-wrap: wrap; gap: 8px; }
 
@@ -327,7 +334,7 @@ async function init() {
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
     { id: 'features', label: 'Features', roles: ['admin'],
       icon: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>' },
-    { id: 'security', label: 'Security', roles: ['admin'],
+    { id: 'security', label: 'Security', roles: ['admin','shift_lead','member'],
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
     { id: 'email', label: 'Email', roles: ['admin'],
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
@@ -379,7 +386,7 @@ async function init() {
     isAdmin ? renderTeamPanel() : Promise.resolve(),
     isAdmin ? renderLocationsPanel() : Promise.resolve(),
     isAdmin ? renderFeaturesPanel() : Promise.resolve(),
-    isAdmin ? renderSecurityPanel() : Promise.resolve(),
+    renderSecurityPanel(),
     isAdmin ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
@@ -1953,12 +1960,14 @@ async function deleteLoc(id, name) {
 
 // ── Security panel ─────────────────────────────────────────────────────────────
 async function renderSecurityPanel() {
-  const c = await api('/api/config')
+  const userIsAdmin = cfg.user.role === 'admin'
+  const c = userIsAdmin ? await api('/api/config') : {}
   const pol = c.passwordPolicy || {}
   const el = document.getElementById('panel-security')
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Security</h2>
 
+    ${userIsAdmin ? `
     <div class="card section-card">
       <div class="card-header">
         <h3 class="card-title">Password Policy</h3>
@@ -2025,6 +2034,7 @@ async function renderSecurityPanel() {
         </div>
       </div>
     </div>
+    ` : ''}
 
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Two-Factor Authentication (2FA)</h3></div>

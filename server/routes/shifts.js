@@ -313,6 +313,7 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
     tx()
 
     audit(req.user.id, 'shift.template_apply', 'shift', template_id, tmpl.name, { user_id, week_start, days: created.length, skipped: skipped.length })
+    if (created.length) req.app.locals.broadcastShiftEvent?.('shift.create', { user_id, week_start }, req.user.id)
     res.json({ ok: true, applied: created.length, skipped: skipped.length })
   } catch (err) {
     console.error('apply template:', err.message)
