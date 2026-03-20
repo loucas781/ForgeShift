@@ -101,6 +101,39 @@
       min-width:0;
       box-sizing:border-box;
     }
+    @media(max-width:820px){
+      #panel-team { max-width: 100%; }
+      #panel-team .team-layout-grid { grid-template-columns: minmax(0, 1fr) !important; }
+      #panel-team .team-permissions-panel { position: static !important; top: auto !important; }
+      #panel-team .team-member-header { flex-direction: column; align-items: flex-start; }
+      #panel-team .member-row { flex-direction: column; align-items: stretch; gap: 10px; }
+      #panel-team .member-info { width: 100%; }
+      #panel-team .team-member-status { width: 100%; justify-content: flex-start !important; }
+      #panel-team .member-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+        padding-left: 0;
+        padding-top: 0;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #panel-team .member-actions .btn {
+        flex: 0 0 auto;
+        min-width: 0;
+        padding: 5px 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        text-align: left;
+      }
+      #panel-team .member-actions::-webkit-scrollbar { display: none; }
+      #panel-team .team-export-grid { grid-template-columns: minmax(0, 1fr) !important; }
+      #panel-team .team-export-action { padding-bottom: 0 !important; }
+      #panel-team .team-member-email,
+      #panel-team .team-modal-user-email { white-space: normal; overflow-wrap: anywhere; }
+      #panel-team .card-body { padding: 16px; }
+    }
     .theme-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
     .theme-option {
       display:flex; flex-direction:column; align-items:center; gap:8px;
@@ -153,35 +186,7 @@
 
       /* Member rows — keep horizontal but allow wrapping gracefully */
       .member-row { align-items: flex-start; }
-      #panel-team .member-row { flex-direction: column; align-items: stretch; gap: 10px; }
-      #panel-team .member-info { width: 100%; }
-      #panel-team .member-actions {
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 6px;
-        padding-left: 0;
-        padding-top: 0;
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      #panel-team .member-actions .btn {
-        flex: 1 1 0;
-        min-width: 0;
-        padding: 5px 8px;
-        font-size: 11px;
-        justify-content: center;
-        white-space: nowrap;
-        text-align: center;
-      }
-      #panel-team .member-actions::-webkit-scrollbar { display: none; }
-      #panel-team .team-member-header { flex-direction: column; align-items: flex-start; }
-      #panel-team .team-member-email,
-      #panel-team .team-modal-user-email { white-space: normal; overflow-wrap: anywhere; }
       #panel-team .team-section-actions .btn { width: 100%; justify-content: center; }
-      #panel-team .team-export-grid { grid-template-columns: 1fr !important; }
-      #panel-team .team-permissions-panel { position: static !important; top: auto !important; }
-      #panel-team .card-body { padding: 16px; }
 
       /* Copy URL row — stack on mobile so the input + button don't get crushed */
       .copy-url-row { flex-direction: column; gap: 8px; }
@@ -1044,7 +1049,7 @@ async function renderTeamPanel() {
                   <label class="form-label">User</label>
                   <select class="form-select" id="csvUser"><option value="all">All users</option></select>
                 </div>
-                <div style="padding-bottom:1px">
+                <div class="team-export-action" style="padding-bottom:1px">
                   <button class="btn btn-primary" onclick="doAdminCSVExport()">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                     Download CSV
@@ -1230,7 +1235,7 @@ function renderTeamListFiltered() {
           <div class="team-member-email">${u.email}</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <div class="team-member-status" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
       </div>
       <div class="member-actions">
