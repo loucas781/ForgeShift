@@ -155,13 +155,28 @@
       .member-row { align-items: flex-start; }
       #panel-team .member-row { flex-direction: column; align-items: stretch; gap: 10px; }
       #panel-team .member-info { width: 100%; }
-      #panel-team .member-actions { padding-left: 0; padding-top: 0; width: 100%; }
+      #panel-team .member-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding-left: 0;
+        padding-top: 0;
+        width: 100%;
+      }
       #panel-team .member-actions .btn {
-        flex: 1 1 calc(50% - 3px);
+        width: 100%;
         min-width: 0;
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 12px;
         justify-content: center;
         white-space: normal;
         text-align: center;
+      }
+      #panel-team .member-actions .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+      #panel-team .member-actions .btn-ghost {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
       }
       #panel-team .team-member-header { flex-direction: column; align-items: flex-start; }
       #panel-team .team-member-email,
