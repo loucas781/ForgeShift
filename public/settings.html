@@ -67,9 +67,9 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
-    .settings-panel { display:none; padding:24px; max-width:700px; }
-    #panel-team { max-width:960px; }
-    #settingsPanelsWrap { overflow-x: hidden; }
+    .settings-panel { display:none; width:100%; max-width:700px; min-width:0; padding:24px; }
+    #panel-team { width:100%; max-width:960px; min-width:0; }
+    #settingsPanelsWrap { width:100%; min-width:0; overflow-x:hidden; }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
@@ -81,6 +81,104 @@
     .member-row:last-child { border-bottom:none; }
     .member-info { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
     .member-actions { display:flex; gap:6px; flex-wrap:wrap; padding-top:6px; padding-left:48px; width:100%; }
+    .team-member-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+    .team-member-name { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-weight:600; font-size:13px; }
+    .team-member-email,
+    .team-modal-user-email { font-size:12px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .team-section-actions { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .team-export-grid { display:grid; grid-template-columns:1fr 1fr auto auto; gap:12px; align-items:end; }
+    .team-export-grid > div { min-width:0; }
+    #panel-team .team-export-card input[type="date"] {
+      min-height: 44px;
+      line-height: 1.4;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    #panel-team .team-export-card input[type="date"]::-webkit-date-and-time-value {
+      min-height: 1.4em;
+      text-align: left;
+    }
+    #panel-team .team-export-card input[type="date"]::-webkit-datetime-edit {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.4em;
+      padding: 0;
+    }
+    .team-role-tab { display:inline-flex; align-items:center; gap:6px; min-width:max-content; }
+    .team-layout-grid,
+    .team-layout-grid > div,
+    #panel-team .card,
+    #panel-team .card-body,
+    #panel-team #roleTabBar,
+    #panel-team #teamList,
+    #panel-team #teamsListEl,
+    #panel-team #tmplGroupsListEl {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      box-sizing:border-box;
+    }
+    #roleTabBar {
+      overflow-y: hidden;
+      touch-action: pan-x;
+      overscroll-behavior-x: contain;
+      overscroll-behavior-y: none;
+    }
+    @media(max-width:820px){
+      #panel-team { max-width: 100%; }
+      #panel-team .team-layout-grid { grid-template-columns: minmax(0, 1fr) !important; }
+      #panel-team .team-permissions-panel { position: static !important; top: auto !important; }
+      #panel-team .team-member-header {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      #panel-team .member-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 10px 12px;
+      }
+      #panel-team .member-info { width: 100%; min-width: 0; }
+      #panel-team .team-member-status {
+        width: auto;
+        min-width: max-content;
+        justify-content: flex-end !important;
+        align-self: start;
+      }
+      #panel-team .member-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+        padding-left: 0;
+        padding-top: 0;
+        width: 100%;
+        grid-column: 1 / -1;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #panel-team .member-actions .btn {
+        flex: 0 0 auto;
+        min-width: 0;
+        padding: 5px 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        text-align: left;
+      }
+      #panel-team .member-actions::-webkit-scrollbar { display: none; }
+      #panel-team .team-export-grid { grid-template-columns: minmax(0, 1fr) !important; }
+      #panel-team .team-export-action { padding-bottom: 0 !important; }
+      #panel-team .team-export-card .card-body { padding: 20px; }
+      #panel-team .team-export-card .form-input,
+      #panel-team .team-export-card .form-select {
+        padding: 8px 12px;
+        min-height: 40px;
+      }
+      #panel-team .team-member-email,
+      #panel-team .team-modal-user-email { white-space: normal; overflow-wrap: anywhere; }
+      #panel-team .card-body { padding: 16px; }
+    }
     .theme-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
     .theme-option {
       display:flex; flex-direction:column; align-items:center; gap:8px;
@@ -124,7 +222,8 @@
       .member-actions { padding-left:0; }
 
       /* Settings panels get proper padding on mobile */
-      .settings-panel { padding: 16px; }
+      .settings-panel { width: 100%; max-width: 100%; padding: 16px; }
+      #panel-team { max-width: 100%; }
 
       /* Pref rows — stack label and control vertically on very small screens */
       .pref-row { flex-wrap: wrap; gap: 10px; }
@@ -132,6 +231,7 @@
 
       /* Member rows — keep horizontal but allow wrapping gracefully */
       .member-row { align-items: flex-start; }
+      #panel-team .team-section-actions .btn { width: 100%; justify-content: center; }
 
       /* Copy URL row — stack on mobile so the input + button don't get crushed */
       .copy-url-row { flex-direction: column; gap: 8px; }
@@ -147,7 +247,7 @@
       /* Invite form grid — stack name + email */
       #panel-team .form-group[style*="grid-column:1/-1"] { grid-column: unset; }
       /* Stack team layout to single column on narrow screens */
-      #panel-team .team-layout-grid { grid-template-columns: 1fr !important; }
+      #panel-team .team-layout-grid { grid-template-columns: minmax(0, 1fr) !important; }
       #panel-team { overflow-x: hidden; }
 
       /* Role tab bar: scroll horizontally instead of clipping on narrow screens */
@@ -914,7 +1014,7 @@ async function renderTeamPanel() {
     : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'
 
   el.innerHTML = `
-    <div class="team-layout-grid" style="display:grid;grid-template-columns:1fr 230px;gap:16px;align-items:start">
+    <div class="team-layout-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px;align-items:start">
 
       <!-- Left column: all team content -->
       <div>
@@ -924,7 +1024,7 @@ async function renderTeamPanel() {
           <div class="card-body">
             <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
             <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:16px">
               <div class="form-group" style="margin:0">
                 <label class="form-label">Full Name</label>
                 <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
@@ -950,7 +1050,7 @@ async function renderTeamPanel() {
         <!-- Team Members card -->
         <div class="card">
           <div class="card-body">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div class="team-member-header">
               <h2 style="font-size:16px;font-weight:700" id="teamMembersTitle">Team Members</h2>
               <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
             </div>
@@ -968,7 +1068,7 @@ async function renderTeamPanel() {
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
             Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
           </p>
-          <div style="display:flex;gap:8px;margin-bottom:16px">
+          <div class="team-section-actions">
             <button class="btn btn-secondary btn-sm" onclick="openCreateTeamModal()">+ Create team</button>
           </div>
           <div class="card" id="teamsCard">
@@ -979,9 +1079,9 @@ async function renderTeamPanel() {
         <div style="margin-top:32px">
           <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Export Shifts</h2>
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Download shift data as a CSV file for reporting or integration with other tools.</p>
-          <div class="card">
+          <div class="card team-export-card">
             <div class="card-body">
-              <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end;flex-wrap:wrap">
+              <div class="team-export-grid">
                 <div>
                   <label class="form-label">From</label>
                   <input type="date" class="form-input" id="csvFrom">
@@ -994,7 +1094,7 @@ async function renderTeamPanel() {
                   <label class="form-label">User</label>
                   <select class="form-select" id="csvUser"><option value="all">All users</option></select>
                 </div>
-                <div style="padding-bottom:1px">
+                <div class="team-export-action" style="padding-bottom:1px">
                   <button class="btn btn-primary" onclick="doAdminCSVExport()">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                     Download CSV
@@ -1010,7 +1110,7 @@ async function renderTeamPanel() {
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
             Organise templates into groups and control which members can see them. Members only see templates belonging to groups they are assigned to. Ungrouped templates are visible to everyone.
           </p>
-          <div style="display:flex;gap:8px;margin-bottom:16px">
+          <div class="team-section-actions">
             <button class="btn btn-secondary btn-sm" onclick="openCreateTmplGroupModal()">+ Create group</button>
           </div>
           <div class="card">
@@ -1021,7 +1121,7 @@ async function renderTeamPanel() {
       </div>
 
       <!-- Right column: Role Permissions (sticky) -->
-      <div style="position:sticky;top:24px">
+      <div class="team-permissions-panel" style="position:sticky;top:24px">
         <div class="card">
           <div class="card-body" style="padding:16px">
             <h3 style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text)">Role Permissions</h3>
@@ -1137,7 +1237,7 @@ function renderTeamTabs() {
 
   bar.innerHTML = tabs.map(t => {
     const active = t.key === activeRoleTab
-    return `<button onclick="switchRoleTab('${t.key}')" style="
+    return `<button class="team-role-tab" onclick="switchRoleTab('${t.key}')" style="
       display:inline-flex;align-items:center;gap:6px;
       padding:8px 14px;border:none;background:none;cursor:pointer;
       font-size:13px;font-weight:${active ? '600' : '500'};
@@ -1147,7 +1247,7 @@ function renderTeamTabs() {
     ">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">${t.key === 'admin' ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' : t.key === 'shift_lead' ? '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' : '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'}
       </svg>
-      ${t.label} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${roleCounts[t.key]}</span>
+      ${t.label} <span class="team-role-tab-count" style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${roleCounts[t.key]}</span>
     </button>`
   }).join('')
 
@@ -1176,11 +1276,11 @@ function renderTeamListFiltered() {
       <div class="member-info">
         ${_avatarHTML(u)}
         <div style="min-width:0">
-          <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
-          <div style="font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
+          <div class="team-member-name">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
+          <div class="team-member-email">${u.email}</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <div class="team-member-status" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
       </div>
       <div class="member-actions">
@@ -1341,7 +1441,7 @@ function openTeamMembersModal(teamId) {
               ${_avatarHTML(u, 'md')}
               <div style="flex:1;min-width:0">
                 <div style="font-size:13px;font-weight:500">${u.name}</div>
-                <div style="font-size:11px;color:var(--text-3)">${u.email}</div>
+                <div class="team-modal-user-email">${u.email}</div>
               </div>
               <span class="badge badge-${u.role === 'admin' ? 'blue' : u.role === 'shift_lead' ? 'purple' : 'gray'}" style="font-size:10px">${u.role === 'shift_lead' ? 'Shift Lead' : u.role}</span>
             </label>`).join('')}
