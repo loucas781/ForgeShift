@@ -131,13 +131,18 @@ router.post('/register-verify', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Verification failed' })
     }
 
-    const { credentialID, credentialPublicKey, counter } = verification.registrationInfo
-    const pubKey = Buffer.from(credentialPublicKey).toString('base64')
+    // Support both v9 (top-level credentialID/credentialPublicKey/counter) and
+    // v10+ (nested under registrationInfo.credential)
+    const regInfo = verification.registrationInfo
+    const credId  = regInfo.credential?.id  ?? regInfo.credentialID
+    const credPK  = regInfo.credential?.publicKey ?? regInfo.credentialPublicKey
+    const counter = regInfo.credential?.counter ?? regInfo.counter
+    const pubKey  = Buffer.from(credPK).toString('base64')
 
     db.prepare(`
       INSERT INTO passkey_credentials (id, user_id, public_key, counter, device_name)
       VALUES (?, ?, ?, ?, ?)
-    `).run(credentialID, req.user.id, pubKey, counter || 0, deviceName || null)
+    `).run(credId, req.user.id, pubKey, counter || 0, deviceName || null)
 
     res.json({ ok: true })
   } catch (err) {
@@ -199,16 +204,26 @@ router.post('/auth-verify', async (req, res) => {
 
     const publicKey = Buffer.from(stored.public_key, 'base64')
 
+    // Pass both v9 (authenticator) and v10 (credential) forms — the library
+    // uses whichever it recognises and ignores the other.
     const verification = await verifyAuthenticationResponse({
       response:          credential,
       expectedChallenge,
       expectedOrigin:    origin,
       expectedRPID:      rpID,
+      // v10+ API
       credential: {
         id:         stored.id,
         publicKey,
         counter:    stored.counter,
         transports: credential.response?.transports,
+      },
+      // v9 API (authenticator renamed to credential in v10)
+      authenticator: {
+        credentialID:        stored.id,
+        credentialPublicKey: publicKey,
+        counter:             stored.counter,
+        transports:          credential.response?.transports,
       },
       requireUserVerification: false,
     })

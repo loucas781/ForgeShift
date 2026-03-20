@@ -69,6 +69,7 @@
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
     .settings-panel { display:none; padding:24px; max-width:700px; }
     #panel-team { max-width:960px; }
+    #settingsPanelsWrap { overflow-x: hidden; }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
@@ -147,6 +148,7 @@
       #panel-team .form-group[style*="grid-column:1/-1"] { grid-column: unset; }
       /* Stack team layout to single column on narrow screens */
       #panel-team .team-layout-grid { grid-template-columns: 1fr !important; }
+      #panel-team { overflow-x: hidden; }
 
       /* Role tab bar: scroll horizontally instead of clipping on narrow screens */
       #roleTabBar { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
