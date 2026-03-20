@@ -88,6 +88,22 @@
     .team-section-actions { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
     .team-export-grid { display:grid; grid-template-columns:1fr 1fr auto auto; gap:12px; align-items:end; }
     .team-export-grid > div { min-width:0; }
+    #panel-team .team-export-card input[type="date"] {
+      min-height: 44px;
+      line-height: 1.4;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    #panel-team .team-export-card input[type="date"]::-webkit-date-and-time-value {
+      min-height: 1.4em;
+      text-align: left;
+    }
+    #panel-team .team-export-card input[type="date"]::-webkit-datetime-edit {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.4em;
+      padding: 0;
+    }
     .team-role-tab { display:inline-flex; align-items:center; gap:6px; min-width:max-content; }
     .team-layout-grid,
     .team-layout-grid > div,
