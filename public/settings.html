@@ -67,9 +67,9 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
-    .settings-panel { display:none; padding:24px; max-width:700px; }
-    #panel-team { max-width:960px; }
-    #settingsPanelsWrap { overflow-x: hidden; }
+    .settings-panel { display:none; width:100%; max-width:700px; min-width:0; padding:24px; }
+    #panel-team { width:100%; max-width:960px; min-width:0; }
+    #settingsPanelsWrap { width:100%; min-width:0; overflow-x:hidden; }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
     .pref-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:16px; }
@@ -88,6 +88,19 @@
     .team-section-actions { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
     .team-export-grid { display:grid; grid-template-columns:1fr 1fr auto auto; gap:12px; align-items:end; }
     .team-role-tab { display:inline-flex; align-items:center; gap:6px; min-width:max-content; }
+    .team-layout-grid,
+    .team-layout-grid > div,
+    #panel-team .card,
+    #panel-team .card-body,
+    #panel-team #roleTabBar,
+    #panel-team #teamList,
+    #panel-team #teamsListEl,
+    #panel-team #tmplGroupsListEl {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      box-sizing:border-box;
+    }
     .theme-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
     .theme-option {
       display:flex; flex-direction:column; align-items:center; gap:8px;
@@ -131,7 +144,8 @@
       .member-actions { padding-left:0; }
 
       /* Settings panels get proper padding on mobile */
-      .settings-panel { padding: 16px; }
+      .settings-panel { width: 100%; max-width: 100%; padding: 16px; }
+      #panel-team { max-width: 100%; }
 
       /* Pref rows — stack label and control vertically on very small screens */
       .pref-row { flex-wrap: wrap; gap: 10px; }
@@ -171,7 +185,7 @@
       /* Invite form grid — stack name + email */
       #panel-team .form-group[style*="grid-column:1/-1"] { grid-column: unset; }
       /* Stack team layout to single column on narrow screens */
-      #panel-team .team-layout-grid { grid-template-columns: 1fr !important; }
+      #panel-team .team-layout-grid { grid-template-columns: minmax(0, 1fr) !important; }
       #panel-team { overflow-x: hidden; }
 
       /* Role tab bar: scroll horizontally instead of clipping on narrow screens */
@@ -938,7 +952,7 @@ async function renderTeamPanel() {
     : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'
 
   el.innerHTML = `
-    <div class="team-layout-grid" style="display:grid;grid-template-columns:1fr 230px;gap:16px;align-items:start">
+    <div class="team-layout-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px;align-items:start">
 
       <!-- Left column: all team content -->
       <div>
@@ -948,7 +962,7 @@ async function renderTeamPanel() {
           <div class="card-body">
             <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
             <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:16px">
               <div class="form-group" style="margin:0">
                 <label class="form-label">Full Name</label>
                 <input type="text" class="form-input" id="iName" placeholder="Jane Smith">
