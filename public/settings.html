@@ -105,10 +105,25 @@
       #panel-team { max-width: 100%; }
       #panel-team .team-layout-grid { grid-template-columns: minmax(0, 1fr) !important; }
       #panel-team .team-permissions-panel { position: static !important; top: auto !important; }
-      #panel-team .team-member-header { flex-direction: column; align-items: flex-start; }
-      #panel-team .member-row { flex-direction: column; align-items: stretch; gap: 10px; }
-      #panel-team .member-info { width: 100%; }
-      #panel-team .team-member-status { width: 100%; justify-content: flex-start !important; }
+      #panel-team .team-member-header {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      #panel-team .member-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 10px 12px;
+      }
+      #panel-team .member-info { width: 100%; min-width: 0; }
+      #panel-team .team-member-status {
+        width: auto;
+        min-width: max-content;
+        justify-content: flex-end !important;
+        align-self: start;
+      }
       #panel-team .member-actions {
         display: flex;
         flex-wrap: nowrap;
@@ -116,6 +131,7 @@
         padding-left: 0;
         padding-top: 0;
         width: 100%;
+        grid-column: 1 / -1;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
       }
