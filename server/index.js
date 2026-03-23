@@ -222,15 +222,34 @@ app.patch('/api/config/password-policy', requireAuth, (req, res) => {
 app.get('/api/audit', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
-  const limit  = Math.min(parseInt(req.query.limit || '50'), 200)
-  const offset = parseInt(req.query.offset || '0')
+  const limit    = Math.min(parseInt(req.query.limit  || '30'), 200)
+  const offset   = parseInt(req.query.offset  || '0')
+  const action   = req.query.action   || ''
+  const actorId  = req.query.actor_id || ''
+
+  const where = []
+  const params = []
+  if (action)  { where.push('a.action = ?');   params.push(action) }
+  if (actorId) { where.push('a.actor_id = ?'); params.push(actorId) }
+  const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : ''
+
   const entries = db.prepare(`
     SELECT a.*, u.name as actor_name, u.initials as actor_initials, u.color as actor_color, u.avatar as actor_avatar
     FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
+    ${whereClause}
     ORDER BY a.created_at DESC LIMIT ? OFFSET ?
-  `).all(limit, offset)
-  const total = db.prepare('SELECT COUNT(*) as c FROM audit_log').get().c
-  res.json({ entries, total, limit, offset })
+  `).all(...params, limit, offset)
+
+  const total = db.prepare(`SELECT COUNT(*) as c FROM audit_log a ${whereClause}`).get(...params).c
+
+  // Return distinct actors for populating the user filter
+  const actors = db.prepare(`
+    SELECT DISTINCT u.id, u.name, u.initials, u.color, u.avatar
+    FROM audit_log a JOIN users u ON u.id = a.actor_id
+    ORDER BY u.name
+  `).all()
+
+  res.json({ entries, total, limit, offset, actors })
 })
 
 // Short-lived cache helper (10 s public, stale-while-revalidate)

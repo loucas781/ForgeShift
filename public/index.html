@@ -1895,13 +1895,25 @@ function connectSSE() {
 function _initSwipe() {
   const wrapper = document.querySelector('.cal-wrapper')
   if (!wrapper) return
-  let _tx = null
-  wrapper.addEventListener('touchstart', e => { _tx = e.touches[0].clientX }, { passive: true })
+  let _tx = null, _ty = null, _gridScrollX = null
+  wrapper.addEventListener('touchstart', e => {
+    _tx = e.touches[0].clientX
+    _ty = e.touches[0].clientY
+    const grid = document.getElementById('calGrid')
+    _gridScrollX = grid ? grid.scrollLeft : 0
+  }, { passive: true })
   wrapper.addEventListener('touchend', e => {
     if (_tx === null) return
     const dx = e.changedTouches[0].clientX - _tx
-    _tx = null
-    if (Math.abs(dx) < 50) return
+    const dy = e.changedTouches[0].clientY - _ty
+    _tx = null; _ty = null
+    // Ignore swipes that are more vertical than horizontal
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) { _gridScrollX = null; return }
+    // Ignore if the grid scrolled horizontally (user was scrolling, not navigating)
+    const grid = document.getElementById('calGrid')
+    const currentScrollX = grid ? grid.scrollLeft : 0
+    if (_gridScrollX !== null && currentScrollX !== _gridScrollX) { _gridScrollX = null; return }
+    _gridScrollX = null
     dx < 0 ? next() : prev()
   }, { passive: true })
 }
