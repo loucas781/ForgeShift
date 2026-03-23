@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ForgeShift — Settings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -409,6 +409,7 @@
 let cfg = null, users = [], locations = []
 let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
 let euPwIndicator = null
+let isAdmin = false, isShiftLead = false
 
 async function init() {
   cfg = await loadConfig()
@@ -417,8 +418,8 @@ async function init() {
   // Load user prefs so the Preferences panel can show current values
   await loadPrefs()
 
-  const isAdmin = cfg.user.role === 'admin'
-  const isShiftLead = cfg.user.role === 'shift_lead'
+  isAdmin = cfg.user.role === 'admin'
+  isShiftLead = cfg.user.role === 'shift_lead'
 
   const ALL_TABS = [
     { id: 'appearance', label: 'Appearance', roles: ['admin','shift_lead','member'],
@@ -493,7 +494,7 @@ async function init() {
     isAdmin ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
-    isAdmin ? renderBuildInfoPanel() : Promise.resolve(),
+    renderBuildInfoPanel(),
     renderAccountPanel(),
     renderAboutPanel(),
   ])
@@ -2815,49 +2816,184 @@ async function setAllowSignup(val) {
 }
 
 // ── Audit log panel ────────────────────────────────────────────────────────────
+const AUDIT_ACTION_META = {
+  'user.login':              { icon: '🔑', label: 'Login' },
+  'user.logout':             { icon: '🔑', label: 'Logout' },
+  'user.logout_all':         { icon: '🔑', label: 'Signed out all devices' },
+  'user.signup':             { icon: '✨', label: 'Signed up' },
+  'user.create':             { icon: '👤', label: 'User created' },
+  'user.update':             { icon: '✏️', label: 'User updated' },
+  'user.delete':             { icon: '🗑️', label: 'User deleted' },
+  'user.self_deleted':       { icon: '🗑️', label: 'Account deleted' },
+  'user.invite':             { icon: '📧', label: 'Invite sent' },
+  'user.profile_update':     { icon: '✏️', label: 'Profile updated' },
+  'user.avatar_upload':      { icon: '🖼️', label: 'Avatar uploaded' },
+  'user.avatar_remove':      { icon: '🖼️', label: 'Avatar removed' },
+  'user.password_reset':     { icon: '🔒', label: 'Password reset' },
+  'user.admin_password_reset':{ icon: '🔒', label: 'Password reset (admin)' },
+  'user.admin_reset_link':   { icon: '🔒', label: 'Reset link sent' },
+  'user.forgot_password':    { icon: '🔒', label: 'Forgot password' },
+  'user.2fa_enabled':        { icon: '🛡️', label: '2FA enabled' },
+  'user.2fa_disabled':       { icon: '🛡️', label: '2FA disabled' },
+  'user.revoke_all':         { icon: '🔒', label: 'Sessions revoked' },
+  'user.data_export':        { icon: '📥', label: 'Data exported' },
+  'shift.create':            { icon: '➕', label: 'Shift created' },
+  'shift.update':            { icon: '✏️', label: 'Shift updated' },
+  'shift.delete':            { icon: '🗑️', label: 'Shift deleted' },
+  'shift.template_apply':    { icon: '📋', label: 'Template applied' },
+  'location.create':         { icon: '📍', label: 'Location created' },
+  'location.update':         { icon: '📍', label: 'Location updated' },
+  'location.delete':         { icon: '🗑️', label: 'Location deleted' },
+  'template.create':         { icon: '📋', label: 'Template created' },
+  'template.update':         { icon: '📋', label: 'Template updated' },
+  'template.delete':         { icon: '🗑️', label: 'Template deleted' },
+  'template_group.create':   { icon: '📁', label: 'Template group created' },
+  'template_group.update':   { icon: '📁', label: 'Template group updated' },
+  'template_group.delete':   { icon: '🗑️', label: 'Template group deleted' },
+  'template_group.members_updated': { icon: '📁', label: 'Template group members updated' },
+  'team.create':             { icon: '👥', label: 'Team created' },
+  'team.update':             { icon: '👥', label: 'Team updated' },
+  'team.delete':             { icon: '🗑️', label: 'Team deleted' },
+  'team.members_update':     { icon: '👥', label: 'Team members updated' },
+  'task_list.create':        { icon: '✅', label: 'Task list created' },
+  'task_list.update':        { icon: '✅', label: 'Task list updated' },
+  'task_list.delete':        { icon: '🗑️', label: 'Task list deleted' },
+  'task_list_group.create':  { icon: '📁', label: 'Task group created' },
+  'task_list_group.update':  { icon: '📁', label: 'Task group updated' },
+  'task_list_group.delete':  { icon: '🗑️', label: 'Task group deleted' },
+  'task_list_group.members_updated': { icon: '📁', label: 'Task group members updated' },
+  'task_assignment.create':  { icon: '✅', label: 'Task assigned' },
+  'task_assignment.bulk_create': { icon: '✅', label: 'Tasks assigned (bulk)' },
+  'task_assignment.delete':  { icon: '🗑️', label: 'Task assignment removed' },
+  'backup.export':           { icon: '💾', label: 'Backup exported' },
+  'backup.restore':          { icon: '💾', label: 'Backup restored' },
+  'holidays.fetch':          { icon: '📅', label: 'Holidays fetched' },
+  'holidays.clear':          { icon: '📅', label: 'Holidays cleared' },
+}
+
+function _auditRelTime(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const s = Math.floor(diff / 1000)
+  if (s < 60)   return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60)   return m + 'm ago'
+  const h = Math.floor(m / 60)
+  if (h < 24)   return h + 'h ago'
+  const d = Math.floor(h / 24)
+  if (d < 30)   return d + 'd ago'
+  const mo = Math.floor(d / 30)
+  if (mo < 12)  return mo + 'mo ago'
+  return Math.floor(mo / 12) + 'y ago'
+}
+
+function _auditDetailText(entry) {
+  if (!entry.meta) return ''
+  let meta
+  try { meta = JSON.parse(entry.meta) } catch { return '' }
+  // Show changed fields if present
+  if (meta.changed && Array.isArray(meta.changed)) return 'Changed: ' + meta.changed.join(', ')
+  // Other notable fields
+  const skip = new Set(['by', 'actorId'])
+  const parts = Object.entries(meta).filter(([k]) => !skip.has(k)).map(([k, v]) => `${k}: ${v}`)
+  return parts.slice(0, 2).join(' · ')
+}
+
 async function renderAuditPanel() {
   const el = document.getElementById('panel-audit')
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Audit Log</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <h2 style="font-size:18px;font-weight:800;margin:0">Audit Log</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="form-select" id="auditActionFilter" onchange="reloadAudit()" style="font-size:12px;padding:6px 10px;height:34px">
+          <option value="">All actions</option>
+          ${Object.entries(AUDIT_ACTION_META).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
+        </select>
+        <select class="form-select" id="auditUserFilter" onchange="reloadAudit()" style="font-size:12px;padding:6px 10px;height:34px">
+          <option value="">All users</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="reloadAudit()" style="height:34px">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="margin-right:4px"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
     <div class="card">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Subject</th></tr></thead>
-          <tbody id="auditBody"><tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">Loading…</td></tr></tbody>
+          <thead>
+            <tr>
+              <th style="width:90px">Time</th>
+              <th style="width:160px">User</th>
+              <th>Action</th>
+              <th>Subject</th>
+              <th style="max-width:180px">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="auditBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">Loading…</td></tr>
+          </tbody>
         </table>
       </div>
-      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px" id="auditPager"></div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px" id="auditPager"></div>
     </div>`
   await loadAudit(0)
 }
 
 let auditOffset = 0
+async function reloadAudit() { await loadAudit(0) }
 async function loadAudit(offset) {
   auditOffset = offset
+  const actionFilter = document.getElementById('auditActionFilter')?.value || ''
+  const userFilter   = document.getElementById('auditUserFilter')?.value   || ''
   try {
-    const data = await api(`/api/audit?limit=30&offset=${offset}`)
+    const params = new URLSearchParams({ limit: 30, offset })
+    if (actionFilter) params.set('action',   actionFilter)
+    if (userFilter)   params.set('actor_id', userFilter)
+    const data = await api(`/api/audit?${params}`)
+
+    // Populate user filter on first load
+    if (offset === 0 && data.actors?.length) {
+      const sel = document.getElementById('auditUserFilter')
+      if (sel && sel.options.length <= 1) {
+        data.actors.forEach(a => {
+          const opt = document.createElement('option')
+          opt.value = a.id
+          opt.textContent = a.name
+          sel.appendChild(opt)
+        })
+        if (userFilter) sel.value = userFilter
+      }
+    }
+
     const tbody = document.getElementById('auditBody')
+    const COLS = 5
     if (!data.entries.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px">No audit entries yet</td></tr>'; return
+      tbody.innerHTML = `<tr><td colspan="${COLS}" style="text-align:center;color:var(--text-3);padding:24px">No audit entries found</td></tr>`; return
     }
     tbody.innerHTML = data.entries.map(e => {
-      const dt = new Date(e.created_at)
-      const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+      const am      = AUDIT_ACTION_META[e.action] || { icon: '📄', label: e.action }
+      const relTime = _auditRelTime(e.created_at)
+      const absTime = new Date(e.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+      const detail  = _auditDetailText(e)
       return `<tr>
-        <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${ts}</td>
-        <td>${e.actor_name ? `<div style="display:flex;align-items:center;gap:6px">${_avatarHTML({name:e.actor_name,initials:e.actor_initials,color:e.actor_color||'#4f46e5',avatar:e.actor_avatar||null},'xs')}<span style="font-size:12px">${e.actor_name}</span></div>` : '<span style="color:var(--text-3)">—</span>'}</td>
-        <td><code style="font-size:11px;background:var(--bg);padding:1px 5px;border-radius:3px">${e.action}</code></td>
-        <td style="font-size:12px;color:var(--text-3)">${e.entity_name||e.entity_id||'—'}</td>
+        <td style="font-size:11px;color:var(--text-3);white-space:nowrap" title="${escHtml(absTime)}">${escHtml(relTime)}</td>
+        <td>${e.actor_name
+          ? `<div style="display:flex;align-items:center;gap:6px">${_avatarHTML({name:e.actor_name,initials:e.actor_initials,color:e.actor_color||'#4f46e5',avatar:e.actor_avatar||null},'xs')}<span style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px" title="${escHtml(e.actor_name)}">${escHtml(e.actor_name)}</span></div>`
+          : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500">${am.icon} ${escHtml(am.label)}</span></td>
+        <td style="font-size:12px;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(e.entity_name||e.entity_id||'')}">${escHtml(e.entity_name||e.entity_id||'—')}</td>
+        <td style="font-size:11px;color:var(--text-3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(detail)}">${escHtml(detail) || '—'}</td>
       </tr>`
     }).join('')
-    // Pager
+
     const pager = document.getElementById('auditPager')
+    const total = data.total
     pager.innerHTML = `
       <button class="btn btn-secondary btn-sm" onclick="loadAudit(${Math.max(0,offset-30)})" ${offset===0?'disabled':''}>← Prev</button>
-      <span style="font-size:12px;color:var(--text-3);align-self:center">${offset+1}–${Math.min(offset+30,data.total)} of ${data.total}</span>
-      <button class="btn btn-secondary btn-sm" onclick="loadAudit(${offset+30})" ${offset+30>=data.total?'disabled':''}>Next →</button>`
+      <span style="font-size:12px;color:var(--text-3);flex:1;text-align:center">${total === 0 ? '0' : offset+1}–${Math.min(offset+30,total)} of ${total}</span>
+      <button class="btn btn-secondary btn-sm" onclick="loadAudit(${offset+30})" ${offset+30>=total?'disabled':''}>Next →</button>`
   } catch (err) {
-    document.getElementById('auditBody').innerHTML = `<tr><td colspan="4" style="color:var(--red);padding:24px;text-align:center">${err.message}</td></tr>`
+    document.getElementById('auditBody').innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:24px;text-align:center">${escHtml(err.message)}</td></tr>`
   }
 }
 
@@ -3150,29 +3286,33 @@ async function renderBuildInfoPanel() {
         </table>
       </div>
     </div>
+    ${isAdmin ? `
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
       <div class="card-body" id="buildInfoStats">
         <div style="color:var(--text-3);font-size:13px">Loading…</div>
       </div>
-    </div>`
+    </div>` : ''}
+  `
 
-  try {
-    const stats = await api('/api/stats')
-    document.getElementById('buildInfoStats').innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
-        ${[
-          { label: 'Active Users',  value: stats.users },
-          { label: 'Shifts',        value: stats.shifts },
-          { label: 'Locations',     value: stats.locations },
-          { label: 'Templates',     value: stats.templates },
-        ].map(s => `
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
-            <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
-          </div>`).join('')}
-      </div>`
-  } catch {}
+  if (isAdmin) {
+    try {
+      const stats = await api('/api/stats')
+      document.getElementById('buildInfoStats').innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
+          ${[
+            { label: 'Active Users',  value: stats.users },
+            { label: 'Shifts',        value: stats.shifts },
+            { label: 'Locations',     value: stats.locations },
+            { label: 'Templates',     value: stats.templates },
+          ].map(s => `
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
+              <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
+            </div>`).join('')}
+        </div>`
+    } catch {}
+  }
 }
 
 // ── Account panel ─────────────────────────────────────────────────────────────
@@ -3312,7 +3452,7 @@ async function renderAboutPanel() {
           </div>
           <div>
             <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
-            <div style="font-size:13px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management</div>
+            <div style="font-size:13px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management · ${escHtml(cfg.version)}</div>
           </div>
         </div>
         <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">

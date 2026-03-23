@@ -16,6 +16,7 @@ const {
 
 // ── GET /api/shifts ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
   try {
     const { start, end, user_id } = req.query
     let sql = `
