@@ -680,9 +680,9 @@ function renderMonth() {
   const hasShiftsThisMonth = visibleShifts.some(s => s.date >= toDateStr(first) && s.date <= toDateStr(last))
   if (!hasShiftsThisMonth) {
     const hint = document.createElement('div')
-    hint.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding-top:80px'
+    hint.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1'
     const isLocFiltered = locFilterVal !== ''
-    hint.innerHTML = `<div style="text-align:center;color:var(--text-3)">
+    hint.innerHTML = `<div style="text-align:center;color:var(--text-3);background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:32px 28px;box-shadow:0 2px 12px rgba(0,0,0,0.06)">
       <div style="font-size:36px;margin-bottom:12px">📅</div>
       <div style="font-size:15px;font-weight:600;color:var(--text-2)">${isLocFiltered ? 'No shifts at this location' : 'No shifts this month'}</div>
       ${canManage() && !isLocFiltered

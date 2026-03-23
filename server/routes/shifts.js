@@ -6,6 +6,7 @@ const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/a
 const audit  = require('../audit')
 const { buildHolidayMapServer } = require('../holidays')
 const { getShiftLeadScope } = require('../utils/scope')
+const logger = require('../utils/logger')
 
 // ── GET /api/shifts ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
@@ -47,7 +48,7 @@ router.get('/', requireAuth, (req, res) => {
     const shifts = db.prepare(sql).all(...params)
     res.json(shifts)
   } catch (err) {
-    console.error('shifts get:', err.message)
+    logger.error('shifts get:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -95,7 +96,7 @@ router.get('/export/csv', requireAuth, (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="shifts-${new Date().toISOString().slice(0,10)}.csv"`)
     res.send(lines.join('\r\n'))
   } catch (err) {
-    console.error('csv export:', err.message)
+    logger.error('csv export:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -172,7 +173,7 @@ router.post('/', requireAuth, (req, res) => {
     req.app.locals.broadcastShiftEvent?.('shift.create', shift, req.user.id)
     res.status(201).json(shift)
   } catch (err) {
-    console.error('shift create:', err.message)
+    logger.error('shift create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -196,10 +197,10 @@ router.put('/:id', requireAuth, (req, res) => {
     const { date: newDate, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
     const targetDate = newDate || shift.date
     db.prepare(`
-      UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now')
+      UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now'), updated_by=?
       WHERE id=?
     `).run(targetDate, location_id || null, start_time || null, end_time || null,
-           notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.params.id)
+           notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id, req.params.id)
 
     const updated = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     audit(req.user.id, 'shift.update', 'shift', req.params.id, targetDate)
@@ -316,7 +317,7 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
     if (created.length) req.app.locals.broadcastShiftEvent?.('shift.create', { user_id, week_start }, req.user.id)
     res.json({ ok: true, applied: created.length, skipped: skipped.length })
   } catch (err) {
-    console.error('apply template:', err.message)
+    logger.error('apply template:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

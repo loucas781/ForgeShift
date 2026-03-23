@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth, requireAdmin } = require('../middleware/auth')
 const audit  = require('../audit')
+const logger = require('../utils/logger')
 
 // ── GET /api/task-list-groups ─────────────────────────────────────────────────
 // Admin: all groups with full member details. Others: only groups they belong to.
@@ -61,7 +62,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     group.member_count = 0
     res.status(201).json(group)
   } catch (err) {
-    console.error('task_list_group create:', err.message)
+    logger.error('task_list_group create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

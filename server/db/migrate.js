@@ -201,11 +201,15 @@ function migrateAdditive() {
     console.log('✓ Added last_applied_at column to shift_templates')
   }
 
-  // On-call support
+  // On-call support + updated_by tracking
   const shiftCols = db.prepare("PRAGMA table_info(shifts)").all().map(c => c.name)
   if (!shiftCols.includes('is_oncall')) {
     db.exec("ALTER TABLE shifts ADD COLUMN is_oncall INTEGER NOT NULL DEFAULT 0")
     console.log('✓ Added is_oncall column to shifts')
+  }
+  if (!shiftCols.includes('updated_by')) {
+    db.exec("ALTER TABLE shifts ADD COLUMN updated_by TEXT REFERENCES users(id) ON DELETE SET NULL")
+    console.log('✓ Added updated_by column to shifts')
   }
 
   // Migrate task_assignments: rename week_start -> date if the old schema is present.
@@ -332,8 +336,8 @@ function migrateAdditive() {
     );
     CREATE INDEX IF NOT EXISTS idx_template_groups_sort ON template_groups(sort_order);
   `)
-  const tmplCols = db.prepare("PRAGMA table_info(shift_templates)").all().map(c => c.name)
-  if (!tmplCols.includes('group_id')) {
+  const tmplGroupCols = db.prepare("PRAGMA table_info(shift_templates)").all().map(c => c.name)
+  if (!tmplGroupCols.includes('group_id')) {
     db.exec("ALTER TABLE shift_templates ADD COLUMN group_id TEXT REFERENCES template_groups(id) ON DELETE SET NULL")
     console.log('✓ Added group_id column to shift_templates')
   }

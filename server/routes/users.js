@@ -8,6 +8,7 @@ const audit   = require('../audit')
 const fs      = require('fs')
 const path    = require('path')
 const multer  = require('multer')
+const logger  = require('../utils/logger')
 
 // ── Avatar upload storage ──────────────────────────────────────────────────────
 const AVATARS_DIR = path.join(__dirname, '../../public/uploads/avatars')
@@ -88,7 +89,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     audit(req.user.id, 'user.create', 'user', id, name.trim(), { createdBy: req.user.name })
     res.status(201).json(user)
   } catch (err) {
-    console.error('user create:', err.message)
+    logger.error('user create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -126,7 +127,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req, res) => {
     audit(req.user.id, 'user.update', 'user', req.params.id, updated.name, { by: req.user.name })
     res.json(updated)
   } catch (err) {
-    console.error('user patch:', err.message)
+    logger.error('user patch:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
