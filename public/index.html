@@ -676,21 +676,28 @@ function renderMonth() {
   html += '</div>'
   grid.innerHTML = html
 
-  // Empty state: if no shifts exist for any day in the current month, show a hint
+  // Empty state: if no shifts exist for any day in the current month, replace grid with empty state
   const hasShiftsThisMonth = visibleShifts.some(s => s.date >= toDateStr(first) && s.date <= toDateStr(last))
   if (!hasShiftsThisMonth) {
-    const hint = document.createElement('div')
-    hint.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1'
     const isLocFiltered = locFilterVal !== ''
-    hint.innerHTML = `<div style="text-align:center;color:var(--text-3);background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:32px 28px;box-shadow:0 2px 12px rgba(0,0,0,0.06)">
-      <div style="font-size:36px;margin-bottom:12px">📅</div>
-      <div style="font-size:15px;font-weight:600;color:var(--text-2)">${isLocFiltered ? 'No shifts at this location' : 'No shifts this month'}</div>
+    // Keep only the day-name header row, replace cell area with centered empty state
+    const headerHtml = `<div class="cal-month${compact ? ' compact-chips' : ''}${showWkNums ? ' has-weeknums' : ''}">
+      ${showWkNums ? '<div class="cal-wknum-header"></div>' : ''}
+      ${dayAbbrs.map(d => `<div class="cal-day-header">${d}</div>`).join('')}
+    </div>`
+    grid.innerHTML = headerHtml
+    grid.style.position = ''
+
+    const hint = document.createElement('div')
+    hint.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;padding:48px 16px'
+    hint.innerHTML = `<div style="text-align:center;color:var(--text-3)">
+      <div style="font-size:40px;margin-bottom:14px">📅</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text-2);margin-bottom:4px">${isLocFiltered ? 'No shifts at this location' : 'No shifts this month'}</div>
       ${canManage() && !isLocFiltered
-        ? '<div style="font-size:13px;margin-top:6px">Click any day to add a shift</div><button class="btn btn-primary btn-sm" style="margin-top:16px;pointer-events:all" onclick="openCreateModal(\'' + toDateStr(new Date()) + '\')">Add first shift</button>'
-        : (isLocFiltered ? '<div style="font-size:13px;margin-top:6px">Try selecting a different location filter</div>' : '')
+        ? '<div style="font-size:13px">Click any day to add a shift</div><button class="btn btn-primary btn-sm" style="margin-top:16px" onclick="openCreateModal(\'' + toDateStr(new Date()) + '\')">Add first shift</button>'
+        : (isLocFiltered ? '<div style="font-size:13px">Try selecting a different location filter</div>' : '')
       }
     </div>`
-    grid.style.position = 'relative'
     grid.appendChild(hint)
   } else {
     grid.style.position = ''
