@@ -1897,6 +1897,11 @@ function _initSwipe() {
   if (!wrapper) return
   let _tx = null, _ty = null, _gridScrollX = null
   wrapper.addEventListener('touchstart', e => {
+    // Don't track swipe if any modal is open or touch starts on a form element
+    if (document.querySelector('.modal-overlay.open') || e.target.closest('input, select, textarea')) {
+      _tx = null; _ty = null; _gridScrollX = null
+      return
+    }
     _tx = e.touches[0].clientX
     _ty = e.touches[0].clientY
     const grid = document.getElementById('calGrid')
