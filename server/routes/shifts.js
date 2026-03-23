@@ -7,6 +7,7 @@ const audit  = require('../audit')
 const { buildHolidayMapServer } = require('../holidays')
 const { getShiftLeadScope } = require('../utils/scope')
 const logger = require('../utils/logger')
+const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 const {
   PATTERN_TEMPLATE_TYPE,
   loadTemplateDays,
@@ -166,7 +167,7 @@ router.post('/', requireAuth, (req, res) => {
         INSERT INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, created_by)
         VALUES (?,?,?,?,?,?,?,?,?,?,?)
       `).run(id, targetUserId, date, location_id || null, start_time || null, end_time || null,
-             notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id)
+             notes || null, resolveStoredColor(note_color, DEFAULT_COLOR), is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id)
       shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(id)
       return { ok: true }
     })
@@ -205,7 +206,7 @@ router.put('/:id', requireAuth, (req, res) => {
       UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now'), updated_by=?
       WHERE id=?
     `).run(targetDate, location_id || null, start_time || null, end_time || null,
-           notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id, req.params.id)
+           notes || null, note_color !== undefined ? normalizeColorInput(note_color) : shift.note_color, is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id, req.params.id)
 
     const updated = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     audit(req.user.id, 'shift.update', 'shift', req.params.id, targetDate)
@@ -244,7 +245,7 @@ router.delete('/:id', requireAuth, (req, res) => {
 // ── POST /api/shifts/apply-template ──────────────────────────────────────────
 router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
   try {
-    const { template_id, user_id, week_start, start_date, skip_holidays } = req.body
+    const { template_id, user_id, week_start, start_date, range_start, end_date, skip_holidays } = req.body
     if (!template_id || !user_id)
       return res.status(400).json({ error: 'template_id and user_id are required.' })
 
@@ -270,6 +271,8 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
 
     // Parse the selected date as local date components to avoid UTC-offset day drift.
     const [sy, sm, sd] = baseDate.split('-').map(Number)
+    const rangeStartDate = range_start || baseDate
+    const rangeEndDate = end_date || null
 
     // Build a Set of bank holiday date strings if the toggle is enabled
     const bankHolidayDates = new Set()
@@ -309,6 +312,9 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
         const dd     = String(target.getDate()).padStart(2, '0')
         const dateStr = `${yyyy}-${mm}-${dd}`
 
+        if (rangeStartDate && dateStr < rangeStartDate) continue
+        if (rangeEndDate && dateStr > rangeEndDate) continue
+
         if (skip_holidays && bankHolidayDates.has(dateStr)) {
           skipped.push(dateStr)
           continue
@@ -331,6 +337,8 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
       user_id,
       template_type: templateType,
       start_date: baseDate,
+      range_start: rangeStartDate,
+      end_date: rangeEndDate,
       days: created.length,
       skipped: skipped.length,
     })

@@ -1,5 +1,7 @@
 'use strict'
 
+const { DEFAULT_NOTE_COLOR, resolveStoredColor } = require('./color-utils')
+
 const WEEKLY_TEMPLATE_TYPE = 'weekly'
 const PATTERN_TEMPLATE_TYPE = 'pattern'
 const MAX_PATTERN_CYCLE_LENGTH = 42
@@ -101,7 +103,7 @@ function sanitizeTemplateDays(templateType, cycleLength, days) {
       start_time: day.start_time || null,
       end_time: day.end_time || null,
       notes: typeof day.notes === 'string' ? day.notes.trim() || null : null,
-      note_color: day.note_color || '#4f46e5',
+      note_color: resolveStoredColor(day.note_color, DEFAULT_NOTE_COLOR),
       is_off: day.is_off ? 1 : 0,
     }
   })

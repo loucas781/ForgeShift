@@ -360,26 +360,108 @@ function startOfWeek(date, startDay = 1) {
 // ── Colour swatches ────────────────────────────────────────────────────────────
 const NOTE_COLOURS = [
   { value: '#4f46e5', label: 'Indigo' },
-  { value: '#059669', label: 'Green' },
-  { value: '#d97706', label: 'Amber' },
-  { value: '#dc2626', label: 'Red' },
-  { value: '#7c3aed', label: 'Purple' },
+  { value: '#2563eb', label: 'Blue' },
+  { value: '#0284c7', label: 'Sky' },
   { value: '#0891b2', label: 'Cyan' },
+  { value: '#0f766e', label: 'Teal' },
+  { value: '#059669', label: 'Emerald' },
+  { value: '#65a30d', label: 'Lime' },
+  { value: '#d97706', label: 'Amber' },
+  { value: '#ea580c', label: 'Orange' },
+  { value: '#dc2626', label: 'Red' },
+  { value: '#e11d48', label: 'Rose' },
   { value: '#db2777', label: 'Pink' },
+  { value: '#7c3aed', label: 'Purple' },
+  { value: '#9333ea', label: 'Violet' },
   { value: '#6b7280', label: 'Gray' },
+  { value: '#78716c', label: 'Stone' },
 ]
+const HEX_COLOUR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+
+function normalizeOptionalColourValue(value) {
+  const colour = typeof value === 'string' ? value.trim() : ''
+  if (!colour) return ''
+  return HEX_COLOUR_RE.test(colour) ? colour : ''
+}
+
+function resolveColourValue(value, fallback = '') {
+  return value === undefined || value === null
+    ? fallback
+    : normalizeOptionalColourValue(value)
+}
+
+function pickColourValue(...values) {
+  for (const value of values) {
+    const colour = normalizeOptionalColourValue(value)
+    if (colour) return colour
+  }
+  return ''
+}
+
+function getAccentPresentation(value, options = {}) {
+  const {
+    alpha = '18',
+    neutralBackground = 'var(--surface-2)',
+    neutralBorder = 'var(--border)',
+    neutralText = 'var(--text-2)',
+  } = options
+  const colour = pickColourValue(value)
+  if (!colour) {
+    return {
+      background: neutralBackground,
+      border: neutralBorder,
+      color: neutralText,
+    }
+  }
+  return {
+    background: `${colour}${alpha}`,
+    border: colour,
+    color: colour,
+  }
+}
+
+function renderInlineColourSwatch(value, options = {}) {
+  const {
+    size = 20,
+    round = true,
+    title = '',
+    className = '',
+  } = options
+  const colour = pickColourValue(value)
+  const classes = ['inline-colour-swatch']
+  if (round) classes.push('is-round')
+  if (!colour) classes.push('is-none')
+  if (className) classes.push(className)
+  const styles = [
+    `width:${size}px`,
+    `height:${size}px`,
+    `border-radius:${round ? '50%' : '6px'}`,
+  ]
+  if (colour) styles.push(`background:${colour}`, `--swatch-colour:${colour}`)
+  const titleAttr = title ? ` title="${escHtml(title)}"` : ''
+  return `<span class="${classes.join(' ')}" style="${styles.join(';')}"${titleAttr}></span>`
+}
 
 // ── PWA — Service Worker registration ──────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {})
 }
 
-function renderColourPicker(container, value, onChange) {
+function renderColourPicker(container, value, onChange, options = {}) {
+  const { allowNone = false } = options
+  const selectedValue = resolveColourValue(value)
+  const swatches = allowNone
+    ? [{ value: '', label: 'No colour' }, ...NOTE_COLOURS]
+    : NOTE_COLOURS
   container.className = 'colour-picker'
-  NOTE_COLOURS.forEach(c => {
+  container.innerHTML = ''
+  swatches.forEach(c => {
     const sw = document.createElement('div')
-    sw.className = `colour-swatch${value === c.value ? ' selected' : ''}`
-    sw.style.background = c.value
+    sw.className = `colour-swatch${selectedValue === c.value ? ' selected' : ''}${c.value ? '' : ' is-none'}`
+    if (c.value) {
+      sw.style.background = c.value
+      sw.style.setProperty('--swatch-colour', c.value)
+    }
     sw.title = c.label
     sw.addEventListener('click', () => {
       container.querySelectorAll('.colour-swatch').forEach(s => s.classList.remove('selected'))

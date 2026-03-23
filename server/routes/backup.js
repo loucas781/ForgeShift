@@ -26,6 +26,7 @@ const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit   = require('../audit')
 const logger  = require('../utils/logger')
+const { DEFAULT_COLOR, resolveStoredColor } = require('../utils/color-utils')
 const fs      = require('fs')
 const path    = require('path')
 
@@ -189,7 +190,7 @@ router.post('/restore', (req, res) => {
           email:        u.email,
           password:     u.password,
           initials:     u.initials,
-          color:        u.color || '#0052cc',
+          color:        resolveStoredColor(u.color, DEFAULT_COLOR),
           avatar:       u.avatar || null,
           role:         u.role || 'member',
           is_active:    u.is_active ?? 1,
@@ -222,7 +223,7 @@ router.post('/restore', (req, res) => {
           id:         l.id,
           name:       l.name,
           address:    l.address || null,
-          color:      l.color || '#0052cc',
+          color:      resolveStoredColor(l.color, DEFAULT_COLOR),
           created_by: l.created_by || null,
           created_at: l.created_at,
         })
@@ -320,7 +321,7 @@ router.post('/restore', (req, res) => {
           start_time:  td.start_time || null,
           end_time:    td.end_time || null,
           notes:       td.notes || null,
-          note_color:  td.note_color || '#0052cc',
+          note_color:  resolveStoredColor(td.note_color, DEFAULT_COLOR),
           is_off:      td.is_off ?? 0,
         })
         tdCount++
@@ -355,7 +356,7 @@ router.post('/restore', (req, res) => {
             start_time: td.start_time || null,
             end_time: td.end_time || null,
             notes: td.notes || null,
-            note_color: td.note_color || '#0052cc',
+            note_color: resolveStoredColor(td.note_color, DEFAULT_COLOR),
             is_off: td.is_off ?? 0,
           })
           patternDayCount++
@@ -399,7 +400,7 @@ router.post('/restore', (req, res) => {
           upsertTeam.run({
             id:         t.id,
             name:       t.name,
-            color:      t.color || '#0052cc',
+            color:      resolveStoredColor(t.color, DEFAULT_COLOR),
             created_by: t.created_by || null,
             created_at: t.created_at,
             owned_by:   t.owned_by || null,
@@ -462,7 +463,7 @@ router.post('/restore', (req, res) => {
           start_time:  s.start_time || null,
           end_time:    s.end_time || null,
           notes:       s.notes || null,
-          note_color:  s.note_color || '#0052cc',
+          note_color:  resolveStoredColor(s.note_color, DEFAULT_COLOR),
           is_off:      s.is_off ?? 0,
           is_oncall:   s.is_oncall ?? 0,
           template_id: s.template_id || null,
@@ -496,7 +497,7 @@ router.post('/restore', (req, res) => {
           upsertTaskList.run({
             id:          tl.id,
             name:        tl.name,
-            color:       tl.color || '#0052cc',
+            color:       resolveStoredColor(tl.color, DEFAULT_COLOR),
             sort_order:  tl.sort_order ?? 0,
             created_by:  tl.created_by || null,
             created_at:  tl.created_at,

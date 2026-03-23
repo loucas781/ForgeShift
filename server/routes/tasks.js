@@ -5,6 +5,7 @@ const db     = require('../db/connection')
 const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
 const audit  = require('../audit')
 const { getShiftLeadScope } = require('../utils/scope')
+const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
 // Admin: all lists. Others: ungrouped (public) lists + lists in groups they belong to.
@@ -50,7 +51,16 @@ router.post('/lists', requireAuth, requireAdmin, (req, res) => {
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
     const id = uuidv4()
     db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, group_id, created_by) VALUES (?,?,?,?,?,?,?,?)')
-      .run(id, name.trim(), color || '#0052cc', description?.trim() || null, location_id || null, sort_order ?? 0, group_id || null, req.user.id)
+      .run(
+        id,
+        name.trim(),
+        resolveStoredColor(color, DEFAULT_COLOR),
+        description?.trim() || null,
+        location_id || null,
+        sort_order ?? 0,
+        group_id || null,
+        req.user.id
+      )
     const list = db.prepare(`
       SELECT t.*, l.name as location_name, l.color as location_color, g.name as group_name
       FROM task_lists t
@@ -74,7 +84,7 @@ router.put('/lists/:id', requireAuth, requireAdmin, (req, res) => {
     db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, group_id=? WHERE id=?')
       .run(
         name?.trim() || list.name,
-        color || list.color,
+        color !== undefined ? normalizeColorInput(color) : list.color,
         description !== undefined ? (description?.trim() || null) : list.description,
         location_id !== undefined ? (location_id || null) : list.location_id,
         sort_order ?? list.sort_order,

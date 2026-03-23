@@ -1950,8 +1950,8 @@ function renderTaskListsTable() {
     <td style="font-weight:600">${t.name}</td>
     <td style="font-size:13px">${t.group_name ? `<span style="display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" style="color:var(--text-3)"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>${t.group_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
     <td style="color:var(--text-2);font-size:13px;max-width:260px">${t.description ? `<span title="${t.description.replace(/"/g,'&quot;')}">${t.description.length>80?t.description.slice(0,80)+'…':t.description}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
-    <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:${t.location_color||'#888'};flex-shrink:0"></span>${t.location_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
-    <td><div style="width:20px;height:20px;border-radius:50%;background:${t.color};border:1px solid var(--border)"></div></td>
+    <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${t.location_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+    <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
     <td><div style="display:flex;gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTaskList('${t.id}','${t.name}')">Delete</button>
@@ -1999,7 +1999,7 @@ function openCreateTaskList() {
 }
 function openEditTaskList(id) {
   const t = taskLists.find(x => x.id === id); if (!t) return
-  editingTaskListId = id; tlColour = t.color || '#4f46e5'
+  editingTaskListId = id; tlColour = resolveColourValue(t.color, '#4f46e5')
   document.getElementById('taskListModalTitle').textContent = 'Edit Task List'
   document.getElementById('tlName').value = t.name
   document.getElementById('tlDescription').value = t.description || ''
@@ -2019,7 +2019,7 @@ function _populateTlLocationSelect(selectedId) {
 function closeTaskListModal() { document.getElementById('taskListModal').classList.remove('open') }
 function setupTlColour() {
   const el = document.getElementById('tlColourPicker'); el.innerHTML = ''
-  renderColourPicker(el, tlColour, v => { tlColour = v })
+  renderColourPicker(el, tlColour, v => { tlColour = v }, { allowNone: true })
 }
 async function saveTaskList() {
   const name = document.getElementById('tlName').value.trim()
@@ -2214,7 +2214,7 @@ function renderLocsTable() {
   tbody.innerHTML = locations.map(l => `<tr>
     <td style="font-weight:600">${l.name}</td>
     <td style="color:var(--text-3)">${l.address||'—'}</td>
-    <td><div style="width:20px;height:20px;border-radius:50%;background:${l.color};border:1px solid var(--border)"></div></td>
+    <td>${renderInlineColourSwatch(l.color, { size: 20, title: pickColourValue(l.color) || 'No colour' })}</td>
     <td><div style="display:flex;gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${l.name}')">Delete</button>
@@ -2232,7 +2232,7 @@ function openCreateLoc() {
 }
 function openEditLoc(id) {
   const l = locations.find(x => x.id === id); if (!l) return
-  editingLocId = id; locColour = l.color || '#4f46e5'
+  editingLocId = id; locColour = resolveColourValue(l.color, '#4f46e5')
   document.getElementById('locModalTitle').textContent = 'Edit Location'
   document.getElementById('lName').value = l.name
   document.getElementById('lAddress').value = l.address || ''
@@ -2242,7 +2242,7 @@ function openEditLoc(id) {
 function closeLocModal() { document.getElementById('locModal').classList.remove('open') }
 function setupLocColour() {
   const el = document.getElementById('locColourPicker'); el.innerHTML = ''
-  renderColourPicker(el, locColour, v => { locColour = v })
+  renderColourPicker(el, locColour, v => { locColour = v }, { allowNone: true })
 }
 async function saveLoc() {
   const name = document.getElementById('lName').value.trim()
