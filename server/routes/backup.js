@@ -52,6 +52,7 @@ router.get('/export', (req, res) => {
       // Children of the above
       shift_templates:     db.prepare('SELECT * FROM shift_templates ORDER BY created_at').all(),
       template_days:       db.prepare('SELECT * FROM template_days').all(),
+      template_pattern_days: db.prepare('SELECT * FROM template_pattern_days').all(),
       user_template_groups:db.prepare('SELECT * FROM user_template_groups').all(),
       teams:               db.prepare('SELECT * FROM teams ORDER BY created_at').all(),
       team_members:        db.prepare('SELECT * FROM team_members ORDER BY added_at').all(),
@@ -132,6 +133,7 @@ router.post('/restore', (req, res) => {
   const shiftCols    = new Set(db.prepare('PRAGMA table_info(shifts)').all().map(c => c.name))
   const teamCols     = new Set(db.prepare('PRAGMA table_info(teams)').all().map(c => c.name))
   const taskListCols = new Set(db.prepare('PRAGMA table_info(task_lists)').all().map(c => c.name))
+  const templateCols = new Set(db.prepare('PRAGMA table_info(shift_templates)').all().map(c => c.name))
 
   // Check which tables actually exist on this instance (feature flags may
   // mean some tables haven't been created yet).
@@ -257,19 +259,25 @@ router.post('/restore', (req, res) => {
       const updateTmplIdByName = db.prepare(`
         UPDATE shift_templates SET id = @id WHERE LOWER(TRIM(name)) = LOWER(TRIM(@name)) AND id != @id
       `)
-      const tmplHasGroupId = new Set(
-        db.prepare('PRAGMA table_info(shift_templates)').all().map(c => c.name)
-      ).has('group_id')
+      const tmplHasGroupId = templateCols.has('group_id')
+      const tmplHasType = templateCols.has('template_type')
+      const tmplHasCycleLength = templateCols.has('cycle_length')
       const upsertTmpl = db.prepare(`
         INSERT INTO shift_templates (id, name, description, created_by, created_at
           ${tmplHasGroupId ? ', group_id' : ''}
+          ${tmplHasType ? ', template_type' : ''}
+          ${tmplHasCycleLength ? ', cycle_length' : ''}
         )
         VALUES (@id, @name, @description, @created_by, @created_at
           ${tmplHasGroupId ? ', @group_id' : ''}
+          ${tmplHasType ? ', @template_type' : ''}
+          ${tmplHasCycleLength ? ', @cycle_length' : ''}
         )
         ON CONFLICT(id) DO UPDATE SET
           name=excluded.name, description=excluded.description
           ${tmplHasGroupId ? ', group_id=excluded.group_id' : ''}
+          ${tmplHasType ? ', template_type=excluded.template_type' : ''}
+          ${tmplHasCycleLength ? ', cycle_length=excluded.cycle_length' : ''}
       `)
       let tmplCount = 0
       for (const t of (tables.shift_templates || [])) {
@@ -281,6 +289,8 @@ router.post('/restore', (req, res) => {
           created_by:  t.created_by || null,
           created_at:  t.created_at,
           group_id:    t.group_id || null,
+          template_type: t.template_type || 'weekly',
+          cycle_length: t.cycle_length ?? 7,
         })
         tmplCount++
       }
@@ -317,7 +327,43 @@ router.post('/restore', (req, res) => {
       }
       stats.templateDays = tdCount
 
-      // ── 6. User → Template Group assignments ───────────────────────────────
+      // ── 6. Pattern Template Days ──────────────────────────────────────────
+      if (existingTables.has('template_pattern_days')) {
+        const upsertPatternDay = db.prepare(`
+          INSERT INTO template_pattern_days (
+            id, template_id, day_index, location_id, start_time, end_time, notes, note_color, is_off
+          )
+          VALUES (
+            @id, @template_id, @day_index, @location_id, @start_time, @end_time, @notes, @note_color, @is_off
+          )
+          ON CONFLICT(id) DO UPDATE SET
+            day_index=excluded.day_index, location_id=excluded.location_id,
+            start_time=excluded.start_time, end_time=excluded.end_time,
+            notes=excluded.notes, note_color=excluded.note_color, is_off=excluded.is_off
+          ON CONFLICT(template_id, day_index) DO UPDATE SET
+            location_id=excluded.location_id,
+            start_time=excluded.start_time, end_time=excluded.end_time,
+            notes=excluded.notes, note_color=excluded.note_color, is_off=excluded.is_off
+        `)
+        let patternDayCount = 0
+        for (const td of (tables.template_pattern_days || [])) {
+          upsertPatternDay.run({
+            id: td.id,
+            template_id: td.template_id,
+            day_index: td.day_index,
+            location_id: td.location_id || null,
+            start_time: td.start_time || null,
+            end_time: td.end_time || null,
+            notes: td.notes || null,
+            note_color: td.note_color || '#0052cc',
+            is_off: td.is_off ?? 0,
+          })
+          patternDayCount++
+        }
+        stats.templatePatternDays = patternDayCount
+      }
+
+      // ── 7. User → Template Group assignments ───────────────────────────────
       if (existingTables.has('user_template_groups')) {
         const upsertUTG = db.prepare(`
           INSERT OR IGNORE INTO user_template_groups (user_id, group_id, added_at)
@@ -335,7 +381,7 @@ router.post('/restore', (req, res) => {
         stats.userTemplateGroups = utgCount
       }
 
-      // ── 7. Teams ───────────────────────────────────────────────────────────
+      // ── 8. Teams ───────────────────────────────────────────────────────────
       if (existingTables.has('teams')) {
         const upsertTeam = db.prepare(`
           INSERT INTO teams (id, name, color, created_by, created_at

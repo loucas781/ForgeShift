@@ -7,6 +7,11 @@ const audit  = require('../audit')
 const { buildHolidayMapServer } = require('../holidays')
 const { getShiftLeadScope } = require('../utils/scope')
 const logger = require('../utils/logger')
+const {
+  PATTERN_TEMPLATE_TYPE,
+  loadTemplateDays,
+  normalizeTemplateType,
+} = require('../utils/template-utils')
 
 // ── GET /api/shifts ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
@@ -239,9 +244,9 @@ router.delete('/:id', requireAuth, (req, res) => {
 // ── POST /api/shifts/apply-template ──────────────────────────────────────────
 router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
   try {
-    const { template_id, user_id, week_start, skip_holidays } = req.body
-    if (!template_id || !user_id || !week_start)
-      return res.status(400).json({ error: 'template_id, user_id and week_start are required.' })
+    const { template_id, user_id, week_start, start_date, skip_holidays } = req.body
+    if (!template_id || !user_id)
+      return res.status(400).json({ error: 'template_id and user_id are required.' })
 
     // shift_lead: verify target user is in their scope
     if (req.user.role === 'shift_lead') {
@@ -251,11 +256,20 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
 
     const tmpl = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(template_id)
     if (!tmpl) return res.status(404).json({ error: 'Template not found' })
+    const templateType = normalizeTemplateType(tmpl.template_type)
+    const baseDate = templateType === PATTERN_TEMPLATE_TYPE ? start_date : week_start
+    if (!baseDate) {
+      return res.status(400).json({
+        error: templateType === PATTERN_TEMPLATE_TYPE
+          ? 'start_date is required for pattern templates.'
+          : 'week_start is required for weekly templates.'
+      })
+    }
 
-    const days = db.prepare('SELECT * FROM template_days WHERE template_id = ?').all(template_id)
+    const days = loadTemplateDays(db, template_id, templateType)
 
-    // Parse week_start as local date components (YYYY-MM-DD) to avoid UTC-offset day drift
-    const [sy, sm, sd] = week_start.split('-').map(Number)
+    // Parse the selected date as local date components to avoid UTC-offset day drift.
+    const [sy, sm, sd] = baseDate.split('-').map(Number)
 
     // Build a Set of bank holiday date strings if the toggle is enabled
     const bankHolidayDates = new Set()
@@ -266,10 +280,10 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
       try { userPrefs = JSON.parse(userRow?.prefs || '{}') } catch {}
       const enabledSets = Array.isArray(userPrefs.holidays) ? userPrefs.holidays : []
       if (enabledSets.length) {
-        // Collect all years spanned by this week
+        // Collect all years spanned by the template span
         const years = new Set()
         for (const day of days) {
-          years.add(new Date(sy, sm - 1, sd + day.day_of_week).getFullYear())
+          years.add(new Date(sy, sm - 1, sd + day.day_index).getFullYear())
         }
         for (const yr of years) {
           const map = buildHolidayMapServer(yr, enabledSets, db)
@@ -288,8 +302,8 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
 
     const tx = db.transaction(() => {
       for (const day of days) {
-        // Local-date arithmetic — avoids UTC midnight roll-back on servers behind UTC
-        const target = new Date(sy, sm - 1, sd + day.day_of_week)
+        // Local-date arithmetic avoids UTC midnight roll-back on servers behind UTC.
+        const target = new Date(sy, sm - 1, sd + day.day_index)
         const yyyy   = target.getFullYear()
         const mm     = String(target.getMonth() + 1).padStart(2, '0')
         const dd     = String(target.getDate()).padStart(2, '0')
@@ -313,8 +327,14 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
       db.prepare("UPDATE shift_templates SET last_applied_at = datetime('now') WHERE id = ?").run(template_id)
     }
 
-    audit(req.user.id, 'shift.template_apply', 'shift', template_id, tmpl.name, { user_id, week_start, days: created.length, skipped: skipped.length })
-    if (created.length) req.app.locals.broadcastShiftEvent?.('shift.create', { user_id, week_start }, req.user.id)
+    audit(req.user.id, 'shift.template_apply', 'shift', template_id, tmpl.name, {
+      user_id,
+      template_type: templateType,
+      start_date: baseDate,
+      days: created.length,
+      skipped: skipped.length,
+    })
+    if (created.length) req.app.locals.broadcastShiftEvent?.('shift.create', { user_id, start_date: baseDate }, req.user.id)
     res.json({ ok: true, applied: created.length, skipped: skipped.length })
   } catch (err) {
     logger.error('apply template:', err.message)

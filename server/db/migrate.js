@@ -66,6 +66,8 @@ function migrate() {
       id          TEXT PRIMARY KEY,
       name        TEXT NOT NULL,
       description TEXT,
+      template_type TEXT NOT NULL DEFAULT 'weekly',
+      cycle_length INTEGER NOT NULL DEFAULT 7,
       created_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -82,6 +84,19 @@ function migrate() {
       note_color   TEXT NOT NULL DEFAULT '#0052cc',
       is_off       INTEGER NOT NULL DEFAULT 0,
       UNIQUE (template_id, day_of_week)
+    );
+
+    CREATE TABLE IF NOT EXISTS template_pattern_days (
+      id           TEXT PRIMARY KEY,
+      template_id  TEXT NOT NULL REFERENCES shift_templates(id) ON DELETE CASCADE,
+      day_index    INTEGER NOT NULL CHECK (day_index >= 0),
+      location_id  TEXT REFERENCES locations(id) ON DELETE SET NULL,
+      start_time   TEXT,
+      end_time     TEXT,
+      notes        TEXT,
+      note_color   TEXT NOT NULL DEFAULT '#0052cc',
+      is_off       INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (template_id, day_index)
     );
 
     -- ── Shifts ────────────────────────────────────────────────────────
@@ -170,6 +185,7 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_shifts_date     ON shifts(date);
     CREATE INDEX IF NOT EXISTS idx_shifts_user_date ON shifts(user_id, date);
     CREATE INDEX IF NOT EXISTS idx_tmpl_days_tmpl  ON template_days(template_id);
+    CREATE INDEX IF NOT EXISTS idx_tmpl_pattern_days_tmpl ON template_pattern_days(template_id);
     CREATE INDEX IF NOT EXISTS idx_audit_actor     ON audit_log(actor_id);
     CREATE INDEX IF NOT EXISTS idx_audit_created   ON audit_log(created_at);
     CREATE INDEX IF NOT EXISTS idx_reset_token     ON password_reset_tokens(token);
@@ -200,6 +216,31 @@ function migrateAdditive() {
     db.exec("ALTER TABLE shift_templates ADD COLUMN last_applied_at TEXT")
     console.log('✓ Added last_applied_at column to shift_templates')
   }
+  if (!tmplCols.includes('template_type')) {
+    db.exec("ALTER TABLE shift_templates ADD COLUMN template_type TEXT NOT NULL DEFAULT 'weekly'")
+    console.log('✓ Added template_type column to shift_templates')
+  }
+  if (!tmplCols.includes('cycle_length')) {
+    db.exec("ALTER TABLE shift_templates ADD COLUMN cycle_length INTEGER NOT NULL DEFAULT 7")
+    console.log('✓ Added cycle_length column to shift_templates')
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS template_pattern_days (
+      id           TEXT PRIMARY KEY,
+      template_id  TEXT NOT NULL REFERENCES shift_templates(id) ON DELETE CASCADE,
+      day_index    INTEGER NOT NULL CHECK (day_index >= 0),
+      location_id  TEXT REFERENCES locations(id) ON DELETE SET NULL,
+      start_time   TEXT,
+      end_time     TEXT,
+      notes        TEXT,
+      note_color   TEXT NOT NULL DEFAULT '#0052cc',
+      is_off       INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (template_id, day_index)
+    );
+    CREATE INDEX IF NOT EXISTS idx_tmpl_pattern_days_tmpl ON template_pattern_days(template_id);
+  `)
+  console.log('✓ Pattern template schema ready')
 
   // On-call support + updated_by tracking
   const shiftCols = db.prepare("PRAGMA table_info(shifts)").all().map(c => c.name)
