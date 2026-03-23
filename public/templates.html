@@ -30,7 +30,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Templates</h1>
-          <p class="page-subtitle">Create reusable weekly shift patterns</p>
+          <p class="page-subtitle">Create reusable weekly rotas or flexible shift patterns</p>
         </div>
         <div style="display:flex;gap:8px" id="adminActions"></div>
       </div>
@@ -39,7 +39,7 @@
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>
           <h3>No templates yet</h3>
-          <p>Create a template to quickly apply weekly shift patterns</p>
+          <p>Create a template to quickly apply weekly rotas or flexible shift patterns</p>
         </div>
       </div>
     </main>
@@ -61,13 +61,24 @@
         <label class="form-label">Description (optional)</label>
         <input type="text" class="form-input" id="tmplDesc" placeholder="Describe this template…">
       </div>
+      <div class="form-group">
+        <label class="form-label">Template type</label>
+        <select class="form-select" id="tmplType" onchange="onTemplateTypeChange(this.value)">
+          <option value="weekly">Weekly rota</option>
+          <option value="pattern">Flexible pattern</option>
+        </select>
+      </div>
+      <div class="form-group" id="tmplCycleLengthRow" style="display:none">
+        <label class="form-label">Pattern length (days)</label>
+        <input type="number" class="form-input" id="tmplCycleLength" min="1" max="42" value="7" onchange="onPatternLengthChange(this.value)">
+      </div>
       <div class="form-group" id="tmplGroupRow">
         <label class="form-label">Group</label>
         <select class="form-select" id="tmplGroup">
           <option value="">No group</option>
         </select>
       </div>
-      <h4 style="margin:16px 0 12px;font-size:13px">Configure each day</h4>
+      <h4 style="margin:16px 0 12px;font-size:13px" id="dayEditorHeading">Configure each day</h4>
       <div id="copyDayBar" style="display:none;margin-bottom:10px"></div>
       <div class="day-editor-wrap"><div class="day-editor-grid" id="dayEditorGrid"></div></div>
     </div>
@@ -86,7 +97,7 @@
       <button class="modal-close" onclick="closeApplyModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Apply this template to one or more team members for a specific week.</p>
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px" id="applyModalCopy">Apply this template to one or more team members.</p>
       <div class="form-group">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <label class="form-label" style="margin:0">Team members</label>
@@ -98,7 +109,7 @@
         <div id="applyUserList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;gap:4px"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Week starting (Monday)</label>
+        <label class="form-label" id="applyDateLabel">Week starting (Monday)</label>
         <input type="date" class="form-input" id="applyWeekStart">
       </div>
       <div class="form-group">
@@ -133,11 +144,91 @@ let locations = []
 let users = []
 let editingTmplId = null
 let applyingTmplId = null
+let applyingTmplType = 'weekly'
 let activeGroupFilter = 'all'
-let dayConfigs = {} // day_of_week -> { location_id, start_time, end_time, notes, note_color, is_off }
+let templateType = 'weekly'
+let patternLength = 7
+let dayConfigs = {} // day index -> { location_id, start_time, end_time, notes, note_color, is_off }
 let excludedDays = new Set() // day indices excluded from this template
 
+const TEMPLATE_TYPE_WEEKLY = 'weekly'
+const TEMPLATE_TYPE_PATTERN = 'pattern'
+const MAX_PATTERN_DAYS = 42
 const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+const DEFAULT_TEMPLATE_COLOUR = '#4f46e5'
+
+function getTemplateType(value) {
+  return value === TEMPLATE_TYPE_PATTERN ? TEMPLATE_TYPE_PATTERN : TEMPLATE_TYPE_WEEKLY
+}
+
+function getTemplateCycleLength(type = templateType, cycleLength = patternLength) {
+  if (getTemplateType(type) !== TEMPLATE_TYPE_PATTERN) return 7
+  const parsed = parseInt(cycleLength, 10)
+  if (!Number.isInteger(parsed)) return 7
+  return Math.min(MAX_PATTERN_DAYS, Math.max(1, parsed))
+}
+
+function getTemplateSlotCount(type = templateType, cycleLength = patternLength) {
+  return getTemplateType(type) === TEMPLATE_TYPE_PATTERN
+    ? getTemplateCycleLength(type, cycleLength)
+    : 7
+}
+
+function getTemplateDayIndex(day) {
+  const idx = day?.day_index ?? day?.day_of_week
+  return Number.isInteger(idx) ? idx : parseInt(idx, 10)
+}
+
+function getTemplateDayLabel(index, type = templateType, short = false) {
+  if (getTemplateType(type) === TEMPLATE_TYPE_PATTERN) return short ? `D${index + 1}` : `Day ${index + 1}`
+  return short ? DAY_SHORT[index] : DAY_FULL[index]
+}
+
+function syncTemplateEditorMode() {
+  const normalizedType = getTemplateType(templateType)
+  templateType = normalizedType
+  patternLength = getTemplateCycleLength(normalizedType, patternLength)
+
+  const typeEl = document.getElementById('tmplType')
+  if (typeEl) typeEl.value = normalizedType
+
+  const cycleRow = document.getElementById('tmplCycleLengthRow')
+  if (cycleRow) cycleRow.style.display = normalizedType === TEMPLATE_TYPE_PATTERN ? '' : 'none'
+
+  const cycleEl = document.getElementById('tmplCycleLength')
+  if (cycleEl) cycleEl.value = patternLength
+
+  const heading = document.getElementById('dayEditorHeading')
+  if (heading) heading.textContent = normalizedType === TEMPLATE_TYPE_PATTERN
+    ? 'Configure each pattern day'
+    : 'Configure each day'
+}
+
+function pruneTemplateEditorState() {
+  const slotCount = getTemplateSlotCount()
+  Object.keys(dayConfigs).forEach(key => {
+    if (parseInt(key, 10) >= slotCount) delete dayConfigs[key]
+  })
+  excludedDays = new Set([...excludedDays].filter(idx => idx < slotCount))
+}
+
+function onTemplateTypeChange(value) {
+  closeCopyDayMenu()
+  templateType = getTemplateType(value)
+  if (templateType !== TEMPLATE_TYPE_PATTERN) patternLength = 7
+  syncTemplateEditorMode()
+  pruneTemplateEditorState()
+  renderDayEditor()
+}
+
+function onPatternLengthChange(value) {
+  closeCopyDayMenu()
+  patternLength = getTemplateCycleLength(TEMPLATE_TYPE_PATTERN, value)
+  syncTemplateEditorMode()
+  pruneTemplateEditorState()
+  renderDayEditor()
+}
 
 async function init() {
   cfg = await loadConfig()
@@ -228,20 +319,42 @@ function setGroupFilter(groupId) {
 }
 
 function renderTemplateCard(t) {
-  const dayAbbrs = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  const type = getTemplateType(t.template_type)
+  const cycleLength = getTemplateCycleLength(type, t.cycle_length)
   const dayMap = {}
-  ;(t.days||[]).forEach(d => { dayMap[d.day_of_week] = d })
-  const dayCells = Array.from({length:7}, (_,i) => {
+  ;(t.days||[]).forEach(d => {
+    const idx = getTemplateDayIndex(d)
+    if (Number.isInteger(idx)) dayMap[idx] = d
+  })
+
+  const previewCount = type === TEMPLATE_TYPE_PATTERN ? Math.min(cycleLength, 7) : 7
+  const extraCount = type === TEMPLATE_TYPE_PATTERN ? Math.max(0, cycleLength - previewCount) : 0
+  const previewColumns = previewCount + (extraCount ? 1 : 0)
+
+  const dayCells = Array.from({ length: previewCount }, (_, i) => {
     const d = dayMap[i]
-    if (!d) return `<div class="template-day-cell"><div class="day-abbr">${dayAbbrs[i]}</div><div class="day-loc">—</div></div>`
-    const locName = d.location_id ? (locations.find(l=>l.id===d.location_id)?.name||'?') : (d.is_off?'Off':'—')
-    const swatchColor = (d.location_id ? locations.find(l=>l.id===d.location_id)?.color : null) || d.note_color || '#4f46e5'
+    const label = getTemplateDayLabel(i, type, true)
+    if (!d) return `<div class="template-day-cell"><div class="day-abbr">${label}</div><div class="day-loc">—</div></div>`
+    const locName = d.location_id ? (locations.find(l => l.id === d.location_id)?.name || '?') : (d.is_off ? 'Off' : '—')
+    const swatchColor = (d.location_id ? locations.find(l => l.id === d.location_id)?.color : null) || d.note_color || DEFAULT_TEMPLATE_COLOUR
     return `<div class="template-day-cell">
-      <div class="day-abbr">${dayAbbrs[i]}</div>
+      <div class="day-abbr">${label}</div>
       <div class="day-loc" title="${locName}">${locName}</div>
       <div class="day-swatch" style="background:${swatchColor}"></div>
     </div>`
   }).join('')
+
+  const moreCell = extraCount
+    ? `<div class="template-day-cell">
+        <div class="day-abbr">+${extraCount}</div>
+        <div class="day-loc">more</div>
+      </div>`
+    : ''
+  const typeBadge = type === TEMPLATE_TYPE_PATTERN
+    ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(0,82,204,.08);border:1px solid rgba(0,82,204,.18);color:var(--brand);margin-top:3px">
+        ${cycleLength}-day pattern
+      </span>`
+    : ''
 
   const groupBadge = t.group_name
     ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);margin-top:3px">
@@ -285,12 +398,13 @@ function renderTemplateCard(t) {
       <div>
         <div class="template-card-title">${t.name}</div>
         ${t.description ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${t.description}</div>` : ''}
+        ${typeBadge}
         ${groupBadge}
         ${lastAppliedBadge}
       </div>
       ${adminBtns}
     </div>
-    <div class="template-days-row">${dayCells}</div>
+    <div class="template-days-row" style="grid-template-columns:repeat(${previewColumns},1fr)">${dayCells}${moreCell}</div>
   </div>`
 }
 
@@ -381,12 +495,15 @@ function renderGroupSelect(selectedId) {
 
 function openCreateTmpl() {
   editingTmplId = null
+  templateType = TEMPLATE_TYPE_WEEKLY
+  patternLength = 7
   dayConfigs = {}
   excludedDays = new Set()
   document.getElementById('tmplModalTitle').textContent = 'New Template'
   document.getElementById('tmplName').value = ''
   document.getElementById('tmplDesc').value = ''
   renderGroupSelect(null)
+  syncTemplateEditorMode()
   renderDayEditor()
   document.getElementById('tmplModal').classList.add('open')
 }
@@ -395,18 +512,24 @@ function openEditTmpl(id) {
   const t = templates.find(x => x.id === id)
   if (!t) return
   editingTmplId = id
+  templateType = getTemplateType(t.template_type)
+  patternLength = getTemplateCycleLength(templateType, t.cycle_length)
   dayConfigs = {}
   excludedDays = new Set()
-  // Days that exist in the template — all others are considered excluded
-  const existingDayNums = new Set((t.days||[]).map(d => d.day_of_week))
-  for (let i = 0; i < 7; i++) {
+  const slotCount = getTemplateSlotCount(templateType, patternLength)
+  const existingDayNums = new Set((t.days || []).map(getTemplateDayIndex))
+  for (let i = 0; i < slotCount; i++) {
     if (!existingDayNums.has(i)) excludedDays.add(i)
   }
-  ;(t.days||[]).forEach(d => { dayConfigs[d.day_of_week] = { ...d } })
+  ;(t.days || []).forEach(d => {
+    const idx = getTemplateDayIndex(d)
+    if (Number.isInteger(idx)) dayConfigs[idx] = { ...d, day_index: idx }
+  })
   document.getElementById('tmplModalTitle').textContent = 'Edit Template'
   document.getElementById('tmplName').value = t.name
   document.getElementById('tmplDesc').value = t.description || ''
   renderGroupSelect(t.group_id || null)
+  syncTemplateEditorMode()
   renderDayEditor()
   document.getElementById('tmplModal').classList.add('open')
 }
@@ -418,16 +541,20 @@ function closeTmplModal() {
 
 function renderDayEditor() {
   const grid = document.getElementById('dayEditorGrid')
+  const slotCount = getTemplateSlotCount()
+  syncTemplateEditorMode()
+  grid.style.gridTemplateColumns = `repeat(${slotCount}, minmax(130px, 1fr))`
+  grid.style.minWidth = `${Math.max(7, slotCount) * 130}px`
   grid.innerHTML = ''
-  for (let i = 0; i < 7; i++) {
-    const cfg_day = dayConfigs[i] || { note_color: '#4f46e5', is_off: 0 }
+  for (let i = 0; i < slotCount; i++) {
+    const cfg_day = dayConfigs[i] || { note_color: DEFAULT_TEMPLATE_COLOUR, is_off: 0 }
     const isExcluded = excludedDays.has(i)
     const cell = document.createElement('div')
     cell.className = 'day-editor-cell' + (isExcluded ? ' day-excluded' : '')
     cell.id = `dc_cell_${i}`
     cell.innerHTML = `
       <div class="day-editor-cell-header" id="dc_hdr_${i}">
-        <span class="day-label">${DAY_FULL[i]}</span>
+        <span class="day-label">${getTemplateDayLabel(i)}</span>
         <div style="display:flex;gap:4px;align-items:center">
           ${!isExcluded ? `<button class="day-copy-btn" id="dc_copybtn_${i}" title="Copy this day to other days…">
             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
@@ -485,7 +612,7 @@ function renderDayEditor() {
 
       // Colour picker
       const colContainer = document.getElementById(`dc_colours_${i}`)
-      let thisColour = cfg_day.note_color || '#4f46e5'
+      let thisColour = cfg_day.note_color || DEFAULT_TEMPLATE_COLOUR
       renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v })
       if (!dayConfigs[i]) dayConfigs[i] = {}
       dayConfigs[i].note_color = thisColour
@@ -512,16 +639,16 @@ function openCopyDayMenu(srcDay) {
   _copyDdSrc = srcDay
 
   // Mark active button
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < getTemplateSlotCount(); i++) {
     document.getElementById(`dc_copybtn_${i}`)?.classList.toggle('active', i === srcDay)
   }
 
   const bar = document.getElementById('copyDayBar')
-  const targets = Array.from({length:7}, (_,i) => i).filter(i => i !== srcDay)
+  const targets = Array.from({ length: getTemplateSlotCount() }, (_, i) => i).filter(i => i !== srcDay)
   bar.innerHTML = `
-    <span class="copy-day-bar-label">Copy <strong>${DAY_FULL[srcDay]}</strong> to:</span>
+    <span class="copy-day-bar-label">Copy <strong>${getTemplateDayLabel(srcDay)}</strong> to:</span>
     <div class="copy-day-bar-pills">
-      ${targets.map(i => `<button class="copy-day-pill" data-target="${i}">${DAY_FULL[i]}</button>`).join('')}
+      ${targets.map(i => `<button class="copy-day-pill" data-target="${i}">${getTemplateDayLabel(i)}</button>`).join('')}
       <button class="copy-day-pill all" data-target="all">All other days</button>
     </div>
     <button class="copy-day-bar-close" title="Close">✕</button>`
@@ -539,7 +666,7 @@ function openCopyDayMenu(srcDay) {
 
 function closeCopyDayMenu() {
   _copyDdSrc = null
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < getTemplateSlotCount(); i++) {
     document.getElementById(`dc_copybtn_${i}`)?.classList.remove('active')
   }
   const bar = document.getElementById('copyDayBar')
@@ -558,7 +685,7 @@ function snapshotDay(dayIdx) {
 }
 
 function applyDaySnapshot(snap, targetIdx) {
-  dayConfigs[targetIdx] = { ...snap, day_of_week: targetIdx }
+  dayConfigs[targetIdx] = { ...snap, day_index: targetIdx }
   const locEl = document.getElementById(`dc_loc_${targetIdx}`)
   if (locEl) locEl.value = snap.location_id || ''
   const startEl = document.getElementById(`dc_start_${targetIdx}`)
@@ -571,7 +698,7 @@ function applyDaySnapshot(snap, targetIdx) {
   if (offEl) offEl.checked = !!snap.is_off
   const colContainer = document.getElementById(`dc_colours_${targetIdx}`)
   if (colContainer) {
-    const colour = snap.note_color || '#4f46e5'
+    const colour = snap.note_color || DEFAULT_TEMPLATE_COLOUR
     dayConfigs[targetIdx].note_color = colour
     colContainer.innerHTML = ''
     renderColourPicker(colContainer, colour, v => { dayConfigs[targetIdx].note_color = v })
@@ -582,46 +709,58 @@ function copyDayTo(srcIdx, targetIdx) {
   closeCopyDayMenu()
   const snap = snapshotDay(srcIdx)
   applyDaySnapshot(snap, targetIdx)
-  toast(`${DAY_FULL[srcIdx]} copied to ${DAY_FULL[targetIdx]}`, 'success', 2000)
+  toast(`${getTemplateDayLabel(srcIdx)} copied to ${getTemplateDayLabel(targetIdx)}`, 'success', 2000)
 }
 
 function copyDayToAll(srcIdx) {
   closeCopyDayMenu()
   const snap = snapshotDay(srcIdx)
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < getTemplateSlotCount(); i++) {
     if (i !== srcIdx) applyDaySnapshot(snap, i)
   }
-  toast(`${DAY_FULL[srcIdx]} copied to all days`, 'success', 2000)
+  toast(`${getTemplateDayLabel(srcIdx)} copied to all days`, 'success', 2000)
 }
 
 // ── Save / Delete ──────────────────────────────────────────────────────────────
 async function saveTmpl() {
   const name = document.getElementById('tmplName').value.trim()
   if (!name) { toast('Template name is required', 'error'); return }
+  const currentType = getTemplateType(document.getElementById('tmplType')?.value || templateType)
+  const currentCycleLength = currentType === TEMPLATE_TYPE_PATTERN
+    ? getTemplateCycleLength(currentType, document.getElementById('tmplCycleLength')?.value || patternLength)
+    : 7
 
   const days = []
-  for (let i = 0; i < 7; i++) {
-    if (excludedDays.has(i)) continue // skip excluded days — no shift will be created for this day
+  for (let i = 0; i < getTemplateSlotCount(currentType, currentCycleLength); i++) {
+    if (excludedDays.has(i)) continue
     const dc = dayConfigs[i] || {}
     days.push({
-      day_of_week: i,
+      [currentType === TEMPLATE_TYPE_PATTERN ? 'day_index' : 'day_of_week']: i,
       location_id: document.getElementById(`dc_loc_${i}`)?.value || null,
       start_time:  document.getElementById(`dc_start_${i}`)?.value || null,
       end_time:    document.getElementById(`dc_end_${i}`)?.value || null,
       notes:       document.getElementById(`dc_notes_${i}`)?.value.trim() || null,
-      note_color:  dc.note_color || '#4f46e5',
+      note_color:  dc.note_color || DEFAULT_TEMPLATE_COLOUR,
       is_off:      document.getElementById(`dc_off_${i}`)?.checked || false,
     })
   }
 
   const group_id = document.getElementById('tmplGroup')?.value || null
+  const body = {
+    name,
+    description: document.getElementById('tmplDesc').value.trim(),
+    group_id,
+    template_type: currentType,
+    cycle_length: currentCycleLength,
+    days,
+  }
 
   try {
     if (editingTmplId) {
-      await api(`/api/templates/${editingTmplId}`, { method: 'PUT', body: { name, description: document.getElementById('tmplDesc').value.trim(), group_id, days } })
+      await api(`/api/templates/${editingTmplId}`, { method: 'PUT', body })
       toast('Template updated', 'success')
     } else {
-      await api('/api/templates', { method: 'POST', body: { name, description: document.getElementById('tmplDesc').value.trim(), group_id, days } })
+      await api('/api/templates', { method: 'POST', body })
       toast('Template created', 'success')
     }
     closeTmplModal()
@@ -672,6 +811,8 @@ async function duplicateTmpl(id) {
   const t = templates.find(x => x.id === id)
   if (!t) return
   const newName = `${t.name} (Copy)`
+  const type = getTemplateType(t.template_type)
+  const cycleLength = getTemplateCycleLength(type, t.cycle_length)
   try {
     await api('/api/templates', {
       method: 'POST',
@@ -679,13 +820,15 @@ async function duplicateTmpl(id) {
         name: newName,
         description: t.description || '',
         group_id: t.group_id || null,
+        template_type: type,
+        cycle_length: cycleLength,
         days: (t.days || []).map(d => ({
-          day_of_week: d.day_of_week,
+          [type === TEMPLATE_TYPE_PATTERN ? 'day_index' : 'day_of_week']: getTemplateDayIndex(d),
           location_id: d.location_id || null,
           start_time:  d.start_time  || null,
           end_time:    d.end_time    || null,
           notes:       d.notes       || null,
-          note_color:  d.note_color  || '#4f46e5',
+          note_color:  d.note_color  || DEFAULT_TEMPLATE_COLOUR,
           is_off:      d.is_off      || false,
         }))
       }
@@ -716,12 +859,28 @@ function applySelectAll(checked) {
   document.querySelectorAll('.apply-user-cb').forEach(cb => { cb.checked = checked })
 }
 
+function setApplyDateMeta(type) {
+  const normalizedType = getTemplateType(type)
+  applyingTmplType = normalizedType
+  document.getElementById('applyDateLabel').textContent = normalizedType === TEMPLATE_TYPE_PATTERN
+    ? 'Start date'
+    : 'Week starting (Monday)'
+  document.getElementById('applyModalCopy').textContent = normalizedType === TEMPLATE_TYPE_PATTERN
+    ? 'Apply this pattern template to one or more team members from a chosen start date.'
+    : 'Apply this weekly template to one or more team members for a specific week.'
+}
+
 function openApplyTmpl(id) {
+  const template = templates.find(x => x.id === id)
+  if (!template) return
   applyingTmplId = id
+  setApplyDateMeta(template.template_type)
   const d = new Date()
-  const day = d.getDay()
-  const toMon = (day === 0) ? -6 : 1 - day
-  d.setDate(d.getDate() + toMon)
+  if (applyingTmplType === TEMPLATE_TYPE_WEEKLY) {
+    const day = d.getDay()
+    const toMon = (day === 0) ? -6 : 1 - day
+    d.setDate(d.getDate() + toMon)
+  }
   document.getElementById('applyWeekStart').value = toDateStr(d)
   document.getElementById('applyProgress').style.display = 'none'
   _buildApplyUserList()
@@ -731,11 +890,14 @@ function openApplyTmpl(id) {
 function closeApplyModal() { document.getElementById('applyModal').classList.remove('open') }
 
 async function doApplyTmpl() {
-  const week_start    = document.getElementById('applyWeekStart').value
+  const selectedDate  = document.getElementById('applyWeekStart').value
   const skip_holidays = document.getElementById('applySkipHolidays').checked
   const selectedIds   = [...document.querySelectorAll('.apply-user-cb:checked')].map(cb => cb.dataset.uid)
   if (!selectedIds.length) { toast('Please select at least one team member', 'error'); return }
-  if (!week_start) { toast('Please select a week', 'error'); return }
+  if (!selectedDate) {
+    toast(applyingTmplType === TEMPLATE_TYPE_PATTERN ? 'Please select a start date' : 'Please select a week', 'error')
+    return
+  }
 
   const btn = document.getElementById('applyBtn')
   btn.disabled = true
@@ -752,8 +914,16 @@ async function doApplyTmpl() {
     progressText.textContent = `Applying to ${i + 1} / ${selectedIds.length}…`
     progressBar.style.width = pct + '%'
     try {
+      const body = {
+        template_id: applyingTmplId,
+        user_id: selectedIds[i],
+        skip_holidays,
+      }
+      if (applyingTmplType === TEMPLATE_TYPE_PATTERN) body.start_date = selectedDate
+      else body.week_start = selectedDate
       const r = await api('/api/shifts/apply-template', {
-        method: 'POST', body: { template_id: applyingTmplId, user_id: selectedIds[i], week_start, skip_holidays }
+        method: 'POST',
+        body,
       })
       applied += r.applied; skipped += r.skipped
     } catch { errors++ }
