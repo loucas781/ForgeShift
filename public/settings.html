@@ -493,7 +493,7 @@ async function init() {
     isAdmin ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
-    isAdmin ? renderBuildInfoPanel() : Promise.resolve(),
+    renderBuildInfoPanel(),
     renderAccountPanel(),
     renderAboutPanel(),
   ])
@@ -3150,29 +3150,33 @@ async function renderBuildInfoPanel() {
         </table>
       </div>
     </div>
+    ${isAdmin ? `
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
       <div class="card-body" id="buildInfoStats">
         <div style="color:var(--text-3);font-size:13px">Loading…</div>
       </div>
-    </div>`
+    </div>` : ''}
+  `
 
-  try {
-    const stats = await api('/api/stats')
-    document.getElementById('buildInfoStats').innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
-        ${[
-          { label: 'Active Users',  value: stats.users },
-          { label: 'Shifts',        value: stats.shifts },
-          { label: 'Locations',     value: stats.locations },
-          { label: 'Templates',     value: stats.templates },
-        ].map(s => `
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
-            <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
-          </div>`).join('')}
-      </div>`
-  } catch {}
+  if (isAdmin) {
+    try {
+      const stats = await api('/api/stats')
+      document.getElementById('buildInfoStats').innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">
+          ${[
+            { label: 'Active Users',  value: stats.users },
+            { label: 'Shifts',        value: stats.shifts },
+            { label: 'Locations',     value: stats.locations },
+            { label: 'Templates',     value: stats.templates },
+          ].map(s => `
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px">
+              <div style="font-size:28px;font-weight:900;letter-spacing:-.03em">${s.value}</div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px">${s.label}</div>
+            </div>`).join('')}
+        </div>`
+    } catch {}
+  }
 }
 
 // ── Account panel ─────────────────────────────────────────────────────────────
@@ -3312,7 +3316,7 @@ async function renderAboutPanel() {
           </div>
           <div>
             <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
-            <div style="font-size:13px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management</div>
+            <div style="font-size:13px;color:var(--text-3);margin-top:2px">Self-hosted shift rota management · ${escHtml(cfg.version)}</div>
           </div>
         </div>
         <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">

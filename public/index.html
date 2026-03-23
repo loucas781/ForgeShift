@@ -361,8 +361,8 @@ async function loadTeams() {
   if (cfg.user.role === 'member') return
   try { teams = await api('/api/teams') } catch { teams = [] }
 
-  // For shift_lead: refine the user list to only members across their teams
-  if (cfg.user.role === 'shift_lead' && teams.length) {
+  // For shift_lead: refine the user list to only themselves + their team members
+  if (cfg.user.role === 'shift_lead') {
     const teamMemberIds = new Set()
     teamMemberIds.add(cfg.user.id)
     teams.forEach(t => (t.members || []).forEach(m => { if (m.is_active) teamMemberIds.add(m.id) }))
