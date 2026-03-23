@@ -107,7 +107,12 @@
           <span style="font-size:13px;color:var(--text-2)">Skip bank holidays <span style="color:var(--text-3)">(days that fall on a bank holiday will not be created)</span></span>
         </label>
       </div>
-      <div id="applyProgress" style="display:none;font-size:13px;color:var(--text-2);padding:8px 0"></div>
+      <div id="applyProgress" style="display:none;padding:8px 0">
+        <div id="applyProgressText" style="font-size:13px;color:var(--text-2);margin-bottom:6px"></div>
+        <div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div id="applyProgressBar" style="height:100%;background:var(--brand);border-radius:3px;transition:width .2s ease;width:0%"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeApplyModal()">Cancel</button>
@@ -262,12 +267,26 @@ function renderTemplateCard(t) {
       <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
     </div>` : ''
 
+  // Last-applied date
+  let lastAppliedBadge = ''
+  if (t.last_applied_at) {
+    const then = new Date(t.last_applied_at + 'Z')
+    const diffMs = Date.now() - then.getTime()
+    const diffDays = Math.floor(diffMs / 86400000)
+    const label = diffDays === 0 ? 'today' : diffDays === 1 ? 'yesterday' : `${diffDays}d ago`
+    lastAppliedBadge = `<span style="font-size:10px;color:var(--text-3);display:flex;align-items:center;gap:3px;margin-top:3px">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="9" height="9"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+      Last applied ${label}
+    </span>`
+  }
+
   return `<div class="template-card">
     <div class="template-card-header">
       <div>
         <div class="template-card-title">${t.name}</div>
         ${t.description ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px">${t.description}</div>` : ''}
         ${groupBadge}
+        ${lastAppliedBadge}
       </div>
       ${adminBtns}
     </div>
@@ -612,16 +631,41 @@ async function saveTmpl() {
   }
 }
 
-async function deleteTmpl(id) {
+function deleteTmpl(id) {
   const t = templates.find(x => x.id === id)
-  if (!confirm(`Delete template "${t?.name}"?`)) return
-  try {
-    await api(`/api/templates/${id}`, { method: 'DELETE' })
-    toast('Template deleted', 'success')
-    await loadTemplates()
-  } catch (err) {
-    toast(err.message, 'error')
-  }
+  if (!t) return
+  showConfirm(`Delete template "${t.name}"?`, 'This cannot be undone.', async () => {
+    try {
+      await api(`/api/templates/${id}`, { method: 'DELETE' })
+      toast('Template deleted', 'success')
+      await loadTemplates()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  })
+}
+
+function showConfirm(title, body, onConfirm) {
+  document.getElementById('confirmModal')?.remove()
+  const modal = document.createElement('div')
+  modal.id = 'confirmModal'
+  modal.className = 'modal-overlay open'
+  modal.innerHTML = `
+    <div class="modal" style="max-width:360px">
+      <div class="modal-header"><h3 class="modal-title">${title}</h3></div>
+      <div class="modal-body" style="padding-top:12px">
+        <p style="font-size:13px;color:var(--text-3)">${body}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+        <button class="btn btn-danger" id="confirmOkBtn">Delete</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  document.getElementById('confirmCancelBtn').addEventListener('click', () => modal.remove())
+  document.getElementById('confirmOkBtn').addEventListener('click', () => { modal.remove(); onConfirm() })
+  setTimeout(() => document.getElementById('confirmOkBtn')?.focus(), 50)
 }
 
 async function duplicateTmpl(id) {
@@ -695,13 +739,18 @@ async function doApplyTmpl() {
 
   const btn = document.getElementById('applyBtn')
   btn.disabled = true
-  const progressEl = document.getElementById('applyProgress')
-  progressEl.style.display = ''
-  progressEl.textContent = `Applying to 0 / ${selectedIds.length}…`
+  const progressWrap = document.getElementById('applyProgress')
+  const progressText = document.getElementById('applyProgressText')
+  const progressBar  = document.getElementById('applyProgressBar')
+  progressWrap.style.display = ''
+  progressText.textContent = `Applying to 0 / ${selectedIds.length}…`
+  progressBar.style.width = '0%'
 
   let applied = 0; let skipped = 0; let errors = 0
   for (let i = 0; i < selectedIds.length; i++) {
-    progressEl.textContent = `Applying to ${i + 1} / ${selectedIds.length}…`
+    const pct = Math.round(((i) / selectedIds.length) * 100)
+    progressText.textContent = `Applying to ${i + 1} / ${selectedIds.length}…`
+    progressBar.style.width = pct + '%'
     try {
       const r = await api('/api/shifts/apply-template', {
         method: 'POST', body: { template_id: applyingTmplId, user_id: selectedIds[i], week_start, skip_holidays }
@@ -709,12 +758,17 @@ async function doApplyTmpl() {
       applied += r.applied; skipped += r.skipped
     } catch { errors++ }
   }
+  progressBar.style.width = '100%'
 
-  btn.disabled = false
-  progressEl.style.display = 'none'
-  const msg = `Template applied to ${selectedIds.length - errors} user${selectedIds.length - errors !== 1 ? 's' : ''} — ${applied} shifts created${skipped ? `, ${skipped} skipped (holiday)` : ''}${errors ? `, ${errors} failed` : ''}`
-  toast(msg, errors > 0 ? 'error' : 'success', 4000)
-  closeApplyModal()
+  setTimeout(() => {
+    btn.disabled = false
+    progressWrap.style.display = 'none'
+    progressBar.style.width = '0%'
+    const msg = `Template applied to ${selectedIds.length - errors} user${selectedIds.length - errors !== 1 ? 's' : ''} — ${applied} shifts created${skipped ? `, ${skipped} skipped (holiday)` : ''}${errors ? `, ${errors} failed` : ''}`
+    toast(msg, errors > 0 ? 'error' : 'success', 4000)
+    closeApplyModal()
+    loadTemplates()  // refresh so last-applied date updates
+  }, 300)
 }
 
 // Close modals on overlay click

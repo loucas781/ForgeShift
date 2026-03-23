@@ -11,6 +11,7 @@ const emailSvc = require('../email')
 const { authenticator } = require('otplib')
 const fs      = require('fs')
 const path    = require('path')
+const logger  = require('../utils/logger')
 
 function loadOverrides() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
@@ -26,6 +27,10 @@ function cookieOpts() {
   const hours  = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
   const secure = process.env.COOKIE_SECURE === 'true'
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', maxAge: hours * 3600000, path: '/' }
+}
+function clearCookieOpts() {
+  const secure = process.env.COOKIE_SECURE === 'true'
+  return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
 }
 function makeToken(user) {
   return jwt.sign(
@@ -46,7 +51,9 @@ router.post('/signup', async (req, res) => {
     const { name, email: emailAddr, password } = req.body
     if (!name?.trim() || !emailAddr?.trim() || !password)
       return res.status(400).json({ error: 'All fields are required.' })
-    if (!/\S+@\S+\.\S+/.test(emailAddr))
+    if (name.trim().length > 100) return res.status(400).json({ error: 'Name must be 100 characters or fewer.' })
+    if (emailAddr.trim().length > 254) return res.status(400).json({ error: 'Email address is too long.' })
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddr.trim()))
       return res.status(400).json({ error: 'Please enter a valid email address.' })
     const pol = getPasswordPolicy(loadOverrides())
     const pv  = validatePassword(password, pol)
@@ -63,7 +70,7 @@ router.post('/signup', async (req, res) => {
     res.cookie('token', makeToken(user), cookieOpts())
     audit(user.id, 'user.signup', 'user', user.id, user.name)
     res.json({ ok: true, user })
-  } catch (err) { console.error('signup:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('signup:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/login ───────────────────────────────────────────────────────
@@ -73,22 +80,22 @@ router.post('/login', async (req, res) => {
     if (!email?.trim() || !password)
       return res.status(400).json({ error: 'Email and password are required.' })
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase())
-    if (!user) return res.status(401).json({ error: 'No account found with this email address.' })
+    if (!user) return res.status(401).json({ error: 'Invalid email or password.' })
     if (user.is_active === 0)
       return res.status(403).json({ error: 'This account has been deactivated. Contact an admin.' })
     const { ok: pwOk, needsRehash } = await comparePassword(password, user.password)
-    if (!pwOk) return res.status(401).json({ error: 'Incorrect password.' })
+    if (!pwOk) return res.status(401).json({ error: 'Invalid email or password.' })
     if (needsRehash) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(await hashPassword(password), user.id)
     const { password: _, ...pub } = user
     res.cookie('token', makeToken(pub), cookieOpts())
     audit(pub.id, 'user.login', 'user', pub.id, pub.name)
     res.json({ ok: true, user: pub })
-  } catch (err) { console.error('login:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('login:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/logout ──────────────────────────────────────────────────────
 router.post('/logout', (req, res) => {
-  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+  res.clearCookie('token', clearCookieOpts())
   res.json({ ok: true })
 })
 
@@ -130,7 +137,7 @@ router.patch('/profile', requireAuth, async (req, res) => {
     res.cookie('token', makeToken(updated), cookieOpts())
     audit(user.id, 'user.profile_update', 'user', user.id, updated.name)
     res.json({ ok: true, user: updated })
-  } catch (err) { console.error('profile:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('profile:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/forgot-password ────────────────────────────────────────────
@@ -162,7 +169,7 @@ router.post('/forgot-password', async (req, res) => {
 
     audit(user.id, 'user.forgot_password', 'user', user.id, user.name)
     res.json({ ok: true, emailSent })
-  } catch (err) { console.error('forgot-password:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('forgot-password:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── GET /api/auth/admin/reset-link/:userId ────────────────────────────────────
@@ -182,7 +189,7 @@ router.get('/admin/reset-link/:userId', requireAuth, async (req, res) => {
     const resetUrl = `${origin}/reset-password.html?token=${rawToken}`
     audit(req.user.id, 'user.admin_reset_link', 'user', user.id, user.name)
     res.json({ ok: true, resetUrl, expiresIn: '15 minutes' })
-  } catch (err) { console.error('admin reset-link:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('admin reset-link:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── GET /api/auth/reset-password/validate ─────────────────────────────────────
@@ -204,7 +211,7 @@ router.get('/reset-password/validate', async (req, res) => {
     const sessionExp = new Date(Date.now() + 5 * 60 * 1000).toISOString()
     db.prepare('INSERT INTO password_reset_sessions (id, user_id, expires_at) VALUES (?,?,?)').run(sessionKey, row.user_id, sessionExp)
     res.json({ ok: true, sessionKey, name: row.name, email: row.email })
-  } catch (err) { console.error('reset validate:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('reset validate:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/reset-password ─────────────────────────────────────────────
@@ -223,7 +230,7 @@ router.post('/reset-password', async (req, res) => {
     db.prepare('UPDATE password_reset_sessions SET used = 1 WHERE id = ?').run(session.id)
     audit(session.user_id, 'user.password_reset', 'user', session.user_id, null)
     res.json({ ok: true })
-  } catch (err) { console.error('reset-password:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('reset-password:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/invite — admin creates account (works when signup disabled) ──
@@ -231,7 +238,9 @@ router.post('/invite', requireAuth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const { name, email: emailAddr, role = 'member' } = req.body
   if (!name?.trim() || !emailAddr?.trim()) return res.status(400).json({ error: 'Name and email required.' })
-  if (!/\S+@\S+\.\S+/.test(emailAddr)) return res.status(400).json({ error: 'Invalid email address.' })
+  if (name.trim().length > 100) return res.status(400).json({ error: 'Name must be 100 characters or fewer.' })
+  if (emailAddr.trim().length > 254) return res.status(400).json({ error: 'Email address is too long.' })
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddr.trim())) return res.status(400).json({ error: 'Invalid email address.' })
   try {
     const norm = emailAddr.trim().toLowerCase()
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(norm))
@@ -253,7 +262,7 @@ router.post('/invite', requireAuth, async (req, res) => {
 
     audit(req.user.id, 'user.invite', 'user', id, name.trim(), { by: req.user.name })
     res.json({ ok: true, emailSent, tempPassword: emailSent ? null : tempPassword })
-  } catch (err) { console.error('invite:', err.message); res.status(500).json({ error: 'Server error' }) }
+  } catch (err) { logger.error('invite:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── GET /api/auth/2fa/status ──────────────────────────────────────────────────
@@ -275,7 +284,7 @@ router.post('/2fa/setup', requireAuth, (req, res) => {
     db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(secret, req.user.id)
     res.json({ secret, otpauth })
   } catch (err) {
-    console.error('2fa setup:', err.message)
+    logger.error('2fa setup:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -291,7 +300,7 @@ router.post('/2fa/verify', requireAuth, (req, res) => {
     audit(req.user.id, 'user.2fa_enabled', 'user', req.user.id, req.user.name)
     res.json({ ok: true })
   } catch (err) {
-    console.error('2fa verify:', err.message)
+    logger.error('2fa verify:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -309,7 +318,7 @@ router.post('/2fa/disable', requireAuth, (req, res) => {
     audit(req.user.id, 'user.2fa_disabled', 'user', req.user.id, req.user.name)
     res.json({ ok: true })
   } catch (err) {
-    console.error('2fa disable:', err.message)
+    logger.error('2fa disable:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -349,7 +358,7 @@ router.get('/sessions', requireAuth, (req, res) => {
 
 // ── POST /api/auth/logout-all — clear cookie (only session this browser has) ──
 router.post('/logout-all', requireAuth, (req, res) => {
-  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+  res.clearCookie('token', clearCookieOpts())
   audit(req.user.id, 'user.logout_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
 })
@@ -374,7 +383,7 @@ router.get('/export', requireAuth, (req, res) => {
     res.send(JSON.stringify(payload, null, 2))
     audit(uid, 'user.data_export', 'user', uid, user.name)
   } catch (err) {
-    console.error('export error:', err.message)
+    logger.error('export error:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -382,7 +391,7 @@ router.get('/export', requireAuth, (req, res) => {
 // ── POST /api/auth/revoke-all — invalidate all JWTs for this user ─────────────
 router.post('/revoke-all', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.user.id)
-  res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+  res.clearCookie('token', clearCookieOpts())
   audit(req.user.id, 'user.revoke_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
 })
@@ -407,10 +416,10 @@ router.delete('/account', requireAuth, async (req, res) => {
     db.prepare('DELETE FROM ical_tokens  WHERE user_id = ?').run(uid)
     db.prepare('DELETE FROM users        WHERE id      = ?').run(uid)
     audit(null, 'user.self_deleted', 'user', uid, user.name)
-    res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+    res.clearCookie('token', clearCookieOpts())
     res.json({ ok: true })
   } catch (err) {
-    console.error('delete account:', err.message)
+    logger.error('delete account:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

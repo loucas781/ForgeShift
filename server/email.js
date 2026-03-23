@@ -31,7 +31,7 @@ async function createTransport() {
   return nodemailer.createTransport({
     host: cfg.host, port: cfg.port, secure: cfg.secure,
     auth: { user: cfg.user, pass: cfg.pass },
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: process.env.NODE_ENV !== 'development' },
   })
 }
 

@@ -41,11 +41,23 @@
               <option value="">My shifts</option>
             </select>
           </div>
+          <div id="locationFilterWrap" style="display:none">
+            <select class="cal-user-filter" id="locationFilter" onchange="renderView()" title="Filter by location">
+              <option value="">All locations</option>
+            </select>
+          </div>
           <div class="cal-toolbar-end">
             <span id="hoursStat" class="cal-hours-stat"></span>
+            <button id="copyWeekBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+              Copy week
+            </button>
             <button id="csvExportBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="exportCSV()" title="Export CSV">
               <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
               CSV
+            </button>
+            <button class="btn btn-ghost btn-icon" onclick="window.print()" title="Print rota">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a1 1 0 001 1h8a1 1 0 001-1v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a1 1 0 00-1-1H6a1 1 0 00-1 1zm2 0h6v3H7V4zm-1 9h8v4H6v-4zm7-4a1 1 0 110 2 1 1 0 010-2z" clip-rule="evenodd"/></svg>
             </button>
             <div class="cal-toolbar-sep"></div>
             <button class="btn btn-ghost btn-icon" onclick="toggleKbdHelp()" title="Keyboard shortcuts" style="font-size:14px">?</button>
@@ -63,6 +75,10 @@
           </div>
         </div>
         <!-- Grid -->
+        <div id="calEmptyBanner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;margin:0 0 6px;background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;font-size:13px;color:var(--text-3)">
+          <span id="calEmptyBannerMsg"></span>
+          <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
+        </div>
         <div class="cal-grid" id="calGrid"></div>
       </div>
     </main>
@@ -196,6 +212,8 @@
       <kbd class="kbd-key">W</kbd><span style="color:var(--text-2)">Switch to week view</span>
       <kbd class="kbd-key">M</kbd><span style="color:var(--text-2)">Switch to month view</span>
       <kbd class="kbd-key">N</kbd><span style="color:var(--text-2)">New shift (today)</span>
+      <kbd class="kbd-key">C</kbd><span style="color:var(--text-2)">Copy week → next week (week view)</span>
+      <kbd class="kbd-key">P</kbd><span style="color:var(--text-2)">Print rota</span>
       <kbd class="kbd-key">Esc</kbd><span style="color:var(--text-2)">Close modal / overlay</span>
       <kbd class="kbd-key">?</kbd><span style="color:var(--text-2)">Toggle this help panel</span>
     </div>
@@ -240,7 +258,9 @@ async function init() {
     document.getElementById('adminUserField').style.display = 'block'
   }
 
-  await Promise.all([loadLocations(), loadUsers(), loadTeams(), loadTaskLists()])
+  const _initResults = await Promise.allSettled([loadLocations(), loadUsers(), loadTeams(), loadTaskLists()])
+  const _initFailed = _initResults.filter(r => r.status === 'rejected')
+  if (_initFailed.length) console.warn('Init: some data failed to load', _initFailed.map(r => r.reason?.message))
   renderView()
 
   document.getElementById('prevBtn').addEventListener('click', prev)
@@ -256,11 +276,23 @@ async function init() {
 async function loadLocations() {
   locations = await api('/api/locations')
   const sel = document.getElementById('modalLocation')
+  const locFilter = document.getElementById('locationFilter')
+  const selFrag = document.createDocumentFragment()
+  const filterFrag = document.createDocumentFragment()
   locations.forEach(l => {
     const o = document.createElement('option')
     o.value = l.id; o.textContent = l.name
-    sel.appendChild(o)
+    selFrag.appendChild(o)
+    const o2 = document.createElement('option')
+    o2.value = l.id; o2.textContent = l.name
+    filterFrag.appendChild(o2)
   })
+  sel.appendChild(selFrag)
+  locFilter.appendChild(filterFrag)
+  // Only show the location filter if there are multiple locations
+  if (locations.length > 1) {
+    document.getElementById('locationFilterWrap').style.display = 'block'
+  }
 }
 
 async function loadUsers() {
@@ -275,16 +307,17 @@ async function loadUsers() {
     users = allUsers
   }
   const msel = document.getElementById('modalUser')
-  users.filter(u => u.is_active).forEach(u => {
-    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-    msel.appendChild(o)
-  })
-  // Also populate task assignment user select
   const tasel = document.getElementById('taUser')
+  const mFrag = document.createDocumentFragment()
+  const taFrag = document.createDocumentFragment()
   users.filter(u => u.is_active).forEach(u => {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-    tasel.appendChild(o)
+    mFrag.appendChild(o)
+    const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+    taFrag.appendChild(o2)
   })
+  msel.appendChild(mFrag)
+  tasel.appendChild(taFrag)
 }
 
 let teams = []
@@ -301,17 +334,19 @@ async function loadTeams() {
     const allUsers = users  // already loaded in loadUsers
     users = allUsers.filter(u => teamMemberIds.has(u.id))
     const msel = document.getElementById('modalUser')
-    msel.innerHTML = ''
-    users.forEach(u => {
-      const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-      msel.appendChild(o)
-    })
     const tasel = document.getElementById('taUser')
-    tasel.innerHTML = ''
+    const mFrag2 = document.createDocumentFragment()
+    const taFrag2 = document.createDocumentFragment()
     users.forEach(u => {
       const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-      tasel.appendChild(o)
+      mFrag2.appendChild(o)
+      const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+      taFrag2.appendChild(o2)
     })
+    msel.innerHTML = ''
+    msel.appendChild(mFrag2)
+    tasel.innerHTML = ''
+    tasel.appendChild(taFrag2)
   }
 
   const sel = document.getElementById('teamFilter')
@@ -355,14 +390,40 @@ async function loadTeams() {
 async function loadTaskLists() {
   if (!cfg.featureTasks) return
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
-  // Populate task assignment modal select
+  // Populate task assignment modal select — grouped using optgroup when groups exist
   const sel = document.getElementById('taTaskList')
   if (sel) {
     while (sel.options.length > 1) sel.remove(1)
+    // Group lists by group_id
+    const grouped = {}
+    const ungrouped = []
     taskLists.forEach(t => {
-      const o = document.createElement('option'); o.value = t.id; o.textContent = t.name
-      sel.appendChild(o)
+      if (t.group_id) {
+        if (!grouped[t.group_id]) grouped[t.group_id] = { name: t.group_name, lists: [] }
+        grouped[t.group_id].lists.push(t)
+      } else {
+        ungrouped.push(t)
+      }
     })
+    const hasGroups = Object.keys(grouped).length > 0
+    if (hasGroups) {
+      // Ungrouped first
+      if (ungrouped.length) {
+        const grp = document.createElement('optgroup'); grp.label = 'General'
+        ungrouped.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
+        sel.appendChild(grp)
+      }
+      Object.values(grouped).forEach(g => {
+        const grp = document.createElement('optgroup'); grp.label = g.name
+        g.lists.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
+        sel.appendChild(grp)
+      })
+    } else {
+      taskLists.forEach(t => {
+        const o = document.createElement('option'); o.value = t.id; o.textContent = t.name
+        sel.appendChild(o)
+      })
+    }
   }
 }
 
@@ -374,26 +435,34 @@ function getHolidayMap(year) {
   return _holidayCache[year]
 }
 
-function invalidateHolidayCache() { _holidayCache = {} }
+function invalidateHolidayCache(year) {
+  if (year != null) delete _holidayCache[year]
+  else _holidayCache = {}
+}
 
 // ── Data loading ───────────────────────────────────────────────────────────────
-async function loadShifts() {
+// Returns { start, end } Date objects for the currently visible calendar range.
+function getViewDateRange() {
   const weekStart = prefs?.weekStartDay ?? 1
-  let start, end
   if (view === 'month') {
     const year  = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const first = new Date(year, month, 1)
     const last  = new Date(year, month + 1, 0)
     const startOffset = (first.getDay() - weekStart + 7) % 7
-    start = new Date(year, month, 1 - startOffset)
-    const lastDay = last.getDay()
-    const endOffset = (weekStart + 6 - lastDay + 7) % 7
-    end = new Date(year, month, last.getDate() + endOffset)
+    const start = new Date(year, month, 1 - startOffset)
+    const endOffset = (weekStart + 6 - last.getDay() + 7) % 7
+    const end = new Date(year, month, last.getDate() + endOffset)
+    return { start, end }
   } else {
-    start = startOfWeek(currentDate, weekStart)
-    end   = new Date(start); end.setDate(end.getDate() + 6)
+    const start = startOfWeek(currentDate, weekStart)
+    const end   = new Date(start); end.setDate(end.getDate() + 6)
+    return { start, end }
   }
+}
+
+async function loadShifts() {
+  const { start, end } = getViewDateRange()
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
   const role = cfg.user.role
@@ -414,7 +483,8 @@ async function loadShifts() {
           const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
           return api('/api/shifts?' + p)
         })
-        shifts = (await Promise.all(fetches)).flat()
+        const results = await Promise.allSettled(fetches)
+        shifts = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value)
         return
       }
     } else if (filterVal.startsWith('user:')) {
@@ -426,30 +496,36 @@ async function loadShifts() {
 }
 
 async function loadTaskAssignments() {
-  const weekStart = prefs?.weekStartDay ?? 1
-  let start, end
-  if (view === 'month') {
-    const year  = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const first = new Date(year, month, 1)
-    const last  = new Date(year, month + 1, 0)
-    const startOffset = (first.getDay() - weekStart + 7) % 7
-    start = new Date(year, month, 1 - startOffset)
-    const lastDay = last.getDay()
-    const endOffset = (weekStart + 6 - lastDay + 7) % 7
-    end = new Date(year, month, last.getDate() + endOffset)
-  } else {
-    start = startOfWeek(currentDate, weekStart)
-    end   = new Date(start); end.setDate(end.getDate() + 6)
-  }
+  const { start, end } = getViewDateRange()
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
-  if (cfg.user.role === 'member') params.set('user_id', cfg.user.id)
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  const role = cfg.user.role
+  if (role === 'member') {
+    // Members always see only their own tasks
+    params.set('user_id', cfg.user.id)
+  } else {
+    // Admins and shift_leads: scope tasks to match the current shift view
+    if (filterVal === '') {
+      // "My shifts" — only own tasks
+      params.set('user_id', cfg.user.id)
+    } else if (filterVal.startsWith('user:')) {
+      // Individual user's rota — only their tasks
+      params.set('user_id', filterVal.slice(5))
+    }
+    // 'all' or 'team:xxx' — no user_id filter, backend scopes for shift_lead
+  }
   try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
 }
 
 async function renderView() {
+  // Show a loading shimmer while data is in flight
+  const grid = document.getElementById('calGrid')
+  if (grid && !grid.dataset.loaded) {
+    grid.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text-3);font-size:14px">Loading…</div>'
+  }
   await loadShifts()
   if (cfg.featureTasks && taskLists.length) await loadTaskAssignments()
+  if (grid) grid.dataset.loaded = '1'
   updateTitle()
   if (view === 'month') renderMonth()
   else renderWeek()
@@ -464,6 +540,9 @@ async function renderView() {
   // CSV export button visibility (managers only)
   const csvBtn = document.getElementById('csvExportBtn')
   if (csvBtn) csvBtn.style.display = canManage() ? 'inline-flex' : 'none'
+  // Copy week button: week view + managers only
+  const copyBtn = document.getElementById('copyWeekBtn')
+  if (copyBtn) copyBtn.style.display = (view === 'week' && canManage()) ? 'inline-flex' : 'none'
 }
 
 function updateTitle() {
@@ -485,6 +564,8 @@ function renderMonth() {
   const today      = toDateStr(new Date())
   const year       = currentDate.getFullYear()
   const month      = currentDate.getMonth()
+  const _fv        = document.getElementById('teamFilter')?.value || ''
+  const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
   const first      = new Date(year, month, 1)
   const last       = new Date(year, month + 1, 0)
   const weekStart  = prefs?.weekStartDay ?? 1
@@ -495,8 +576,11 @@ function renderMonth() {
   const startOffset = (first.getDay() - weekStart + 7) % 7
   const totalCells  = Math.ceil((startOffset + last.getDate()) / 7) * 7
 
+  const locFilterVal = document.getElementById('locationFilter')?.value || ''
+  const visibleShifts = locFilterVal ? shifts.filter(s => s.location_id === locFilterVal) : shifts
+
   const shiftMap = {}
-  shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
+  visibleShifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
   // Task assignment map: date -> [assignment, ...]
   const taskMap = {}
@@ -543,19 +627,22 @@ function renderMonth() {
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         }).join('')
-      } else if (canManage()) {
+      } else if (canManage() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
     }
 
     const hasPaste = copiedShift && dayShifts.length === 0
 
+    const isEmpty = dayShifts.length === 0 && !hasPaste
     html += '<div class="cal-cell' +
       (isCurrentMonth ? '' : ' other-month') +
       (isToday ? ' today' : '') +
       (dayHols.length ? ' is-holiday' : '') +
       (hasPaste ? ' can-paste' : '') +
-      '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')">'
+      (isEmpty && canManage() ? ' can-add' : '') +
+      '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
+      (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
 
     // Holiday label(s) — pinned, non-interactive, behind shifts
@@ -567,18 +654,34 @@ function renderMonth() {
     // Task banner (first column of week only)
     if (taskBannerHtml) html += taskBannerHtml
 
-    // Shift chips
-    dayShifts.forEach(s => {
+    // Shift chips — show up to 3, then "+N more"
+    const MAX_CHIPS = 3
+    const chipsToShow = dayShifts.slice(0, MAX_CHIPS)
+    const overflow    = dayShifts.length - MAX_CHIPS
+    chipsToShow.forEach(s => {
       const color = s.location_color || s.note_color || '#4f46e5'
       const label = s.is_off ? '🏖️ Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
       const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      // Duration badge
+      let durBadge = ''
+      if (!s.is_off && !s.is_oncall && s.start_time && s.end_time) {
+        const mins = _timeToMins(s.end_time) - _timeToMins(s.start_time)
+        if (mins > 0) {
+          const h = Math.floor(mins / 60); const m = mins % 60
+          durBadge = `<span style="opacity:.75;font-size:9px;margin-left:3px">${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''}</span>`
+        }
+      }
+      const titleStr = (s.user_name ? s.user_name + ': ' : '') + label + (s.start_time ? ' ' + s.start_time + '–' + s.end_time : '')
       html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
         '" style="background:' + color + '"' +
-        ' title="' + (s.user_name || '') + ': ' + label + '"' +
+        ' title="' + titleStr + '"' +
         (canManage() ? ' onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')"' : ' onclick="event.stopPropagation();openViewModal(\'' + s.id + '\')"') +
         (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')"' : '') + '>' +
-        name + label + '</div>'
+        name + label + durBadge + '</div>'
     })
+    if (overflow > 0) {
+      html += '<div class="cal-more-badge" onclick="event.stopPropagation();openCreateModal(\'' + ds + '\')" title="' + overflow + ' more shift' + (overflow > 1 ? 's' : '') + '">+' + overflow + ' more</div>'
+    }
 
     // Paste hint
     if (hasPaste) {
@@ -589,6 +692,29 @@ function renderMonth() {
   }
   html += '</div>'
   grid.innerHTML = html
+
+  // Empty state banner — full calendar always renders, banner shown above when no shifts
+  const hasShiftsThisMonth = visibleShifts.some(s => s.date >= toDateStr(first) && s.date <= toDateStr(last))
+  const banner = document.getElementById('calEmptyBanner')
+  const bannerMsg = document.getElementById('calEmptyBannerMsg')
+  const bannerBtn = document.getElementById('calEmptyBannerBtn')
+  if (banner) {
+    if (!hasShiftsThisMonth) {
+      const isLocFiltered = locFilterVal !== ''
+      bannerMsg.textContent = isLocFiltered ? 'No shifts at this location.' : 'No shifts this month.'
+      if (canManage() && !isLocFiltered) {
+        bannerBtn.textContent = '+ Add first shift'
+        bannerBtn.onclick = () => openCreateModal(toDateStr(new Date()))
+        bannerBtn.style.display = ''
+      } else {
+        bannerBtn.style.display = 'none'
+      }
+      banner.style.display = 'flex'
+    } else {
+      banner.style.display = 'none'
+    }
+  }
+  grid.style.position = ''
 }
 
 // ── Week render ────────────────────────────────────────────────────────────────
@@ -605,15 +731,22 @@ function _pct(mins) {
 }
 
 function renderWeek() {
+  const emptyBanner = document.getElementById('calEmptyBanner')
+  if (emptyBanner) emptyBanner.style.display = 'none'
   const grid      = document.getElementById('calGrid')
   const todayStr  = toDateStr(new Date())
   const weekStart = prefs?.weekStartDay ?? 1
   const ws        = startOfWeek(currentDate, weekStart)
   const year      = ws.getFullYear()
   const holidays  = getHolidayMap(year)
+  const _fv       = document.getElementById('teamFilter')?.value || ''
+  const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
+
+  const locFilterVal = document.getElementById('locationFilter')?.value || ''
+  const visibleShiftsWeek = locFilterVal ? shifts.filter(s => s.location_id === locFilterVal) : shifts
 
   const shiftMap = {}
-  shifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
+  visibleShiftsWeek.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
 
   // Task assignment map for this week: date -> [assignments]
   const taskMap = {}
@@ -673,7 +806,7 @@ function renderWeek() {
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         })
-      } else if (canManage() && taskLists.length) {
+      } else if (canManage() && taskLists.length && isSingleUserView) {
         html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
       html += `</div>`
@@ -898,6 +1031,10 @@ function showShiftContextMenu(e, id) {
       <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
       Copy shift
     </button>
+    <button class="ctx-item" onclick="dismissContextMenu();openDuplicateModal('${id}')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/></svg>
+      Duplicate to…
+    </button>
     <button class="ctx-item" onclick="openEditModal('${id}');dismissContextMenu()">
       <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
       Edit shift
@@ -919,12 +1056,90 @@ function dismissContextMenu() {
 }
 
 async function quickDeleteShift(id) {
-  if (!confirm('Delete this shift?')) return
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
   try {
     await api(`/api/shifts/${id}`, { method: 'DELETE' })
-    toast('Shift deleted', 'success')
     renderView()
+    _showUndoToast('Shift deleted', s)
   } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Duplicate shift ────────────────────────────────────────────────────────────
+function openDuplicateModal(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  const existing = document.getElementById('duplicateShiftModal')
+  if (existing) existing.remove()
+  const userRows = canManage() ? `
+    <div class="form-group">
+      <label class="form-label">Team member</label>
+      <select class="form-select" id="dupUser">${
+        users.filter(u => u.is_active).map(u =>
+          `<option value="${u.id}"${u.id === s.user_id ? ' selected' : ''}>${u.name}${u.id === cfg.user.id ? ' (me)' : ''}</option>`
+        ).join('')
+      }</select>
+    </div>` : ''
+  const modal = document.createElement('div')
+  modal.id = 'duplicateShiftModal'
+  modal.className = 'modal-overlay open'
+  modal.innerHTML = `
+    <div class="modal" style="max-width:360px">
+      <div class="modal-header">
+        <h3 class="modal-title">Duplicate Shift</h3>
+        <button class="modal-close" onclick="document.getElementById('duplicateShiftModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Choose a date to copy this shift to. The shift details (times, location, notes) will be copied exactly.</p>
+        ${userRows}
+        <div class="form-group">
+          <label class="form-label">Target date</label>
+          <input type="date" class="form-input" id="dupDate">
+        </div>
+        <div id="dupError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('duplicateShiftModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDuplicate('${id}')">Duplicate</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('dupDate').focus(), 50)
+}
+
+async function saveDuplicate(sourceId) {
+  const s = shifts.find(x => x.id === sourceId)
+  if (!s) return
+  const date = document.getElementById('dupDate').value
+  const errEl = document.getElementById('dupError')
+  if (!date) { errEl.style.display = 'block'; errEl.textContent = 'Please select a target date.'; return }
+  const user_id = canManage() ? document.getElementById('dupUser').value : cfg.user.id
+  const saveBtn = document.querySelector('#duplicateShiftModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Duplicating…' }
+  try {
+    await api('/api/shifts', {
+      method: 'POST',
+      body: {
+        user_id,
+        date,
+        location_id: s.location_id,
+        start_time:  s.start_time,
+        end_time:    s.end_time,
+        notes:       s.notes,
+        note_color:  s.note_color,
+        is_off:      s.is_off,
+        is_oncall:   s.is_oncall,
+      }
+    })
+    document.getElementById('duplicateShiftModal').remove()
+    toast('Shift duplicated', 'success')
+    renderView()
+  } catch (err) {
+    errEl.style.display = 'block'
+    errEl.textContent = err.message
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Duplicate' }
+  }
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
@@ -985,30 +1200,16 @@ function openViewModal(id) {
   document.getElementById('modalIsOff').checked    = !!s.is_off
   document.getElementById('modalIsOncall').checked = !!s.is_oncall
   document.getElementById('deleteShiftBtn').style.display = 'none'
-  // Hide save button and make fields read-only for members
-  const saveBtn = document.querySelector('#shiftModal .btn-primary')
-  if (saveBtn) saveBtn.style.display = 'none'
-  ;['modalDate','modalLocation','modalStart','modalEnd','modalNotes'].forEach(id => {
-    const el = document.getElementById(id)
-    if (el) el.setAttribute('disabled', 'disabled')
-  })
-  document.getElementById('modalIsOff').disabled    = true
-  document.getElementById('modalIsOncall').disabled = true
   setupColourPicker()
-  document.getElementById('shiftModal').classList.add('open')
+  const modal = document.getElementById('shiftModal')
+  modal.querySelector('.modal').classList.add('modal--readonly')
+  modal.classList.add('open')
 }
 
 function closeModal() {
-  document.getElementById('shiftModal').classList.remove('open')
-  // Re-enable fields after member view (in case admin also uses the modal)
-  ;['modalDate','modalLocation','modalStart','modalEnd','modalNotes'].forEach(id => {
-    const el = document.getElementById(id)
-    if (el) el.removeAttribute('disabled')
-  })
-  document.getElementById('modalIsOff').disabled    = false
-  document.getElementById('modalIsOncall').disabled = false
-  const saveBtn = document.querySelector('#shiftModal .btn-primary')
-  if (saveBtn) saveBtn.style.display = ''
+  const modal = document.getElementById('shiftModal')
+  modal.classList.remove('open')
+  modal.querySelector('.modal').classList.remove('modal--readonly')
 }
 
 async function saveShift() {
@@ -1042,12 +1243,13 @@ async function saveShift() {
 
 async function deleteShift() {
   if (!editingShiftId) return
-  if (!confirm('Delete this shift?')) return
+  const s = shifts.find(x => x.id === editingShiftId)
+  if (!s) return
+  closeModal()
   try {
     await api(`/api/shifts/${editingShiftId}`, { method: 'DELETE' })
-    toast('Shift deleted', 'success')
-    closeModal()
     renderView()
+    _showUndoToast('Shift deleted', s)
   } catch (err) {
     toast(err.message, 'error')
   }
@@ -1081,7 +1283,15 @@ function showTaskPopover(event, a) {
   }
   const locEl = document.getElementById('taskDetailLocation')
   if (a.location_name) {
-    locEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:${a.location_color||'#888'};flex-shrink:0"></span>${a.location_name}</span>`
+    const outer = document.createElement('span')
+    outer.style.cssText = 'display:inline-flex;align-items:center;gap:5px'
+    const dot = document.createElement('span')
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0'
+    dot.style.background = a.location_color || '#888'
+    outer.appendChild(dot)
+    outer.appendChild(document.createTextNode(a.location_name))
+    locEl.textContent = ''
+    locEl.appendChild(outer)
     locEl.style.display = ''
   } else {
     locEl.style.display = 'none'
@@ -1241,13 +1451,18 @@ async function saveTaskAssignment() {
   })
   if (!dates.length) { toast('Please select at least one day', 'error'); return }
 
+  const saveBtn = document.querySelector('#taskAssignModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…' }
   try {
     await api('/api/tasks/assignments/bulk', { method: 'POST', body: { user_id, task_list_id, dates } })
     toast(dates.length === 1 ? 'Task assigned' : `Task assigned for ${dates.length} days`, 'success')
     await renderView()
     // Re-open so they can keep adding
     openTaskAssignModal(dates[0], user_id)
-  } catch (err) { toast(err.message, 'error') }
+  } catch (err) {
+    toast(err.message, 'error')
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Add assignment' }
+  }
 }
 
 // ── Hours summary ──────────────────────────────────────────────────────────────
@@ -1268,26 +1483,13 @@ function updateHoursStat() {
 
 // ── CSV Export ─────────────────────────────────────────────────────────────────
 function exportCSV() {
-  const weekStart = prefs?.weekStartDay ?? 1
-  let start, end
-  if (view === 'month') {
-    const year  = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const first = new Date(year, month, 1)
-    const last  = new Date(year, month + 1, 0)
-    const startOffset = (first.getDay() - weekStart + 7) % 7
-    start = new Date(year, month, 1 - startOffset)
-    const lastDay = last.getDay()
-    const endOffset = (weekStart + 6 - lastDay + 7) % 7
-    end = new Date(year, month, last.getDate() + endOffset)
-  } else {
-    start = startOfWeek(currentDate, weekStart)
-    end   = new Date(start); end.setDate(end.getDate() + 6)
-  }
+  const { start, end } = getViewDateRange()
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
   if (filterVal.startsWith('user:')) params.set('user_id', filterVal.slice(5))
   else if (filterVal === 'all' && cfg.user.role === 'admin') params.set('user_id', 'all')
+  // Remember last-used export scope in localStorage
+  try { localStorage.setItem('fs-last-export-filter', filterVal) } catch {}
   window.location.href = '/api/shifts/export/csv?' + params
 }
 
@@ -1323,6 +1525,12 @@ document.addEventListener('keydown', e => {
       break
     case 'n': case 'N':
       if (!modalOpen) openCreateModal(toDateStr(new Date()))
+      break
+    case 'c': case 'C':
+      if (!modalOpen && view === 'week' && canManage()) copyWeekToNext()
+      break
+    case 'p': case 'P':
+      if (!modalOpen) window.print()
       break
     case 'Escape':
       if (document.getElementById('kbdHelpOverlay').style.display === 'flex') {
@@ -1407,6 +1615,8 @@ async function saveShift() {
 
   const url    = editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts'
   const method = editingShiftId ? 'PUT' : 'POST'
+  const saveBtn = document.querySelector('#shiftModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…' }
   try {
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const d = await r.json()
@@ -1418,7 +1628,15 @@ async function saveShift() {
         const warn = document.createElement('div')
         warn.id = 'conflictWarning'
         warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
-        warn.innerHTML = `<span>⚠️ ${d.error}</span><button class="btn btn-sm" style="background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px" onclick="saveShiftForce()">Save anyway</button>`
+        const msgSpan = document.createElement('span')
+        msgSpan.appendChild(document.createTextNode('⚠️ ' + (d.error || 'Conflict detected')))
+        const forceBtn = document.createElement('button')
+        forceBtn.className = 'btn btn-sm'
+        forceBtn.style.cssText = 'background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px'
+        forceBtn.textContent = 'Save anyway'
+        forceBtn.addEventListener('click', saveShiftForce)
+        warn.appendChild(msgSpan)
+        warn.appendChild(forceBtn)
         footer.insertAdjacentElement('beforebegin', warn)
         return
       }
@@ -1427,17 +1645,28 @@ async function saveShift() {
     toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
     closeModal()
     renderView()
-  } catch (err) { toast(err.message, 'error') }
+  } catch (err) {
+    toast(err.message, 'error')
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save shift' }
+  }
 }
 
 // ── Drag-and-drop (week view) ──────────────────────────────────────────────────
 let _drag = null  // { shiftId, date, start_time, end_time, durationMins, ghost, colInnerTop, mode }
+let _ddPointerDownHandler = null  // stored reference so we can remove it before re-adding
 
 function _initDragDrop() {
   const grid = document.getElementById('calGrid')
   if (!grid || !canManage() || cfg.featureDragDrop === false) return
 
-  grid.addEventListener('pointerdown', e => {
+  // Remove previous listener to prevent stacking across re-renders
+  if (_ddPointerDownHandler) {
+    grid.removeEventListener('pointerdown', _ddPointerDownHandler)
+    _ddPointerDownHandler = null
+  }
+
+  _ddPointerDownHandler = e => {
     const card = e.target.closest('.cal-week-shift-card')
     const handle = e.target.closest('.shift-resize-handle')
     if (!card) return
@@ -1480,7 +1709,9 @@ function _initDragDrop() {
       originX: e.clientX, originY: e.clientY,
       currentDate: shift.date,
     }
-  })
+  }
+
+  grid.addEventListener('pointerdown', _ddPointerDownHandler)
 
   grid.addEventListener('pointermove', e => {
     if (!_drag) return
@@ -1570,6 +1801,170 @@ function _initDragDrop() {
     document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
     _drag = null
   })
+}
+
+// ── Undo-able delete ───────────────────────────────────────────────────────────
+let _undoTimer = null
+
+function _showUndoToast(message, shiftData) {
+  // Clear any pending undo
+  if (_undoTimer) clearTimeout(_undoTimer)
+
+  let container = document.getElementById('toast-container')
+  if (!container) {
+    container = document.createElement('div')
+    container.id = 'toast-container'
+    container.className = 'toast-container'
+    document.body.appendChild(container)
+  }
+
+  // Remove any existing undo toast
+  document.getElementById('undoDeleteToast')?.remove()
+
+  const t = document.createElement('div')
+  t.id = 'undoDeleteToast'
+  t.className = 'toast'
+  t.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:280px'
+  t.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0;opacity:.7"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+    <span style="flex:1">${message}</span>
+    <button id="undoDeleteBtn" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;font-size:12px;font-weight:700;padding:3px 9px;cursor:pointer;flex-shrink:0">Undo</button>`
+  container.appendChild(t)
+
+  document.getElementById('undoDeleteBtn').addEventListener('click', () => {
+    clearTimeout(_undoTimer)
+    t.remove()
+    undoDeleteShift(shiftData)
+  })
+
+  _undoTimer = setTimeout(() => {
+    t.style.opacity = '0'
+    t.style.transform = 'translateY(8px)'
+    t.style.transition = '200ms'
+    setTimeout(() => t.remove(), 200)
+  }, 5000)
+}
+
+async function undoDeleteShift(s) {
+  try {
+    await api('/api/shifts', {
+      method: 'POST',
+      body: {
+        user_id:     s.user_id,
+        date:        s.date,
+        location_id: s.location_id,
+        start_time:  s.start_time,
+        end_time:    s.end_time,
+        notes:       s.notes,
+        note_color:  s.note_color,
+        is_off:      s.is_off,
+        is_oncall:   s.is_oncall,
+      }
+    })
+    toast('Shift restored', 'success')
+    renderView()
+  } catch (err) {
+    toast('Could not restore shift: ' + err.message, 'error')
+  }
+}
+
+// ── Copy week to next week ─────────────────────────────────────────────────────
+async function copyWeekToNext() {
+  if (view !== 'week') return
+  const weekStart = prefs?.weekStartDay ?? 1
+  const ws   = startOfWeek(currentDate, weekStart)
+  const nextWs = new Date(ws); nextWs.setDate(nextWs.getDate() + 7)
+
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  // Determine which user IDs we're copying for
+  let targetUserIds = []
+  if (cfg.user.role === 'member' || filterVal === '') {
+    targetUserIds = [cfg.user.id]
+  } else if (filterVal.startsWith('user:')) {
+    targetUserIds = [filterVal.slice(5)]
+  } else if (filterVal === 'all' || filterVal.startsWith('team:')) {
+    const uniqueIds = [...new Set(shifts.map(s => s.user_id))]
+    targetUserIds = uniqueIds
+  }
+
+  const btn = document.getElementById('copyWeekBtn')
+  if (btn) { btn.disabled = true; btn.textContent = 'Copying…' }
+
+  let created = 0; let skipped = 0
+  try {
+    for (const s of shifts) {
+      if (!targetUserIds.includes(s.user_id)) continue
+      const [y, m, d] = s.date.split('-').map(Number)
+      const srcDate = new Date(y, m - 1, d)
+      const dayOffset = Math.round((srcDate - ws) / 86400000)
+      const targetDate = new Date(nextWs); targetDate.setDate(nextWs.getDate() + dayOffset)
+      const targetDateStr = toDateStr(targetDate)
+      // Skip if target already has a shift for this user
+      const exists = shifts.some(x => x.user_id === s.user_id && x.date === targetDateStr)
+      if (exists) { skipped++; continue }
+      await api('/api/shifts', {
+        method: 'POST',
+        body: {
+          user_id:     s.user_id,
+          date:        targetDateStr,
+          location_id: s.location_id,
+          start_time:  s.start_time,
+          end_time:    s.end_time,
+          notes:       s.notes,
+          note_color:  s.note_color,
+          is_off:      s.is_off,
+          is_oncall:   s.is_oncall,
+        }
+      })
+      created++
+    }
+    // Navigate to next week
+    currentDate = new Date(nextWs)
+    await renderView()
+    toast(`${created} shift${created !== 1 ? 's' : ''} copied to next week${skipped ? ` (${skipped} skipped — already exist)` : ''}`, 'success', 4000)
+  } catch (err) {
+    toast('Copy failed: ' + err.message, 'error')
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Copy week' }
+  }
+}
+
+// ── Mark day off / empty cell context menu ─────────────────────────────────────
+async function markDayOff(date, userId) {
+  const uid = userId || (canManage() ? null : cfg.user.id) || cfg.user.id
+  try {
+    await api('/api/shifts', {
+      method: 'POST',
+      body: { user_id: uid, date, is_off: true, note_color: '#6b7280' }
+    })
+    toast('Marked as off', 'success')
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function showEmptyCellMenu(e, date) {
+  dismissContextMenu()
+  const menu = document.createElement('div')
+  menu.id = 'shiftContextMenu'
+  menu.className = 'cal-context-menu'
+  menu.style.top  = e.clientY + 'px'
+  menu.style.left = e.clientX + 'px'
+
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  const singleUserId = filterVal.startsWith('user:') ? filterVal.slice(5) : cfg.user.id
+
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="dismissContextMenu();openCreateModal('${date}')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+      Add shift
+    </button>
+    <button class="ctx-item" onclick="dismissContextMenu();markDayOff('${date}','${singleUserId}')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+      Mark as off
+    </button>`
+  document.body.appendChild(menu)
+  const r = menu.getBoundingClientRect()
+  if (r.right  > window.innerWidth)  menu.style.left = (e.clientX - r.width)  + 'px'
+  if (r.bottom > window.innerHeight) menu.style.top  = (e.clientY - r.height) + 'px'
 }
 
 init()

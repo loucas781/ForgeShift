@@ -121,7 +121,12 @@ function renderAvatar(u) {
   const el = document.getElementById('profileAvatar')
   el.style.background = u.color || '#4f46e5'
   if (u.avatar) {
-    el.innerHTML = `<img src="${u.avatar}" alt="${u.name}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`
+    const img = document.createElement('img')
+    img.src = u.avatar
+    img.alt = u.name || ''
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit'
+    el.textContent = ''
+    el.appendChild(img)
   } else {
     el.textContent = u.initials || (u.name || '?').slice(0,2).toUpperCase()
   }

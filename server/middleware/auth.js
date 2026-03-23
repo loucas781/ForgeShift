@@ -2,6 +2,11 @@
 const jwt = require('jsonwebtoken')
 const db  = require('../db/connection')
 
+function clearCookieOpts() {
+  const secure = process.env.COOKIE_SECURE === 'true'
+  return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
+}
+
 function requireAuth(req, res, next) {
   const token = req.cookies?.token
   if (!token) {
@@ -13,13 +18,13 @@ function requireAuth(req, res, next) {
     // Validate token_version to support "sign out all devices"
     const row = db.prepare('SELECT token_version FROM users WHERE id = ?').get(req.user.id)
     if (!row || (row.token_version || 0) !== (req.user.tv || 0)) {
-      res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+      res.clearCookie('token', clearCookieOpts())
       if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
       return res.redirect('/login.html')
     }
     next()
   } catch (err) {
-    res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' })
+    res.clearCookie('token', clearCookieOpts())
     if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session expired' })
     return res.redirect('/login.html')
   }
@@ -29,7 +34,7 @@ function optionalAuth(req, res, next) {
   const token = req.cookies?.token
   if (token) {
     try { req.user = jwt.verify(token, process.env.JWT_SECRET) }
-    catch { res.clearCookie('token', { httpOnly: true, sameSite: 'lax', path: '/' }) }
+    catch { res.clearCookie('token', clearCookieOpts()) }
   }
   next()
 }

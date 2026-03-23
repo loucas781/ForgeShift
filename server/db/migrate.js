@@ -194,11 +194,22 @@ function migrateAdditive() {
     console.log('✓ Added prefs column')
   }
 
-  // On-call support
+  // Template last-applied tracking
+  const tmplCols = db.prepare("PRAGMA table_info(shift_templates)").all().map(c => c.name)
+  if (!tmplCols.includes('last_applied_at')) {
+    db.exec("ALTER TABLE shift_templates ADD COLUMN last_applied_at TEXT")
+    console.log('✓ Added last_applied_at column to shift_templates')
+  }
+
+  // On-call support + updated_by tracking
   const shiftCols = db.prepare("PRAGMA table_info(shifts)").all().map(c => c.name)
   if (!shiftCols.includes('is_oncall')) {
     db.exec("ALTER TABLE shifts ADD COLUMN is_oncall INTEGER NOT NULL DEFAULT 0")
     console.log('✓ Added is_oncall column to shifts')
+  }
+  if (!shiftCols.includes('updated_by')) {
+    db.exec("ALTER TABLE shifts ADD COLUMN updated_by TEXT REFERENCES users(id) ON DELETE SET NULL")
+    console.log('✓ Added updated_by column to shifts')
   }
 
   // Migrate task_assignments: rename week_start -> date if the old schema is present.
@@ -325,8 +336,8 @@ function migrateAdditive() {
     );
     CREATE INDEX IF NOT EXISTS idx_template_groups_sort ON template_groups(sort_order);
   `)
-  const tmplCols = db.prepare("PRAGMA table_info(shift_templates)").all().map(c => c.name)
-  if (!tmplCols.includes('group_id')) {
+  const tmplGroupCols = db.prepare("PRAGMA table_info(shift_templates)").all().map(c => c.name)
+  if (!tmplGroupCols.includes('group_id')) {
     db.exec("ALTER TABLE shift_templates ADD COLUMN group_id TEXT REFERENCES template_groups(id) ON DELETE SET NULL")
     console.log('✓ Added group_id column to shift_templates')
   }
@@ -343,6 +354,34 @@ function migrateAdditive() {
     CREATE INDEX IF NOT EXISTS idx_utg_group ON user_template_groups(group_id);
   `)
   console.log('✓ Template groups schema ready')
+
+  // Task list groups (visibility control, mirrors template groups pattern)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS task_list_groups (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_tlg_sort ON task_list_groups(sort_order);
+  `)
+  const tlCols = db.prepare("PRAGMA table_info(task_lists)").all().map(c => c.name)
+  if (!tlCols.includes('group_id')) {
+    db.exec("ALTER TABLE task_lists ADD COLUMN group_id TEXT REFERENCES task_list_groups(id) ON DELETE SET NULL")
+    console.log('✓ Added group_id column to task_lists')
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_task_list_groups (
+      user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      group_id TEXT NOT NULL REFERENCES task_list_groups(id) ON DELETE CASCADE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, group_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_utlg_user  ON user_task_list_groups(user_id);
+    CREATE INDEX IF NOT EXISTS idx_utlg_group ON user_task_list_groups(group_id);
+  `)
+  console.log('✓ Task list groups schema ready')
 
   // Session invalidation: token_version for JWT revocation across all devices
   {

@@ -108,16 +108,4 @@ router.put('/:id/members', requireAuth, requireAdmin, (req, res) => {
   }
 })
 
-// ── GET /api/template-groups/my — groups the current user belongs to ──────────
-router.get('/my', requireAuth, (req, res) => {
-  const groups = db.prepare(`
-    SELECT g.id, g.name
-    FROM template_groups g
-    JOIN user_template_groups utg ON utg.group_id = g.id
-    WHERE utg.user_id = ?
-    ORDER BY g.sort_order, g.name
-  `).all(req.user.id)
-  res.json(groups)
-})
-
 module.exports = router

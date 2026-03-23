@@ -25,6 +25,7 @@ const router  = require('express').Router()
 const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit   = require('../audit')
+const logger  = require('../utils/logger')
 const fs      = require('fs')
 const path    = require('path')
 
@@ -98,7 +99,7 @@ router.get('/export', (req, res) => {
     res.setHeader('Content-Length', Buffer.byteLength(json))
     res.send(json)
   } catch (err) {
-    console.error('backup export:', err.message)
+    logger.error('backup export:', err.message)
     res.status(500).json({ error: 'Export failed: ' + err.message })
   }
 })
@@ -546,7 +547,7 @@ router.post('/restore', (req, res) => {
     audit(req.user.id, 'backup.restore', 'system', null, manifest.exported_at, { stats })
     res.json({ ok: true, exported_at: manifest.exported_at, instance: manifest.instance, stats })
   } catch (err) {
-    console.error('backup restore error:', err.message)
+    logger.error('backup restore error:', err.message)
     res.status(500).json({ error: 'Restore failed: ' + err.message })
   } finally {
     // Always re-enable FK enforcement after the restore attempt — must be done
