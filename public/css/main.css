@@ -1360,9 +1360,6 @@ tr:hover td { background: var(--surface-2); }
   .modal-footer {
     padding: 0 16px calc(16px + var(--safe-bottom));
   }
-  .modal-grid-2 {
-    grid-template-columns: 1fr;
-  }
   .modal--shift .modal-body .form-input,
   .modal--shift .modal-body .form-select {
     min-height: 44px;
@@ -1398,4 +1395,10 @@ tr:hover td { background: var(--surface-2); }
   }
   .toast-container { bottom: calc(16px + var(--safe-bottom)); }
   .env-badge { bottom: calc(64px + var(--safe-bottom)); }
+}
+
+@media (max-width: 390px) {
+  .modal--shift .modal-grid-2 {
+    grid-template-columns: 1fr;
+  }
 }
