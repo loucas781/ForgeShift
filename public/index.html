@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ForgeShift — Calendar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -90,7 +90,7 @@
 
 <!-- Shift Modal -->
 <div class="modal-overlay" id="shiftModal">
-  <div class="modal">
+  <div class="modal modal--shift">
     <div class="modal-header">
       <h3 class="modal-title" id="modalTitle">Shift</h3>
       <button class="modal-close" onclick="closeModal()">✕</button>
@@ -132,7 +132,7 @@
           <option value="">— No location —</option>
         </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="modal-grid-2">
         <div class="form-group">
           <label class="form-label">Start time</label>
           <input type="time" class="form-input" id="modalStart">
@@ -2380,7 +2380,7 @@ init()
 .copy-week-fab {
   display: none;
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   right: 20px;
   width: 52px;
   height: 52px;
