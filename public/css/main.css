@@ -721,6 +721,11 @@ kbd.kbd-key { display:inline-flex;align-items:center;justify-content:center;padd
   overflow: hidden;
 }
 .modal-overlay.open .modal { transform: none; }
+.modal--readonly .form-input,
+.modal--readonly .form-select,
+.modal--readonly .form-textarea,
+.modal--readonly input[type="checkbox"] { pointer-events: none; opacity: .7; }
+.modal--readonly .btn-primary { display: none; }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 20px 24px 0; flex-shrink: 0;
@@ -1215,3 +1220,74 @@ tr:hover td { background: var(--surface-2); }
 .pref-choice-btn:hover { border-color: var(--brand); color: var(--brand); }
 .pref-choice-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 .holiday-set-row:hover { background: var(--surface-2) !important; }
+
+/* ── Quick-add hover indicator on empty month cells ──────── */
+.cal-cell.can-add::after {
+  content: '+';
+  position: absolute;
+  bottom: 5px; right: 6px;
+  font-size: 16px; font-weight: 300; line-height: 1;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+  pointer-events: none;
+}
+.cal-cell.can-add:hover::after { opacity: .6; }
+
+/* ── +N more badge in month view ─────────────────────────── */
+.cal-more-badge {
+  font-size: 10px; font-weight: 600;
+  color: var(--text-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+  display: inline-block;
+  margin-top: 1px;
+}
+.cal-more-badge:hover { background: var(--brand-light); color: var(--brand); border-color: var(--brand); }
+
+/* ── Print styles ─────────────────────────────────────────── */
+@media print {
+  /* Hide chrome, keep only the calendar grid */
+  .topbar, .cal-toolbar, .modal-overlay,
+  .toast-container, .env-badge, .env-topbar-badge,
+  #copyWeekBtn, #csvExportBtn, #liveIndicator { display: none !important; }
+
+  html, body { height: auto; overflow: visible; background: #fff; }
+  .app-shell { height: auto; overflow: visible; }
+  .page-content { overflow: visible; padding: 0; }
+  .cal-wrapper { height: auto; overflow: visible; }
+  .cal-grid { overflow: visible; height: auto; }
+
+  /* Month view: ensure full grid prints */
+  .cal-month { height: auto; }
+  .cal-cell { min-height: 80px; page-break-inside: avoid; }
+
+  /* Week view: ensure full time grid prints */
+  .cal-week-scroll-wrap { overflow: visible; }
+  .cal-week-outer { overflow: visible; }
+  .cal-week-body { overflow: visible; }
+
+  /* Force light theme colours on print */
+  :root {
+    --text:     #111827;
+    --text-2:   #374151;
+    --text-3:   #6b7280;
+    --border:   #e5e7eb;
+    --bg:       #fff;
+    --surface:  #fff;
+    --surface-2:#f9fafb;
+  }
+
+  /* Add the month/week title at top */
+  .cal-title { font-size: 18px; font-weight: 800; display: block !important; margin: 0 0 8px; }
+
+  /* Shift chips render with a border so they're legible on B&W printers */
+  .cal-shift-chip, .cal-week-shift-card {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

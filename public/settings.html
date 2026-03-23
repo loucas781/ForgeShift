@@ -372,6 +372,7 @@
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="tlName" placeholder="e.g. Monitoring Round"></div>
       <div class="form-group"><label class="form-label">Description <span style="color:var(--text-3);font-weight:400">(optional)</span></label><textarea class="form-input" id="tlDescription" rows="3" placeholder="Describe what this task list involves…" style="resize:vertical;min-height:72px"></textarea></div>
+      <div class="form-group"><label class="form-label">Group <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlGroup"><option value="">— Ungrouped (visible to all) —</option></select></div>
       <div class="form-group"><label class="form-label">Linked location <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlLocation"><option value="">— None —</option></select></div>
       <div class="form-group"><label class="form-label">Colour</label><div id="tlColourPicker"></div></div>
     </div>
@@ -1832,6 +1833,7 @@ async function deleteUser(id, name) {
 // ── Locations panel ────────────────────────────────────────────────────────────
 // ── Features panel ─────────────────────────────────────────────────────────────
 let taskLists = []
+let taskListGroups = []
 let editingTaskListId = null
 let tlColour = '#4f46e5'
 
@@ -1868,6 +1870,16 @@ async function renderFeaturesPanel() {
     </div>
 
     <div id="taskListsSection" style="display:${featData.feature_tasks ? 'block' : 'none'}">
+      <div class="card section-card" style="margin-bottom:20px">
+        <div class="card-header">
+          <h3 class="card-title">Task List Groups</h3>
+          <button class="btn btn-secondary btn-sm" onclick="openCreateTaskListGroupModal()">+ Create group</button>
+        </div>
+        <div class="card-body">
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Organise task lists into groups and control which members can see them. Members only see task lists belonging to groups they are assigned to. Ungrouped task lists are visible to everyone.</p>
+          <div id="taskListGroupsEl">Loading…</div>
+        </div>
+      </div>
       <div class="card section-card">
         <div class="card-header">
           <h3 class="card-title">Task Lists</h3>
@@ -1875,29 +1887,68 @@ async function renderFeaturesPanel() {
         </div>
         <div class="card-body" style="padding:0">
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Group</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
             <tbody id="taskListsBody"></tbody>
           </table></div>
         </div>
       </div>
     </div>`
-  await loadTaskLists()
+  await Promise.all([loadTaskLists(), loadTaskListGroups()])
   renderTaskListsTable()
 }
 
 async function loadTaskLists() {
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
 }
+async function loadTaskListGroups() {
+  try { taskListGroups = await api('/api/task-list-groups') } catch { taskListGroups = [] }
+  renderTaskListGroupsEl()
+}
+function renderTaskListGroupsEl() {
+  const el = document.getElementById('taskListGroupsEl')
+  if (!el) return
+  if (!taskListGroups.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-3)">No task list groups yet. Create one to start controlling task list visibility.</p>'
+    return
+  }
+  el.innerHTML = taskListGroups.map(g => {
+    const memberPills = (g.members || []).length
+      ? g.members.map(m => `
+          <span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
+            ${_avatarHTML(m, 'xs')}
+            ${m.name}
+          </span>`).join('')
+      : '<span style="font-size:12px;color:var(--text-3)">No members assigned</span>'
+    return `<div class="member-row">
+      <div class="member-info" style="flex:1;min-width:0">
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="color:var(--text-3);flex-shrink:0"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+            ${g.name}
+            <span class="badge badge-gray" style="font-size:10px">${g.list_count} list${g.list_count !== 1 ? 's' : ''}</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${memberPills}</div>
+        </div>
+      </div>
+      <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openTaskListGroupMembersModal('${g.id}')">Manage members</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRenameTaskListGroupModal('${g.id}', '${g.name.replace(/'/g, "\\'")}')">Rename</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTaskListGroup('${g.id}','${g.name.replace(/'/g, "\\'")}')">Delete</button>
+      </div>
+    </div>`
+  }).join('')
+}
 
 function renderTaskListsTable() {
   const tbody = document.getElementById('taskListsBody')
   if (!tbody) return
   if (!taskLists.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
     return
   }
   tbody.innerHTML = taskLists.map(t => `<tr>
     <td style="font-weight:600">${t.name}</td>
+    <td style="font-size:13px">${t.group_name ? `<span style="display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" style="color:var(--text-3)"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>${t.group_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
     <td style="color:var(--text-2);font-size:13px;max-width:260px">${t.description ? `<span title="${t.description.replace(/"/g,'&quot;')}">${t.description.length>80?t.description.slice(0,80)+'…':t.description}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
     <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:${t.location_color||'#888'};flex-shrink:0"></span>${t.location_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
     <td><div style="width:20px;height:20px;border-radius:50%;background:${t.color};border:1px solid var(--border)"></div></td>
@@ -1922,6 +1973,7 @@ async function toggleFeatureTasks(enabled) {
   try {
     await api('/api/features', { method: 'PATCH', body: { feature_tasks: enabled } })
     document.getElementById('taskListsSection').style.display = enabled ? 'block' : 'none'
+    if (enabled) await Promise.all([loadTaskLists(), loadTaskListGroups()])
     toast('Feature ' + (enabled ? 'enabled' : 'disabled'), 'success')
   } catch (err) {
     toast(err.message, 'error')
@@ -1929,11 +1981,18 @@ async function toggleFeatureTasks(enabled) {
   }
 }
 
+function _populateTlGroupSelect(selectedId) {
+  const sel = document.getElementById('tlGroup')
+  if (!sel) return
+  sel.innerHTML = '<option value="">— Ungrouped (visible to all) —</option>' +
+    taskListGroups.map(g => `<option value="${g.id}"${g.id === selectedId ? ' selected' : ''}>${g.name}</option>`).join('')
+}
 function openCreateTaskList() {
   editingTaskListId = null; tlColour = '#4f46e5'
   document.getElementById('taskListModalTitle').textContent = 'Add Task List'
   document.getElementById('tlName').value = ''
   document.getElementById('tlDescription').value = ''
+  _populateTlGroupSelect(null)
   _populateTlLocationSelect(null)
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
@@ -1944,6 +2003,7 @@ function openEditTaskList(id) {
   document.getElementById('taskListModalTitle').textContent = 'Edit Task List'
   document.getElementById('tlName').value = t.name
   document.getElementById('tlDescription').value = t.description || ''
+  _populateTlGroupSelect(t.group_id)
   _populateTlLocationSelect(t.location_id)
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
@@ -1951,7 +2011,6 @@ function openEditTaskList(id) {
 function _populateTlLocationSelect(selectedId) {
   const sel = document.getElementById('tlLocation')
   if (!sel) return
-  // locations is already loaded in renderLocationsPanel — fetch fresh if needed
   api('/api/locations').then(locs => {
     sel.innerHTML = '<option value="">— None —</option>' +
       locs.map(l => `<option value="${l.id}"${l.id === selectedId ? ' selected' : ''}>${l.name}</option>`).join('')
@@ -1965,11 +2024,12 @@ function setupTlColour() {
 async function saveTaskList() {
   const name = document.getElementById('tlName').value.trim()
   const description = document.getElementById('tlDescription').value.trim() || null
+  const group_id = document.getElementById('tlGroup').value || null
   const location_id = document.getElementById('tlLocation').value || null
   if (!name) { toast('Name required', 'error'); return }
   try {
-    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, location_id } })
-    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, location_id } })
+    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, group_id, location_id } })
+    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, group_id, location_id } })
     closeTaskListModal()
     await loadTaskLists(); renderTaskListsTable()
     toast('Task list saved', 'success')
@@ -1987,6 +2047,151 @@ async function deleteTaskList(id, name) {
 document.getElementById('taskListModal').addEventListener('click', e => {
   if (e.target === document.getElementById('taskListModal')) closeTaskListModal()
 })
+
+// ── Task List Groups ───────────────────────────────────────────────────────────
+function openCreateTaskListGroupModal() {
+  const existing = document.getElementById('createTLGroupModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'createTLGroupModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Task List Group</h3>
+        <button class="modal-close" onclick="document.getElementById('createTLGroupModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Group name</label>
+          <input type="text" class="form-input" id="ctlgName" placeholder="e.g. Site A, Night Team">
+        </div>
+        <p style="font-size:12px;color:var(--text-3);margin-top:4px">Members assigned to this group will see task lists belonging to it.</p>
+        <div id="ctlgError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('createTLGroupModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doCreateTaskListGroup()">Create group</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('ctlgName').focus(), 50)
+}
+async function doCreateTaskListGroup() {
+  const name = document.getElementById('ctlgName').value.trim()
+  const errEl = document.getElementById('ctlgError')
+  if (!name) { errEl.style.display = 'block'; errEl.textContent = 'Group name is required.'; return }
+  try {
+    await api('/api/task-list-groups', { method: 'POST', body: { name } })
+    document.getElementById('createTLGroupModal').remove()
+    await loadTaskListGroups()
+    toast('Task list group created', 'success')
+  } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
+}
+function openRenameTaskListGroupModal(id, currentName) {
+  const existing = document.getElementById('renameTLGroupModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'renameTLGroupModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Rename Group</h3>
+        <button class="modal-close" onclick="document.getElementById('renameTLGroupModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Group name</label>
+          <input type="text" class="form-input" id="rtlgName" value="${currentName}">
+        </div>
+        <div id="rtlgError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('renameTLGroupModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doRenameTaskListGroup('${id}')">Save</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => { const i = document.getElementById('rtlgName'); i.focus(); i.select() }, 50)
+}
+async function doRenameTaskListGroup(id) {
+  const name = document.getElementById('rtlgName').value.trim()
+  const errEl = document.getElementById('rtlgError')
+  if (!name) { errEl.style.display = 'block'; errEl.textContent = 'Name is required.'; return }
+  try {
+    await api(`/api/task-list-groups/${id}`, { method: 'PATCH', body: { name } })
+    document.getElementById('renameTLGroupModal').remove()
+    await loadTaskListGroups()
+    toast('Group renamed', 'success')
+  } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
+}
+async function deleteTaskListGroup(id, name) {
+  if (!confirm(`Delete group "${name}"? Task lists in this group will become ungrouped. Members assigned to this group will lose access to those task lists unless assigned to another group.`)) return
+  try {
+    await api(`/api/task-list-groups/${id}`, { method: 'DELETE' })
+    await Promise.all([loadTaskListGroups(), loadTaskLists()])
+    renderTaskListsTable()
+    toast('Task list group deleted', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+function openTaskListGroupMembersModal(groupId) {
+  const group = taskListGroups.find(g => g.id === groupId)
+  if (!group) return
+  const assignableUsers = users.filter(u => u.is_active && u.role !== 'admin')
+  const memberIds = new Set((group.members || []).map(m => m.id))
+  const existing = document.getElementById('tlGroupMembersModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'tlGroupMembersModal'
+  modal.className = 'modal-overlay'
+  const rows = assignableUsers.length
+    ? assignableUsers.map(u => `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
+          <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}
+            style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+          ${_avatarHTML(u, 'md')}
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:13px">${u.name}</div>
+            <div style="font-size:11px;color:var(--text-3)">${u.email} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role}</span></div>
+          </div>
+        </label>`).join('')
+    : '<p style="font-size:13px;color:var(--text-3);padding:8px 0">No members or shift leads to assign.</p>'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Assign Members — ${group.name}</h3>
+        <button class="modal-close" onclick="document.getElementById('tlGroupMembersModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">
+          Selected users will see task lists belonging to the <strong>${group.name}</strong> group. Admins always see all task lists.
+        </p>
+        <div id="tlGroupMemberRows" style="max-height:320px;overflow-y:auto">${rows}</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('tlGroupMembersModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTLGroupMembers('${groupId}')">Save</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+}
+async function saveTLGroupMembers(groupId) {
+  const checkboxes = document.querySelectorAll('#tlGroupMemberRows input[type=checkbox]')
+  const user_ids = Array.from(checkboxes).filter(c => c.checked).map(c => c.value)
+  try {
+    await api(`/api/task-list-groups/${groupId}/members`, { method: 'PUT', body: { user_ids } })
+    document.getElementById('tlGroupMembersModal').remove()
+    await loadTaskListGroups()
+    toast('Members updated', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
 
 async function renderLocationsPanel() {
   const el = document.getElementById('panel-locations')

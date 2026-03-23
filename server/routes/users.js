@@ -35,7 +35,17 @@ function getInitials(name) {
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
+// Supports optional ?limit=N&offset=N pagination. Without these params returns all users.
 router.get('/', requireAuth, (req, res) => {
+  if (req.query.limit !== undefined || req.query.offset !== undefined) {
+    const limit  = Math.min(Math.max(parseInt(req.query.limit  || '50'), 1), 200)
+    const offset = Math.max(parseInt(req.query.offset || '0'), 0)
+    const users  = db.prepare(
+      'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users ORDER BY name LIMIT ? OFFSET ?'
+    ).all(limit, offset)
+    const total = db.prepare('SELECT COUNT(*) as c FROM users').get().c
+    return res.json({ users, total, limit, offset })
+  }
   const users = db.prepare(
     'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users ORDER BY name'
   ).all()

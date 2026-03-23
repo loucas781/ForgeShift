@@ -4,17 +4,38 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
 const audit  = require('../audit')
+const { getShiftLeadScope } = require('../utils/scope')
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
+// Admin: all lists. Others: ungrouped (public) lists + lists in groups they belong to.
 router.get('/lists', requireAuth, (req, res) => {
   try {
-    const lists = db.prepare(`
-      SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color
-      FROM task_lists t
-      LEFT JOIN users u ON u.id = t.created_by
-      LEFT JOIN locations l ON l.id = t.location_id
-      ORDER BY t.sort_order, t.name
-    `).all()
+    let lists
+    if (req.user.role === 'admin') {
+      lists = db.prepare(`
+        SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
+               g.name as group_name, g.id as group_id
+        FROM task_lists t
+        LEFT JOIN users u ON u.id = t.created_by
+        LEFT JOIN locations l ON l.id = t.location_id
+        LEFT JOIN task_list_groups g ON g.id = t.group_id
+        ORDER BY g.sort_order, g.name, t.sort_order, t.name
+      `).all()
+    } else {
+      lists = db.prepare(`
+        SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
+               g.name as group_name, g.id as group_id
+        FROM task_lists t
+        LEFT JOIN users u ON u.id = t.created_by
+        LEFT JOIN locations l ON l.id = t.location_id
+        LEFT JOIN task_list_groups g ON g.id = t.group_id
+        WHERE t.group_id IS NULL
+           OR t.group_id IN (
+             SELECT group_id FROM user_task_list_groups WHERE user_id = ?
+           )
+        ORDER BY g.sort_order, g.name, t.sort_order, t.name
+      `).all(req.user.id)
+    }
     res.json(lists)
   } catch (err) {
     console.error('tasks/lists get:', err.message)
@@ -25,15 +46,18 @@ router.get('/lists', requireAuth, (req, res) => {
 // ── POST /api/tasks/lists — create a task list ────────────────────────────────
 router.post('/lists', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, color, description, location_id, sort_order } = req.body
+    const { name, color, description, location_id, sort_order, group_id } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
     const id = uuidv4()
-    db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, created_by) VALUES (?,?,?,?,?,?,?)')
-      .run(id, name.trim(), color || '#0052cc', description?.trim() || null, location_id || null, sort_order ?? 0, req.user.id)
+    db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, group_id, created_by) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, name.trim(), color || '#0052cc', description?.trim() || null, location_id || null, sort_order ?? 0, group_id || null, req.user.id)
     const list = db.prepare(`
-      SELECT t.*, l.name as location_name, l.color as location_color
-      FROM task_lists t LEFT JOIN locations l ON l.id = t.location_id WHERE t.id = ?`).get(id)
-    audit(req.user.id, 'tasklist.create', 'task_list', id, name.trim())
+      SELECT t.*, l.name as location_name, l.color as location_color, g.name as group_name
+      FROM task_lists t
+      LEFT JOIN locations l ON l.id = t.location_id
+      LEFT JOIN task_list_groups g ON g.id = t.group_id
+      WHERE t.id = ?`).get(id)
+    audit(req.user.id, 'task_list.create', 'task_list', id, name.trim())
     res.status(201).json(list)
   } catch (err) {
     console.error('task list create:', err.message)
@@ -46,20 +70,25 @@ router.put('/lists/:id', requireAuth, requireAdmin, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
-    const { name, color, description, location_id, sort_order } = req.body
-    db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=? WHERE id=?')
+    const { name, color, description, location_id, sort_order, group_id } = req.body
+    db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, group_id=? WHERE id=?')
       .run(
         name?.trim() || list.name,
         color || list.color,
         description !== undefined ? (description?.trim() || null) : list.description,
         location_id !== undefined ? (location_id || null) : list.location_id,
         sort_order ?? list.sort_order,
+        group_id !== undefined ? (group_id || null) : list.group_id,
         req.params.id
       )
     const updated = db.prepare(`
-      SELECT t.*, l.name as location_name, l.color as location_color
-      FROM task_lists t LEFT JOIN locations l ON l.id = t.location_id WHERE t.id = ?`).get(req.params.id)
-    audit(req.user.id, 'tasklist.update', 'task_list', req.params.id, updated.name)
+      SELECT t.*, l.name as location_name, l.color as location_color,
+             g.name as group_name
+      FROM task_lists t
+      LEFT JOIN locations l ON l.id = t.location_id
+      LEFT JOIN task_list_groups g ON g.id = t.group_id
+      WHERE t.id = ?`).get(req.params.id)
+    audit(req.user.id, 'task_list.update', 'task_list', req.params.id, updated.name)
     res.json(updated)
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -72,7 +101,7 @@ router.delete('/lists/:id', requireAuth, requireAdmin, (req, res) => {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
     db.prepare('DELETE FROM task_lists WHERE id = ?').run(req.params.id)
-    audit(req.user.id, 'tasklist.delete', 'task_list', req.params.id, list.name)
+    audit(req.user.id, 'task_list.delete', 'task_list', req.params.id, list.name)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -103,21 +132,11 @@ router.get('/assignments', requireAuth, (req, res) => {
       // no extra filter — admins see all assignments, including individual user views
     } else if (req.user.role === 'shift_lead') {
       // Always constrain to team scope whether or not a specific user_id was requested.
-      const teams = db.prepare('SELECT id FROM teams WHERE owned_by = ? OR created_by = ?').all(req.user.id, req.user.id)
-      let scopeIds
-      if (teams.length) {
-        const teamIds = teams.map(t => t.id)
-        const members = db.prepare(
-          `SELECT DISTINCT user_id FROM team_members WHERE team_id IN (${teamIds.map(() => '?').join(',')})`
-        ).all(...teamIds).map(m => m.user_id)
-        members.push(req.user.id)
-        scopeIds = members
-      } else {
-        scopeIds = [req.user.id]
-      }
+      const scope = getShiftLeadScope(req.user.id)
+      const scopeIds = [...scope]
       if (user_id) {
         // Specific user requested — must be in scope
-        if (!scopeIds.includes(user_id)) return res.status(403).json({ error: 'That user is not in your team.' })
+        if (!scope.has(user_id)) return res.status(403).json({ error: 'That user is not in your team.' })
         // user_id filter already applied to SQL above; no extra IN clause needed
       } else {
         sql += ` AND a.user_id IN (${scopeIds.map(() => '?').join(',')})`

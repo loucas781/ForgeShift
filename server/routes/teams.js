@@ -47,16 +47,23 @@ router.get('/', requireAuth, (req, res) => {
     `).all(userId)
   }
 
-  const members = db.prepare(`
-    SELECT tm.team_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.is_active
-    FROM team_members tm JOIN users u ON u.id = tm.user_id ORDER BY u.name
-  `).all()
-  const membersByTeam = {}
-  members.forEach(m => {
-    if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
-    membersByTeam[m.team_id].push({ id: m.id, name: m.name, initials: m.initials, color: m.color, avatar: m.avatar, role: m.role, is_active: m.is_active })
-  })
-  teams.forEach(t => { t.members = membersByTeam[t.id] || [] })
+  if (teams.length) {
+    const teamIds = teams.map(t => t.id)
+    const members = db.prepare(`
+      SELECT tm.team_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.is_active
+      FROM team_members tm JOIN users u ON u.id = tm.user_id
+      WHERE tm.team_id IN (${teamIds.map(() => '?').join(',')})
+      ORDER BY u.name
+    `).all(...teamIds)
+    const membersByTeam = {}
+    members.forEach(m => {
+      if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
+      membersByTeam[m.team_id].push({ id: m.id, name: m.name, initials: m.initials, color: m.color, avatar: m.avatar, role: m.role, is_active: m.is_active })
+    })
+    teams.forEach(t => { t.members = membersByTeam[t.id] || [] })
+  } else {
+    teams.forEach(t => { t.members = [] })
+  }
   res.json(teams)
 })
 

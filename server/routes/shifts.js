@@ -5,19 +5,7 @@ const db     = require('../db/connection')
 const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
 const audit  = require('../audit')
 const { buildHolidayMapServer } = require('../holidays')
-
-// Helper: get IDs of all members in teams owned by a shift_lead (+ themselves)
-function getShiftLeadScope(userId) {
-  const teams = db.prepare('SELECT id FROM teams WHERE owned_by = ? OR created_by = ?').all(userId, userId)
-  if (!teams.length) return new Set([userId])
-  const teamIds = teams.map(t => t.id)
-  const members = db.prepare(
-    `SELECT DISTINCT user_id FROM team_members WHERE team_id IN (${teamIds.map(() => '?').join(',')})`
-  ).all(...teamIds)
-  const ids = new Set(members.map(m => m.user_id))
-  ids.add(userId)
-  return ids
-}
+const { getShiftLeadScope } = require('../utils/scope')
 
 // ── GET /api/shifts ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
@@ -152,27 +140,34 @@ router.post('/', requireAuth, (req, res) => {
       return res.status(403).json({ error: 'Members cannot create shifts. Contact your admin or shift lead.' })
     }
 
-    const existing = db.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ?').get(targetUserId, date)
-    if (existing) return res.status(409).json({ error: 'A shift already exists for this user on this date.' })
+    let id, shift
+    const checkAndInsert = db.transaction(() => {
+      const existing = db.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ?').get(targetUserId, date)
+      if (existing) return { conflict: 'date' }
 
-    // Time overlap check (skipped when force=true query param is set)
-    if (!req.query.force && start_time && end_time) {
-      const overlap = db.prepare(`
-        SELECT id FROM shifts
-        WHERE user_id = ? AND date = ? AND start_time IS NOT NULL AND end_time IS NOT NULL
-          AND start_time < ? AND end_time > ?
-      `).get(targetUserId, date, end_time, start_time)
-      if (overlap) return res.status(409).json({ error: 'This shift overlaps with an existing shift.', conflict: true })
-    }
+      // Time overlap check (skipped when force=true query param is set)
+      if (!req.query.force && start_time && end_time) {
+        const overlap = db.prepare(`
+          SELECT id FROM shifts
+          WHERE user_id = ? AND date = ? AND start_time IS NOT NULL AND end_time IS NOT NULL
+            AND start_time < ? AND end_time > ?
+        `).get(targetUserId, date, end_time, start_time)
+        if (overlap) return { conflict: 'time' }
+      }
 
-    const id = uuidv4()
-    db.prepare(`
-      INSERT INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, created_by)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    `).run(id, targetUserId, date, location_id || null, start_time || null, end_time || null,
-           notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id)
+      id = uuidv4()
+      db.prepare(`
+        INSERT INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      `).run(id, targetUserId, date, location_id || null, start_time || null, end_time || null,
+             notes || null, note_color || '#0052cc', is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id)
+      shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(id)
+      return { ok: true }
+    })
 
-    const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(id)
+    const result = checkAndInsert()
+    if (result.conflict === 'date') return res.status(409).json({ error: 'A shift already exists for this user on this date.' })
+    if (result.conflict === 'time') return res.status(409).json({ error: 'This shift overlaps with an existing shift.', conflict: true })
     audit(req.user.id, 'shift.create', 'shift', id, date)
     req.app.locals.broadcastShiftEvent?.('shift.create', shift, req.user.id)
     res.status(201).json(shift)
@@ -311,6 +306,11 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
       }
     })
     tx()
+
+    // Stamp last applied time on the template
+    if (created.length > 0) {
+      db.prepare("UPDATE shift_templates SET last_applied_at = datetime('now') WHERE id = ?").run(template_id)
+    }
 
     audit(req.user.id, 'shift.template_apply', 'shift', template_id, tmpl.name, { user_id, week_start, days: created.length, skipped: skipped.length })
     if (created.length) req.app.locals.broadcastShiftEvent?.('shift.create', { user_id, week_start }, req.user.id)

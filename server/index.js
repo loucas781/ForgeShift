@@ -56,17 +56,18 @@ const rateLimit    = require('express-rate-limit')
 const { requireAuth, optionalAuth } = require('./middleware/auth')
 const { getPasswordPolicy } = require('./auth-utils')
 const emailSvc = require('./email')
+const logger   = require('./utils/logger')
 
 const app = express()
 
 app.use(express.json({ limit: '5mb' }))
-app.use(express.urlencoded({ extended: false }))
+app.use(express.urlencoded({ extended: false, limit: '1mb' }))
 // Raw text body parser for backup restore (accepts large .fsbackup files)
 app.use('/api/backup/restore', express.text({ limit: '256mb', type: 'text/plain' }))
 app.use(cookieParser())
 
 app.use((req, res, next) => {
-  console.log(`[req] ${req.method} ${req.path}`)
+  logger.debug(`[req] ${req.method} ${req.path}`)
   next()
 })
 
@@ -78,8 +79,32 @@ app.use('/api/auth', rateLimit({
   message: { error: 'Too many attempts — please wait 15 minutes.' },
 }))
 
+// Rate limit on data write operations (POST/PUT/PATCH/DELETE to most API routes)
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false,
+  skip: (req) => process.env.APP_ENV === 'development' || !['POST','PUT','PATCH','DELETE'].includes(req.method),
+  message: { error: 'Too many requests — please slow down.' },
+})
+app.use('/api/shifts',    writeLimiter)
+app.use('/api/teams',     writeLimiter)
+app.use('/api/templates', writeLimiter)
+app.use('/api/users',     writeLimiter)
+app.use('/api/locations', writeLimiter)
+app.use('/api/tasks',     writeLimiter)
+
 // Serve static files
 app.use(express.static(path.join(__dirname, '../public'), { index: false }))
+
+// ── Health check ───────────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  try {
+    const db = require('./db/connection')
+    db.prepare('SELECT 1').get()
+    res.json({ ok: true, version: APP_VERSION, uptime: Math.floor(process.uptime()) })
+  } catch (err) {
+    res.status(503).json({ ok: false, error: 'Database unavailable' })
+  }
+})
 
 // ── Config endpoint ────────────────────────────────────────────────────────────
 app.get('/api/config', optionalAuth, (req, res) => {
@@ -263,6 +288,7 @@ app.use('/api/teams',            require('./routes/teams'))
 app.use('/api/ical',             require('./routes/ical'))
 app.use('/api/backup',           require('./routes/backup'))
 app.use('/api/tasks',            require('./routes/tasks'))
+app.use('/api/task-list-groups', require('./routes/task-list-groups'))
 app.use('/api/holidays',         require('./routes/holidays'))
 app.use('/api/passkeys',         require('./routes/passkeys'))
 
@@ -338,13 +364,31 @@ app.use((req, res) => {
 
 // ── Error handler ──────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(err)
+  logger.error(`Unhandled error on ${req.method} ${req.path}:`, err.message || err)
   if (req.path.startsWith('/api/')) return res.status(500).json({ error: 'Internal server error' })
   res.status(500).send('Server error')
 })
 
+// ── Periodic cleanup of expired password reset tokens ─────────────────────────
+function cleanExpiredTokens() {
+  try {
+    const db = require('./db/connection')
+    const now = new Date().toISOString()
+    const tokens   = db.prepare("DELETE FROM password_reset_tokens   WHERE expires_at < ? OR used = 1").run(now)
+    const sessions = db.prepare("DELETE FROM password_reset_sessions WHERE expires_at < ? OR used = 1").run(now)
+    if (tokens.changes || sessions.changes) {
+      logger.debug(`Token cleanup: removed ${tokens.changes} tokens, ${sessions.changes} sessions`)
+    }
+  } catch (err) {
+    logger.error('Token cleanup failed:', err.message)
+  }
+}
+// Run on startup and every 30 minutes
+cleanExpiredTokens()
+setInterval(cleanExpiredTokens, 30 * 60 * 1000)
+
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '3000')
 app.listen(PORT, () => {
-  console.log(`\n  ForgeShift [${env}] running at http://localhost:${PORT}\n`)
+  logger.info(`ForgeShift [${env}] running at http://localhost:${PORT}`)
 })
