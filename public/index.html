@@ -75,6 +75,10 @@
           </div>
         </div>
         <!-- Grid -->
+        <div id="calEmptyBanner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;margin:0 0 6px;background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;font-size:13px;color:var(--text-3)">
+          <span id="calEmptyBannerMsg"></span>
+          <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
+        </div>
         <div class="cal-grid" id="calGrid"></div>
       </div>
     </main>
@@ -254,7 +258,9 @@ async function init() {
     document.getElementById('adminUserField').style.display = 'block'
   }
 
-  await Promise.all([loadLocations(), loadUsers(), loadTeams(), loadTaskLists()])
+  const _initResults = await Promise.allSettled([loadLocations(), loadUsers(), loadTeams(), loadTaskLists()])
+  const _initFailed = _initResults.filter(r => r.status === 'rejected')
+  if (_initFailed.length) console.warn('Init: some data failed to load', _initFailed.map(r => r.reason?.message))
   renderView()
 
   document.getElementById('prevBtn').addEventListener('click', prev)
@@ -271,14 +277,18 @@ async function loadLocations() {
   locations = await api('/api/locations')
   const sel = document.getElementById('modalLocation')
   const locFilter = document.getElementById('locationFilter')
+  const selFrag = document.createDocumentFragment()
+  const filterFrag = document.createDocumentFragment()
   locations.forEach(l => {
     const o = document.createElement('option')
     o.value = l.id; o.textContent = l.name
-    sel.appendChild(o)
+    selFrag.appendChild(o)
     const o2 = document.createElement('option')
     o2.value = l.id; o2.textContent = l.name
-    locFilter.appendChild(o2)
+    filterFrag.appendChild(o2)
   })
+  sel.appendChild(selFrag)
+  locFilter.appendChild(filterFrag)
   // Only show the location filter if there are multiple locations
   if (locations.length > 1) {
     document.getElementById('locationFilterWrap').style.display = 'block'
@@ -297,16 +307,17 @@ async function loadUsers() {
     users = allUsers
   }
   const msel = document.getElementById('modalUser')
-  users.filter(u => u.is_active).forEach(u => {
-    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-    msel.appendChild(o)
-  })
-  // Also populate task assignment user select
   const tasel = document.getElementById('taUser')
+  const mFrag = document.createDocumentFragment()
+  const taFrag = document.createDocumentFragment()
   users.filter(u => u.is_active).forEach(u => {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-    tasel.appendChild(o)
+    mFrag.appendChild(o)
+    const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+    taFrag.appendChild(o2)
   })
+  msel.appendChild(mFrag)
+  tasel.appendChild(taFrag)
 }
 
 let teams = []
@@ -323,17 +334,19 @@ async function loadTeams() {
     const allUsers = users  // already loaded in loadUsers
     users = allUsers.filter(u => teamMemberIds.has(u.id))
     const msel = document.getElementById('modalUser')
-    msel.innerHTML = ''
-    users.forEach(u => {
-      const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-      msel.appendChild(o)
-    })
     const tasel = document.getElementById('taUser')
-    tasel.innerHTML = ''
+    const mFrag2 = document.createDocumentFragment()
+    const taFrag2 = document.createDocumentFragment()
     users.forEach(u => {
       const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-      tasel.appendChild(o)
+      mFrag2.appendChild(o)
+      const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+      taFrag2.appendChild(o2)
     })
+    msel.innerHTML = ''
+    msel.appendChild(mFrag2)
+    tasel.innerHTML = ''
+    tasel.appendChild(taFrag2)
   }
 
   const sel = document.getElementById('teamFilter')
@@ -422,7 +435,10 @@ function getHolidayMap(year) {
   return _holidayCache[year]
 }
 
-function invalidateHolidayCache() { _holidayCache = {} }
+function invalidateHolidayCache(year) {
+  if (year != null) delete _holidayCache[year]
+  else _holidayCache = {}
+}
 
 // ── Data loading ───────────────────────────────────────────────────────────────
 // Returns { start, end } Date objects for the currently visible calendar range.
@@ -467,7 +483,8 @@ async function loadShifts() {
           const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
           return api('/api/shifts?' + p)
         })
-        shifts = (await Promise.all(fetches)).flat()
+        const results = await Promise.allSettled(fetches)
+        shifts = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value)
         return
       }
     } else if (filterVal.startsWith('user:')) {
@@ -676,32 +693,28 @@ function renderMonth() {
   html += '</div>'
   grid.innerHTML = html
 
-  // Empty state: if no shifts exist for any day in the current month, replace grid with empty state
+  // Empty state banner — full calendar always renders, banner shown above when no shifts
   const hasShiftsThisMonth = visibleShifts.some(s => s.date >= toDateStr(first) && s.date <= toDateStr(last))
-  if (!hasShiftsThisMonth) {
-    const isLocFiltered = locFilterVal !== ''
-    // Keep only the day-name header row, replace cell area with centered empty state
-    const headerHtml = `<div class="cal-month${compact ? ' compact-chips' : ''}${showWkNums ? ' has-weeknums' : ''}">
-      ${showWkNums ? '<div class="cal-wknum-header"></div>' : ''}
-      ${dayAbbrs.map(d => `<div class="cal-day-header">${d}</div>`).join('')}
-    </div>`
-    grid.innerHTML = headerHtml
-    grid.style.position = ''
-
-    const hint = document.createElement('div')
-    hint.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;padding:48px 16px'
-    hint.innerHTML = `<div style="text-align:center;color:var(--text-3)">
-      <div style="font-size:40px;margin-bottom:14px">📅</div>
-      <div style="font-size:15px;font-weight:600;color:var(--text-2);margin-bottom:4px">${isLocFiltered ? 'No shifts at this location' : 'No shifts this month'}</div>
-      ${canManage() && !isLocFiltered
-        ? '<div style="font-size:13px">Click any day to add a shift</div><button class="btn btn-primary btn-sm" style="margin-top:16px" onclick="openCreateModal(\'' + toDateStr(new Date()) + '\')">Add first shift</button>'
-        : (isLocFiltered ? '<div style="font-size:13px">Try selecting a different location filter</div>' : '')
+  const banner = document.getElementById('calEmptyBanner')
+  const bannerMsg = document.getElementById('calEmptyBannerMsg')
+  const bannerBtn = document.getElementById('calEmptyBannerBtn')
+  if (banner) {
+    if (!hasShiftsThisMonth) {
+      const isLocFiltered = locFilterVal !== ''
+      bannerMsg.textContent = isLocFiltered ? 'No shifts at this location.' : 'No shifts this month.'
+      if (canManage() && !isLocFiltered) {
+        bannerBtn.textContent = '+ Add first shift'
+        bannerBtn.onclick = () => openCreateModal(toDateStr(new Date()))
+        bannerBtn.style.display = ''
+      } else {
+        bannerBtn.style.display = 'none'
       }
-    </div>`
-    grid.appendChild(hint)
-  } else {
-    grid.style.position = ''
+      banner.style.display = 'flex'
+    } else {
+      banner.style.display = 'none'
+    }
   }
+  grid.style.position = ''
 }
 
 // ── Week render ────────────────────────────────────────────────────────────────
@@ -718,6 +731,8 @@ function _pct(mins) {
 }
 
 function renderWeek() {
+  const emptyBanner = document.getElementById('calEmptyBanner')
+  if (emptyBanner) emptyBanner.style.display = 'none'
   const grid      = document.getElementById('calGrid')
   const todayStr  = toDateStr(new Date())
   const weekStart = prefs?.weekStartDay ?? 1
@@ -1268,7 +1283,15 @@ function showTaskPopover(event, a) {
   }
   const locEl = document.getElementById('taskDetailLocation')
   if (a.location_name) {
-    locEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:${a.location_color||'#888'};flex-shrink:0"></span>${a.location_name}</span>`
+    const outer = document.createElement('span')
+    outer.style.cssText = 'display:inline-flex;align-items:center;gap:5px'
+    const dot = document.createElement('span')
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0'
+    dot.style.background = a.location_color || '#888'
+    outer.appendChild(dot)
+    outer.appendChild(document.createTextNode(a.location_name))
+    locEl.textContent = ''
+    locEl.appendChild(outer)
     locEl.style.display = ''
   } else {
     locEl.style.display = 'none'
@@ -1605,7 +1628,15 @@ async function saveShift() {
         const warn = document.createElement('div')
         warn.id = 'conflictWarning'
         warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
-        warn.innerHTML = `<span>⚠️ ${d.error}</span><button class="btn btn-sm" style="background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px" onclick="saveShiftForce()">Save anyway</button>`
+        const msgSpan = document.createElement('span')
+        msgSpan.appendChild(document.createTextNode('⚠️ ' + (d.error || 'Conflict detected')))
+        const forceBtn = document.createElement('button')
+        forceBtn.className = 'btn btn-sm'
+        forceBtn.style.cssText = 'background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px'
+        forceBtn.textContent = 'Save anyway'
+        forceBtn.addEventListener('click', saveShiftForce)
+        warn.appendChild(msgSpan)
+        warn.appendChild(forceBtn)
         footer.insertAdjacentElement('beforebegin', warn)
         return
       }
