@@ -751,10 +751,25 @@ kbd.kbd-key { display:inline-flex;align-items:center;justify-content:center;padd
 }
 .colour-swatch {
   width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+  background: var(--swatch-colour, transparent);
   transition: transform var(--t-fast), border-color var(--t-fast);
 }
+.colour-swatch.is-none,
+.inline-colour-swatch.is-none {
+  background:
+    linear-gradient(135deg, transparent 0 43%, rgba(220, 38, 38, .85) 44%, rgba(220, 38, 38, .85) 56%, transparent 57%),
+    repeating-linear-gradient(-45deg, rgba(148, 163, 184, .12) 0 4px, var(--surface-2) 4px 8px);
+}
+.colour-swatch.is-none { border-color: var(--border); }
 .colour-swatch:hover { transform: scale(1.15); }
 .colour-swatch.selected { border-color: var(--text); transform: scale(1.15); }
+.inline-colour-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--swatch-colour, transparent);
+}
+.inline-colour-swatch.is-round { border-radius: 50%; }
 
 /* ── Templates ────────────────────────────────────────────── */
 .template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap: 16px; }
@@ -779,7 +794,7 @@ kbd.kbd-key { display:inline-flex;align-items:center;justify-content:center;padd
 .template-day-cell:last-child { border-right: none; }
 .template-day-cell .day-abbr { font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
 .template-day-cell .day-loc { font-size: 9px; color: var(--text-2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.template-day-cell .day-swatch { width: 8px; height: 8px; border-radius: 50%; margin: 3px auto 0; }
+.template-day-cell .day-swatch { display: block; width: 8px; height: 8px; border-radius: 50%; margin: 3px auto 0; }
 
 /* ── Day editor (template) ────────────────────────────────── */
 .day-editor-wrap {

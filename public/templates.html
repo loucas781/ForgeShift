@@ -335,12 +335,13 @@ function renderTemplateCard(t) {
     const d = dayMap[i]
     const label = getTemplateDayLabel(i, type, true)
     if (!d) return `<div class="template-day-cell"><div class="day-abbr">${label}</div><div class="day-loc">—</div></div>`
-    const locName = d.location_id ? (locations.find(l => l.id === d.location_id)?.name || '?') : (d.is_off ? 'Off' : '—')
-    const swatchColor = (d.location_id ? locations.find(l => l.id === d.location_id)?.color : null) || d.note_color || DEFAULT_TEMPLATE_COLOUR
+    const loc = d.location_id ? locations.find(l => l.id === d.location_id) : null
+    const locName = loc?.name || (d.is_off ? 'Off' : '—')
+    const swatchColor = pickColourValue(loc?.color, d.note_color)
     return `<div class="template-day-cell">
       <div class="day-abbr">${label}</div>
       <div class="day-loc" title="${locName}">${locName}</div>
-      <div class="day-swatch" style="background:${swatchColor}"></div>
+      ${renderInlineColourSwatch(swatchColor, { size: 8, title: swatchColor || 'No colour', className: 'day-swatch' })}
     </div>`
   }).join('')
 
@@ -612,8 +613,8 @@ function renderDayEditor() {
 
       // Colour picker
       const colContainer = document.getElementById(`dc_colours_${i}`)
-      let thisColour = cfg_day.note_color || DEFAULT_TEMPLATE_COLOUR
-      renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v })
+      let thisColour = resolveColourValue(cfg_day.note_color, DEFAULT_TEMPLATE_COLOUR)
+      renderColourPicker(colContainer, thisColour, v => { thisColour = v; if (!dayConfigs[i]) dayConfigs[i] = {}; dayConfigs[i].note_color = v }, { allowNone: true })
       if (!dayConfigs[i]) dayConfigs[i] = {}
       dayConfigs[i].note_color = thisColour
     }
@@ -698,10 +699,10 @@ function applyDaySnapshot(snap, targetIdx) {
   if (offEl) offEl.checked = !!snap.is_off
   const colContainer = document.getElementById(`dc_colours_${targetIdx}`)
   if (colContainer) {
-    const colour = snap.note_color || DEFAULT_TEMPLATE_COLOUR
+    const colour = resolveColourValue(snap.note_color, DEFAULT_TEMPLATE_COLOUR)
     dayConfigs[targetIdx].note_color = colour
     colContainer.innerHTML = ''
-    renderColourPicker(colContainer, colour, v => { dayConfigs[targetIdx].note_color = v })
+    renderColourPicker(colContainer, colour, v => { dayConfigs[targetIdx].note_color = v }, { allowNone: true })
   }
 }
 
@@ -740,7 +741,7 @@ async function saveTmpl() {
       start_time:  document.getElementById(`dc_start_${i}`)?.value || null,
       end_time:    document.getElementById(`dc_end_${i}`)?.value || null,
       notes:       document.getElementById(`dc_notes_${i}`)?.value.trim() || null,
-      note_color:  dc.note_color || DEFAULT_TEMPLATE_COLOUR,
+      note_color:  resolveColourValue(dc.note_color, DEFAULT_TEMPLATE_COLOUR),
       is_off:      document.getElementById(`dc_off_${i}`)?.checked || false,
     })
   }
@@ -828,7 +829,7 @@ async function duplicateTmpl(id) {
           start_time:  d.start_time  || null,
           end_time:    d.end_time    || null,
           notes:       d.notes       || null,
-          note_color:  d.note_color  || DEFAULT_TEMPLATE_COLOUR,
+          note_color:  resolveColourValue(d.note_color, DEFAULT_TEMPLATE_COLOUR),
           is_off:      d.is_off      || false,
         }))
       }

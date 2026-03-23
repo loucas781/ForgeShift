@@ -100,6 +100,28 @@
         <label class="form-label">Date</label>
         <input type="date" class="form-input" id="modalDate">
       </div>
+      <div id="modalTemplateQuickWrap" class="form-group" style="display:none">
+        <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+            <label class="form-label" style="margin:0">Quick template apply</label>
+            <span id="modalTemplateRangeLabel" style="font-size:11px;color:var(--text-3)"></span>
+          </div>
+          <p style="font-size:12px;color:var(--text-3);margin:0 0 10px">Apply a saved template from this date to the end of the week. Manual shift entry below still works if you prefer.</p>
+          <div id="modalTemplateEmpty" style="display:none;font-size:12px;color:var(--text-3)">No compatible templates are available for your current role.</div>
+          <div id="modalTemplateControls" style="display:none">
+            <div class="form-group" style="margin-bottom:8px">
+              <select class="form-select" id="modalTemplateSelect">
+                <option value="">Select a template…</option>
+              </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+              <input type="checkbox" id="modalTemplateSkipHolidays" checked style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+              <span style="font-size:12px;color:var(--text-2)">Skip bank holidays</span>
+            </label>
+            <div style="font-size:11px;color:var(--text-3);margin-top:8px">Only the remaining days in that week will be updated. Existing shifts on matching days will be replaced.</div>
+          </div>
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Location</label>
         <select class="form-select" id="modalLocation">
@@ -142,6 +164,7 @@
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-secondary" id="applyTemplateBtn" style="display:none" onclick="applyTemplateFromModal()">Apply template</button>
       <button class="btn btn-primary" onclick="saveShift()">Save shift</button>
     </div>
   </div>
@@ -234,10 +257,20 @@ let currentDate = new Date()
 let shifts = []
 let locations = []
 let users = []
+let templates = []
 let taskLists = []
 let taskAssignments = []
 let editingShiftId = null
 let selectedColour = '#4f46e5'
+const NEUTRAL_CALENDAR_COLOUR = '#6b7280'
+
+function getShiftDisplayColour(shift) {
+  return pickColourValue(shift.location_color, shift.note_color) || NEUTRAL_CALENDAR_COLOUR
+}
+
+function getTaskBannerPresentation(taskAssignment, alpha = '22') {
+  return getAccentPresentation(taskAssignment.task_list_color, { alpha })
+}
 
 // Copy/paste state
 let copiedShift = null   // { location_id, start_time, end_time, notes, note_color, is_off }
@@ -258,13 +291,16 @@ async function init() {
     document.getElementById('adminUserField').style.display = 'block'
   }
 
-  const _initResults = await Promise.allSettled([loadLocations(), loadUsers(), loadTeams(), loadTaskLists()])
+  const _initResults = await Promise.allSettled([loadLocations(), loadUsers(), loadTeams(), loadTaskLists(), loadTemplates()])
   const _initFailed = _initResults.filter(r => r.status === 'rejected')
   if (_initFailed.length) console.warn('Init: some data failed to load', _initFailed.map(r => r.reason?.message))
   renderView()
 
   document.getElementById('prevBtn').addEventListener('click', prev)
   document.getElementById('nextBtn').addEventListener('click', next)
+  document.getElementById('modalDate').addEventListener('change', updateTemplateQuickApplyState)
+  document.getElementById('modalUser').addEventListener('change', updateTemplateQuickApplyState)
+  document.getElementById('modalTemplateSelect').addEventListener('change', updateTemplateQuickApplyState)
 
   // Context menu: dismiss on outside click
   document.addEventListener('click', () => dismissContextMenu())
@@ -425,6 +461,11 @@ async function loadTaskLists() {
       })
     }
   }
+}
+
+async function loadTemplates() {
+  if (!canManage()) { templates = []; return }
+  try { templates = await api('/api/templates') } catch { templates = [] }
 }
 
 // ── Holiday map ────────────────────────────────────────────────────────────────
@@ -622,7 +663,8 @@ function renderMonth() {
       if (dayAssignments.length) {
         taskBannerHtml = dayAssignments.map(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
-          return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}" ` +
+          const accent = getTaskBannerPresentation(a, '22')
+          return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}" ` +
             `onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()" ${canManage() ? clickAttr : ''}>` +
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
@@ -659,7 +701,7 @@ function renderMonth() {
     const chipsToShow = dayShifts.slice(0, MAX_CHIPS)
     const overflow    = dayShifts.length - MAX_CHIPS
     chipsToShow.forEach(s => {
-      const color = s.location_color || s.note_color || '#4f46e5'
+      const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
       const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       // Duration badge
@@ -799,8 +841,9 @@ function renderWeek() {
       if (dayAssignments.length) {
         dayAssignments.forEach(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
+          const accent = getTaskBannerPresentation(a, '22')
           html += `<div class="cal-task-banner week-task-banner${canManage() ? ' clickable' : ''}"
-            style="background:${a.task_list_color||'#0052cc'}22;border-left:3px solid ${a.task_list_color||'#0052cc'};color:${a.task_list_color||'#0052cc'}"
+            style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}"
             onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()"
             ${canManage() ? clickAttr : ''}>` +
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
@@ -853,7 +896,7 @@ function renderWeek() {
 
     // Shift blocks — positioned by time, or all-day chip if no time
     dayShifts.forEach(s => {
-      const color = s.location_color || s.note_color || '#4f46e5'
+      const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
       const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       const clickFn = canManage() ? `openEditModal('${s.id}')` : `openViewModal('${s.id}')`
@@ -1142,6 +1185,185 @@ async function saveDuplicate(sourceId) {
   }
 }
 
+function getCalendarContextUserId() {
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  if (cfg.user.role === 'member') return cfg.user.id
+  if (filterVal.startsWith('user:')) return filterVal.slice(5)
+  return cfg.user.id
+}
+
+function getSelectedModalUserId() {
+  if (!canManage()) return cfg.user.id
+  return document.getElementById('modalUser').value || getCalendarContextUserId()
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function getTemplateApplyWindow(dateStr) {
+  const start = parseLocalDate(dateStr)
+  const weekStart = startOfWeek(start, 1)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 6)
+  return {
+    week_start: toDateStr(weekStart),
+    start_date: toDateStr(start),
+    end_date: toDateStr(weekEnd),
+  }
+}
+
+function getTemplateOptionLabel(t) {
+  const typeLabel = t.template_type === 'pattern'
+    ? `${t.cycle_length || 7}-day pattern`
+    : 'Weekly'
+  return `${t.name} (${typeLabel})`
+}
+
+function populateModalTemplateSelect() {
+  const select = document.getElementById('modalTemplateSelect')
+  if (!select) return
+  const currentValue = select.value
+  select.innerHTML = '<option value="">Select a template…</option>'
+  if (!templates.length) return
+
+  const grouped = new Map()
+  templates.forEach(t => {
+    const key = t.group_name || '__general__'
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key).push(t)
+  })
+
+  grouped.forEach((items, key) => {
+    if (key === '__general__') {
+      items.forEach(t => {
+        const option = document.createElement('option')
+        option.value = t.id
+        option.textContent = getTemplateOptionLabel(t)
+        select.appendChild(option)
+      })
+      return
+    }
+
+    const group = document.createElement('optgroup')
+    group.label = key
+    items.forEach(t => {
+      const option = document.createElement('option')
+      option.value = t.id
+      option.textContent = getTemplateOptionLabel(t)
+      group.appendChild(option)
+    })
+    select.appendChild(group)
+  })
+
+  if ([...select.querySelectorAll('option')].some(o => o.value === currentValue)) {
+    select.value = currentValue
+  }
+}
+
+function setTemplateQuickApplyVisibility(visible, dateStr = '') {
+  const wrap = document.getElementById('modalTemplateQuickWrap')
+  const btn = document.getElementById('applyTemplateBtn')
+  if (!wrap || !btn) return
+
+  if (!visible || !canManage()) {
+    wrap.style.display = 'none'
+    btn.style.display = 'none'
+    btn.disabled = true
+    return
+  }
+
+  wrap.style.display = ''
+  const hasTemplates = templates.length > 0
+  document.getElementById('modalTemplateControls').style.display = hasTemplates ? '' : 'none'
+  document.getElementById('modalTemplateEmpty').style.display = hasTemplates ? 'none' : ''
+  populateModalTemplateSelect()
+
+  if (dateStr) {
+    const window = getTemplateApplyWindow(dateStr)
+    const end = parseLocalDate(window.end_date)
+    document.getElementById('modalTemplateRangeLabel').textContent =
+      `through ${DAY_ABBR[end.getDay()]} ${end.getDate()} ${MONTH_NAMES[end.getMonth()].slice(0,3)}`
+  } else {
+    document.getElementById('modalTemplateRangeLabel').textContent = ''
+  }
+
+  btn.style.display = hasTemplates ? '' : 'none'
+  updateTemplateQuickApplyState()
+}
+
+function updateTemplateQuickApplyState() {
+  const wrap = document.getElementById('modalTemplateQuickWrap')
+  const btn = document.getElementById('applyTemplateBtn')
+  if (!wrap || !btn || wrap.style.display === 'none') return
+
+  const dateStr = document.getElementById('modalDate').value
+  const hasTemplates = templates.length > 0
+  if (dateStr) {
+    const window = getTemplateApplyWindow(dateStr)
+    const end = parseLocalDate(window.end_date)
+    document.getElementById('modalTemplateRangeLabel').textContent =
+      `through ${DAY_ABBR[end.getDay()]} ${end.getDate()} ${MONTH_NAMES[end.getMonth()].slice(0,3)}`
+  } else {
+    document.getElementById('modalTemplateRangeLabel').textContent = ''
+  }
+
+  btn.disabled = !hasTemplates || !dateStr || !document.getElementById('modalTemplateSelect').value || !getSelectedModalUserId()
+}
+
+async function applyTemplateFromModal() {
+  if (!canManage()) return
+  const templateId = document.getElementById('modalTemplateSelect').value
+  const dateStr = document.getElementById('modalDate').value
+  const userId = getSelectedModalUserId()
+  if (!templateId) { toast('Please select a template', 'error'); return }
+  if (!dateStr) { toast('Please select a date', 'error'); return }
+  if (!userId) { toast('Please select a team member', 'error'); return }
+
+  const template = templates.find(t => t.id === templateId)
+  if (!template) { toast('Template not found', 'error'); return }
+
+  const applyBtn = document.getElementById('applyTemplateBtn')
+  if (applyBtn) {
+    applyBtn.disabled = true
+    applyBtn.textContent = 'Applying…'
+  }
+
+  try {
+    const window = getTemplateApplyWindow(dateStr)
+    const body = {
+      template_id: templateId,
+      user_id: userId,
+      skip_holidays: document.getElementById('modalTemplateSkipHolidays').checked,
+      end_date: window.end_date,
+    }
+
+    if (template.template_type === 'pattern') {
+      body.start_date = window.start_date
+    } else {
+      body.week_start = window.week_start
+      body.range_start = window.start_date
+    }
+
+    const result = await api('/api/shifts/apply-template', { method: 'POST', body })
+    toast(
+      `Template applied — ${result.applied} shift${result.applied !== 1 ? 's' : ''} created${result.skipped ? `, ${result.skipped} skipped` : ''}`,
+      'success',
+      4000
+    )
+    closeModal()
+    await renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  } finally {
+    if (applyBtn) {
+      applyBtn.textContent = 'Apply template'
+      updateTemplateQuickApplyState()
+    }
+  }
+}
+
 // ── Modal ──────────────────────────────────────────────────────────────────────
 function openCreateModal(date) {
   editingShiftId = null
@@ -1156,8 +1378,11 @@ function openCreateModal(date) {
   document.getElementById('modalIsOff').checked = false
   document.getElementById('modalIsOncall').checked = false
   document.getElementById('deleteShiftBtn').style.display = 'none'
-  if (canManage()) document.getElementById('modalUser').value = ''
+  if (canManage()) document.getElementById('modalUser').value = getCalendarContextUserId()
+  document.getElementById('modalTemplateSelect').value = ''
+  document.getElementById('modalTemplateSkipHolidays').checked = true
   setupColourPicker()
+  setTemplateQuickApplyVisibility(true, date)
   document.getElementById('shiftModal').classList.add('open')
 }
 
@@ -1165,7 +1390,7 @@ function openEditModal(id) {
   const s = shifts.find(x => x.id === id)
   if (!s) return
   editingShiftId = id
-  selectedColour = s.note_color || '#4f46e5'
+  selectedColour = resolveColourValue(s.note_color, '#4f46e5')
   document.getElementById('modalTitle').textContent = 'Edit Shift'
   document.getElementById('modalDate').value  = s.date
   document.getElementById('modalLocation').value = s.location_id || ''
@@ -1177,13 +1402,14 @@ function openEditModal(id) {
   document.getElementById('deleteShiftBtn').style.display = 'flex'
   if (canManage()) document.getElementById('modalUser').value = s.user_id
   setupColourPicker()
+  setTemplateQuickApplyVisibility(false)
   document.getElementById('shiftModal').classList.add('open')
 }
 
 function setupColourPicker() {
   const el = document.getElementById('modalColourPicker')
   el.innerHTML = ''
-  renderColourPicker(el, selectedColour, v => { selectedColour = v })
+  renderColourPicker(el, selectedColour, v => { selectedColour = v }, { allowNone: true })
 }
 
 // Read-only shift view for members (no save/delete controls)
@@ -1201,6 +1427,7 @@ function openViewModal(id) {
   document.getElementById('modalIsOncall').checked = !!s.is_oncall
   document.getElementById('deleteShiftBtn').style.display = 'none'
   setupColourPicker()
+  setTemplateQuickApplyVisibility(false)
   const modal = document.getElementById('shiftModal')
   modal.querySelector('.modal').classList.add('modal--readonly')
   modal.classList.add('open')
@@ -1210,6 +1437,7 @@ function closeModal() {
   const modal = document.getElementById('shiftModal')
   modal.classList.remove('open')
   modal.querySelector('.modal').classList.remove('modal--readonly')
+  setTemplateQuickApplyVisibility(false)
 }
 
 async function saveShift() {
@@ -1224,7 +1452,7 @@ async function saveShift() {
     is_oncall:   document.getElementById('modalIsOncall').checked,
   }
   if (canManage()) {
-    body.user_id = document.getElementById('modalUser').value || cfg.user.id
+    body.user_id = getSelectedModalUserId()
   }
   try {
     if (editingShiftId) {
@@ -1285,10 +1513,7 @@ function showTaskPopover(event, a) {
   if (a.location_name) {
     const outer = document.createElement('span')
     outer.style.cssText = 'display:inline-flex;align-items:center;gap:5px'
-    const dot = document.createElement('span')
-    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0'
-    dot.style.background = a.location_color || '#888'
-    outer.appendChild(dot)
+    outer.insertAdjacentHTML('beforeend', renderInlineColourSwatch(a.location_color, { size: 8, title: pickColourValue(a.location_color) || 'No colour' }))
     outer.appendChild(document.createTextNode(a.location_name))
     locEl.textContent = ''
     locEl.appendChild(outer)
@@ -1414,11 +1639,14 @@ function _renderCurrentAssignments(userId) {
   list.innerHTML = _taWeekDates.filter(ds => byDate[ds]).map(ds => {
     const dayLabel = _DAY_ABBRS[_taWeekDates.indexOf(ds)]
     return byDate[ds].map(a =>
-      `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:${a.task_list_color||'#0052cc'}18;border-left:3px solid ${a.task_list_color||'#0052cc'}">
-        <span style="font-size:13px;color:${a.task_list_color||'#0052cc'};font-weight:600">${dayLabel} — ${a.task_list_name}</span>
+      (() => {
+        const accent = getTaskBannerPresentation(a)
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:${accent.background};border-left:3px solid ${accent.border}">
+        <span style="font-size:13px;color:${accent.color};font-weight:600">${dayLabel} — ${a.task_list_name}</span>
         <button style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-3);padding:0 2px;line-height:1" title="Remove"
           onclick="removeTaskAssignment('${a.id}','${ds}','${a.user_id}')">✕</button>
       </div>`
+      })()
     ).join('')
   }).join('')
 }
@@ -1608,7 +1836,7 @@ async function saveShift() {
     is_off:      document.getElementById('modalIsOff').checked,
     is_oncall:   document.getElementById('modalIsOncall').checked,
   }
-  if (canManage()) body.user_id = document.getElementById('modalUser').value || cfg.user.id
+  if (canManage()) body.user_id = getSelectedModalUserId()
 
   // Remove any existing conflict warning
   document.getElementById('conflictWarning')?.remove()
@@ -1949,8 +2177,7 @@ function showEmptyCellMenu(e, date) {
   menu.style.top  = e.clientY + 'px'
   menu.style.left = e.clientX + 'px'
 
-  const filterVal = document.getElementById('teamFilter')?.value || ''
-  const singleUserId = filterVal.startsWith('user:') ? filterVal.slice(5) : cfg.user.id
+  const singleUserId = getCalendarContextUserId()
 
   menu.innerHTML = `
     <button class="ctx-item" onclick="dismissContextMenu();openCreateModal('${date}')">
