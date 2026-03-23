@@ -110,6 +110,8 @@
 
 html, body {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
@@ -1319,6 +1321,8 @@ tr:hover td { background: var(--surface-2); }
     max-height: 92dvh;
     border-radius: 20px 20px 0 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    touch-action: pan-y;
     margin: 0;
     animation: slideUp .25s cubic-bezier(.32,1,.23,1);
   }
