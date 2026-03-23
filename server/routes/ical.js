@@ -132,7 +132,7 @@ router.get('/feed/:token', (req, res) => {
         endProp   = `DTEND;TZID=Europe/London:${dtEnd}`
       }
 
-      let summary = shift.is_off ? '🏖️ Annual Leave' : `Shift - ${shift.location_name || 'No location'}`
+      let summary = shift.is_off ? '🏖️ Annual Leave' : (shift.location_name || 'No location')
       let desc = []
       if (shift.location_name)  desc.push(`Location: ${shift.location_name}`)
       if (shift.location_address) desc.push(`Address: ${shift.location_address}`)
