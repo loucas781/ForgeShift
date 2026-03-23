@@ -1896,6 +1896,25 @@ function _initSwipe() {
   const wrapper = document.querySelector('.cal-wrapper')
   if (!wrapper) return
   let _tx = null, _ty = null, _gridScrollX = null
+
+  // Non-passive document-level touchmove: block horizontal viewport pan while
+  // any modal is open. iOS Safari ignores overflow:hidden on the body and can
+  // still elastically scroll the viewport sideways when the user swipes on
+  // native date/time inputs. Calling preventDefault() here stops that entirely
+  // without affecting vertical scrolling inside the modal body.
+  let _docTx = null, _docTy = null
+  document.addEventListener('touchstart', e => {
+    _docTx = e.touches[0].clientX
+    _docTy = e.touches[0].clientY
+  }, { passive: true })
+  document.addEventListener('touchmove', e => {
+    if (!document.querySelector('.modal-overlay.open')) return
+    if (_docTx === null || e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - _docTx
+    const dy = e.touches[0].clientY - _docTy
+    if (Math.abs(dx) > Math.abs(dy)) e.preventDefault()
+  }, { passive: false })
+
   wrapper.addEventListener('touchstart', e => {
     // Don't track swipe if any modal is open or touch starts on a form element
     if (document.querySelector('.modal-overlay.open') || e.target.closest('input, select, textarea')) {
