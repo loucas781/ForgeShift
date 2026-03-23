@@ -81,6 +81,10 @@
         </div>
         <div class="cal-grid" id="calGrid"></div>
       </div>
+      <!-- Mobile FAB: Copy Week (week view + managers only) -->
+      <button id="copyWeekFab" class="copy-week-fab" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week" aria-label="Copy week">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+      </button>
     </main>
 </div>
 
@@ -243,6 +247,21 @@
   </div>
 </div>
 
+<!-- Shift Details Side Panel -->
+<div id="shiftPanel" class="shift-panel" aria-label="Shift details">
+  <div class="shift-panel-header">
+    <div class="shift-panel-title-row">
+      <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
+        <button class="btn btn-ghost btn-icon" onclick="closeShiftPanel()" aria-label="Close panel" style="font-size:16px;width:32px;height:32px">✕</button>
+      </div>
+    </div>
+  </div>
+  <div class="shift-panel-body" id="shiftPanelBody"></div>
+</div>
+<div id="shiftPanelBackdrop" class="shift-panel-backdrop" onclick="closeShiftPanel()"></div>
+
 <script src="/js/shell.js"></script>
 <script src="/js/prefs.js"></script>
 <script>
@@ -307,6 +326,8 @@ async function init() {
 
   // Real-time SSE
   connectSSE()
+  _initSwipe()
+  _initLongPress()
 }
 
 async function loadLocations() {
@@ -562,7 +583,9 @@ async function renderView() {
   // Show a loading shimmer while data is in flight
   const grid = document.getElementById('calGrid')
   if (grid && !grid.dataset.loaded) {
-    grid.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text-3);font-size:14px">Loading…</div>'
+    grid.innerHTML = '<div class="cal-skeleton"><div class="cal-skeleton-grid">' +
+      Array.from({length: 35}, () => '<div class="cal-skeleton-cell"><div class="cal-skeleton-date"></div><div class="cal-skeleton-chip"></div></div>').join('') +
+      '</div></div>'
   }
   await loadShifts()
   if (cfg.featureTasks && taskLists.length) await loadTaskAssignments()
@@ -584,6 +607,9 @@ async function renderView() {
   // Copy week button: week view + managers only
   const copyBtn = document.getElementById('copyWeekBtn')
   if (copyBtn) copyBtn.style.display = (view === 'week' && canManage()) ? 'inline-flex' : 'none'
+  // Mobile FAB — mirrors the copy-week button
+  const fabBtn = document.getElementById('copyWeekFab')
+  if (fabBtn) fabBtn.style.display = (view === 'week' && canManage()) ? 'flex' : 'none'
 }
 
 function updateTitle() {
@@ -717,8 +743,9 @@ function renderMonth() {
       html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
         '" style="background:' + color + '"' +
         ' title="' + titleStr + '"' +
-        (canManage() ? ' onclick="event.stopPropagation();openEditModal(\'' + s.id + '\')"' : ' onclick="event.stopPropagation();openViewModal(\'' + s.id + '\')"') +
-        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')"' : '') + '>' +
+        ' onclick="event.stopPropagation();openShiftPanel(\'' + s.id + '\')"' +
+        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')"' : '') +
+        ' data-shift-id="' + s.id + '"' + '>' +
         name + label + durBadge + '</div>'
     })
     if (overflow > 0) {
@@ -899,7 +926,7 @@ function renderWeek() {
       const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
       const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
-      const clickFn = canManage() ? `openEditModal('${s.id}')` : `openViewModal('${s.id}')`
+      const clickFn = `openShiftPanel('${s.id}')`
       const ctxAttr = canManage()
         ? `oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')"`
         : ''
@@ -1412,25 +1439,9 @@ function setupColourPicker() {
   renderColourPicker(el, selectedColour, v => { selectedColour = v }, { allowNone: true })
 }
 
-// Read-only shift view for members (no save/delete controls)
+// Read-only shift view — now delegates to the slide-in side panel
 function openViewModal(id) {
-  const s = shifts.find(x => x.id === id)
-  if (!s) return
-  editingShiftId = null
-  document.getElementById('modalTitle').textContent = 'Shift Details'
-  document.getElementById('modalDate').value     = s.date
-  document.getElementById('modalLocation').value = s.location_id || ''
-  document.getElementById('modalStart').value    = s.start_time || ''
-  document.getElementById('modalEnd').value      = s.end_time || ''
-  document.getElementById('modalNotes').value    = s.notes || ''
-  document.getElementById('modalIsOff').checked    = !!s.is_off
-  document.getElementById('modalIsOncall').checked = !!s.is_oncall
-  document.getElementById('deleteShiftBtn').style.display = 'none'
-  setupColourPicker()
-  setTemplateQuickApplyVisibility(false)
-  const modal = document.getElementById('shiftModal')
-  modal.querySelector('.modal').classList.add('modal--readonly')
-  modal.classList.add('open')
+  openShiftPanel(id)
 }
 
 function closeModal() {
@@ -1778,8 +1789,84 @@ document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('kbdHelpOverlay')) toggleKbdHelp()
 })
 
+// ── Shift details side panel ───────────────────────────────────────────────────
+let _shiftPanelId = null
+
+function openShiftPanel(shiftId) {
+  const s = shifts.find(x => x.id == shiftId)
+  if (!s) return
+  _shiftPanelId = shiftId
+
+  // Title
+  const title = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
+  document.getElementById('shiftPanelTitle').textContent = title
+
+  // Edit button (managers only)
+  const editBtn = document.getElementById('shiftPanelEditBtn')
+  editBtn.style.display = canManage() ? '' : 'none'
+
+  // Body
+  const rows = []
+
+  if (s.user_name) {
+    rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Team Member</div><div class="shift-panel-value">${escHtml(s.user_name)}</div></div>`)
+  }
+
+  const dateObj = new Date(s.date + 'T00:00:00')
+  const dateStr = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Date</div><div class="shift-panel-value">${escHtml(dateStr)}</div></div>`)
+
+  if (!s.is_off && !s.is_oncall) {
+    if (s.location_name) rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Location</div><div class="shift-panel-value">${escHtml(s.location_name)}</div></div>`)
+    if (s.start_time && s.end_time) {
+      const mins = _timeToMins(s.end_time) - _timeToMins(s.start_time)
+      const dur = mins > 0 ? ` (${Math.floor(mins/60)}h${mins%60>0?' '+mins%60+'m':''})` : ''
+      rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Time</div><div class="shift-panel-value">${escHtml(s.start_time)} – ${escHtml(s.end_time)}${escHtml(dur)}</div></div>`)
+    }
+  }
+
+  if (s.notes) {
+    rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Notes</div><div class="shift-panel-value" style="white-space:pre-wrap;line-height:1.5">${escHtml(s.notes)}</div></div>`)
+  }
+
+  // Task assignments for same date + user
+  const relatedTasks = taskAssignments.filter(a => a.date === s.date && a.user_id === s.user_id)
+  let tasksHtml = ''
+  if (relatedTasks.length) {
+    const cards = relatedTasks.map(a => {
+      const notesHtml = a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : ''
+      return `<div class="shift-panel-task-card"><div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}</div>${notesHtml}</div>`
+    }).join('')
+    tasksHtml = `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks for this day</div>${cards}</div>`
+  }
+
+  document.getElementById('shiftPanelBody').innerHTML = rows.join('') + tasksHtml
+
+  // Open panel
+  document.getElementById('shiftPanel').classList.add('open')
+  document.getElementById('shiftPanelBackdrop').classList.add('open')
+}
+
+function closeShiftPanel() {
+  document.getElementById('shiftPanel').classList.remove('open')
+  document.getElementById('shiftPanelBackdrop').classList.remove('open')
+  _shiftPanelId = null
+}
+
+function shiftPanelEdit() {
+  const id = _shiftPanelId
+  closeShiftPanel()
+  if (id) openEditModal(id)
+}
+
 // ── Real-time SSE ──────────────────────────────────────────────────────────────
 let _sseConn = null
+// Debounced renderView — batches rapid SSE events into a single re-render
+let _sseRenderTimer = null
+function _debouncedRenderView() {
+  clearTimeout(_sseRenderTimer)
+  _sseRenderTimer = setTimeout(renderView, 300)
+}
 function connectSSE() {
   if (_sseConn) return
   _sseConn = new EventSource('/api/sse')
@@ -1791,8 +1878,7 @@ function connectSSE() {
     try {
       const msg = JSON.parse(e.data)
       if (['shift.create','shift.update','shift.delete'].includes(msg.type)) {
-        // Skip if the current user made this change (already re-rendered after saveShift)
-        if (msg.actorId !== cfg?.user?.id) renderView()
+        if (msg.actorId !== cfg?.user?.id) _debouncedRenderView()
       }
     } catch {}
   }
@@ -1803,6 +1889,34 @@ function connectSSE() {
     _sseConn = null
     setTimeout(connectSSE, 5000)
   }
+}
+
+// ── Touch swipe navigation ─────────────────────────────────────────────────────
+function _initSwipe() {
+  const wrapper = document.querySelector('.cal-wrapper')
+  if (!wrapper) return
+  let _tx = null
+  wrapper.addEventListener('touchstart', e => { _tx = e.touches[0].clientX }, { passive: true })
+  wrapper.addEventListener('touchend', e => {
+    if (_tx === null) return
+    const dx = e.changedTouches[0].clientX - _tx
+    _tx = null
+    if (Math.abs(dx) < 50) return
+    dx < 0 ? next() : prev()
+  }, { passive: true })
+}
+
+// ── Long-press on mobile to open shift details ────────────────────────────────
+function _initLongPress() {
+  document.getElementById('calGrid').addEventListener('pointerdown', e => {
+    const chip = e.target.closest('.cal-shift-chip')
+    if (!chip || !chip.dataset.shiftId) return
+    const id = chip.dataset.shiftId
+    const t = setTimeout(() => openViewModal(id), 500)
+    const cancel = () => clearTimeout(t)
+    chip.addEventListener('pointerup',    cancel, { once: true })
+    chip.addEventListener('pointerleave', cancel, { once: true })
+  })
 }
 
 // ── Shift conflict handling ────────────────────────────────────────────────────
@@ -1899,9 +2013,9 @@ function _initDragDrop() {
     const handle = e.target.closest('.shift-resize-handle')
     if (!card) return
 
-    // Determine shift id from onclick attribute
+    // Determine shift id from onclick attribute (now uses openShiftPanel)
     const onclickStr = card.getAttribute('onclick') || ''
-    const idMatch = onclickStr.match(/openEditModal\('([^']+)'\)/)
+    const idMatch = onclickStr.match(/openShiftPanel\('([^']+)'\)/)
     if (!idMatch) return
 
     const shiftId = idMatch[1]
@@ -2196,5 +2310,126 @@ function showEmptyCellMenu(e, date) {
 
 init()
 </script>
+<style>
+/* ── Skeleton loading screen ──────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.cal-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+.cal-skeleton-cell {
+  background: var(--bg);
+  min-height: 90px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-skeleton-date,
+.cal-skeleton-chip {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3,var(--border)) 50%, var(--bg-2) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.cal-skeleton-date { width: 24px; height: 18px; }
+.cal-skeleton-chip { width: 80%; height: 20px; }
+
+/* ── Mobile FAB (Copy Week) ──────────────────────────────────────────────────── */
+.copy-week-fab {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  z-index: 200;
+  transition: transform .15s, box-shadow .15s;
+}
+.copy-week-fab:active { transform: scale(.93); box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+@media (min-width: 641px) { .copy-week-fab { display: none !important; } }
+
+/* ── Mobile: larger shift chip tap targets ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .cal-shift-chip {
+    min-height: 28px;
+    padding: 4px 7px;
+    font-size: 11px;
+    touch-action: manipulation;
+  }
+  .cal-more-badge {
+    min-height: 24px;
+    touch-action: manipulation;
+  }
+}
+
+/* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
+.shift-panel {
+  position: fixed;
+  top: 0;
+  right: -420px;
+  width: 380px;
+  max-width: 100vw;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(0,0,0,.12);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  transition: right .25s cubic-bezier(.32,1,.23,1);
+  overflow: hidden;
+}
+.shift-panel.open { right: 0; }
+.shift-panel-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 499;
+  background: rgba(0,0,0,.3);
+}
+.shift-panel-backdrop.open { display: block; }
+.shift-panel-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shift-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shift-panel-title { font-size: 16px; font-weight: 700; margin: 0; }
+.shift-panel-body { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.shift-panel-row { display: flex; flex-direction: column; gap: 3px; }
+.shift-panel-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.shift-panel-value { font-size: 14px; font-weight: 500; color: var(--text-1); }
+.shift-panel-section { border-top: 1px solid var(--border); padding-top: 14px; }
+.shift-panel-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-bottom: 8px; }
+.shift-panel-task-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.shift-panel-task-name { font-size: 13px; font-weight: 600; }
+.shift-panel-task-notes { font-size: 12px; color: var(--text-2); line-height: 1.5; white-space: pre-wrap; }
+@media (max-width: 640px) {
+  .shift-panel { width: 100%; border-left: none; border-radius: 20px 20px 0 0; top: auto; bottom: -100%; right: 0; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
+  .shift-panel.open { bottom: 0; right: 0; }
+}
+</style>
 </body>
 </html>

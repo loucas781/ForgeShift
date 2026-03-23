@@ -38,6 +38,7 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 // ── GET /api/users ────────────────────────────────────────────────────────────
 // Supports optional ?limit=N&offset=N pagination. Without these params returns all users.
 router.get('/', requireAuth, (req, res) => {
+  res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
   if (req.query.limit !== undefined || req.query.offset !== undefined) {
     const limit  = Math.min(Math.max(parseInt(req.query.limit  || '50'), 1), 200)
     const offset = Math.max(parseInt(req.query.offset || '0'), 0)

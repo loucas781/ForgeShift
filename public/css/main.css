@@ -1306,3 +1306,26 @@ tr:hover td { background: var(--surface-2); }
     print-color-adjust: exact;
   }
 }
+
+/* ── Mobile: bottom-sheet modals ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    overflow-y: auto;
+    margin: 0;
+    animation: slideUp .25s cubic-bezier(.32,1,.23,1);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(30%); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+  }
+  /* Keep the modal-body scrollable inside the sheet */
+  .modal-body { max-height: 70dvh; overflow-y: auto; }
+}

@@ -107,7 +107,7 @@ app.get('/api/health', (req, res) => {
 })
 
 // ── Config endpoint ────────────────────────────────────────────────────────────
-app.get('/api/config', optionalAuth, (req, res) => {
+app.get('/api/config', optionalAuth, cacheShort, (req, res) => {
   const overrides = loadOverrides()
   let user = null
   if (req.user) {
@@ -232,6 +232,12 @@ app.get('/api/audit', requireAuth, (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as c FROM audit_log').get().c
   res.json({ entries, total, limit, offset })
 })
+
+// Short-lived cache helper (10 s public, stale-while-revalidate)
+function cacheShort(req, res, next) {
+  res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
+  next()
+}
 
 // ── GET /api/stats — instance stats for Build Info panel ──────────────────────
 app.get('/api/stats', requireAuth, (req, res) => {
