@@ -6,6 +6,9 @@ const { requireAuth, requireAdmin } = require('../middleware/auth')
 const audit  = require('../audit')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 
+// ── GET /api/locations ────────────────────────────────────────────────────────
+// Admin: all locations with member_count + members array.
+// Others: locations with no members (open to all) + locations they're a member of.
 router.get('/', requireAuth, (req, res) => {
   try {
     if (req.user.role === 'admin') {
@@ -27,7 +30,7 @@ router.get('/', requireAuth, (req, res) => {
       locs.forEach(l => { l.members = byLoc[l.id] || [] })
       return res.json(locs)
     }
-    // Non-admin: return unassigned locations (no members) + locations where user is a member
+    // Non-admin: unassigned (no members) OR user is a member
     const locs = db.prepare(`
       SELECT l.*
       FROM locations l
