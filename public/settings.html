@@ -1905,6 +1905,7 @@ async function renderFeaturesPanel() {
           <h3 class="card-title">Task Lists</h3>
           <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
         </div>
+        <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
         <div class="card-body" style="padding:0">
           <div class="table-wrap"><table>
             <thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
@@ -1914,11 +1915,47 @@ async function renderFeaturesPanel() {
       </div>
     </div>`
   await loadTaskLists()
+  renderTaskListOrgTabs()
   renderTaskListsTable()
 }
 
+let activeTaskListOrgTab = 'all'
+
 async function loadTaskLists() {
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
+}
+
+function renderTaskListOrgTabs() {
+  const bar = document.getElementById('taskListOrgTabBar')
+  if (!bar) return
+  const orgsWithLists = orgs.filter(o => taskLists.some(t => t.org_id === o.id))
+  const hasUnassigned = taskLists.some(t => !t.org_id)
+  if (orgsWithLists.length === 0 && !hasUnassigned) { bar.style.display = 'none'; return }
+  bar.style.display = 'flex'
+
+  const tabs = [{ key: 'all', label: 'All', count: taskLists.length }]
+  if (hasUnassigned) tabs.push({ key: 'unassigned', label: 'No Organisation', count: taskLists.filter(t => !t.org_id).length })
+  orgsWithLists.forEach(o => tabs.push({ key: o.id, label: o.name, count: taskLists.filter(t => t.org_id === o.id).length }))
+
+  if (!tabs.find(t => t.key === activeTaskListOrgTab)) activeTaskListOrgTab = 'all'
+
+  bar.innerHTML = tabs.map(t => {
+    const active = t.key === activeTaskListOrgTab
+    return `<button onclick="switchTaskListOrgTab('${t.key}')" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 14px;border:none;background:none;cursor:pointer;
+      font-size:13px;font-weight:${active ? '600' : '500'};
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap
+    ">${escHtml(t.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${t.count}</span></button>`
+  }).join('')
+}
+
+function switchTaskListOrgTab(key) {
+  activeTaskListOrgTab = key
+  renderTaskListOrgTabs()
+  renderTaskListsTable()
 }
 
 function _renderTaskListRows(lists) {
@@ -1948,26 +1985,14 @@ function renderTaskListsTable() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
     return
   }
-
-  const sections = []
-  const grouped = new Map()
-  taskLists.forEach(t => {
-    const key = t.org_id || 'none'
-    if (!grouped.has(key)) {
-      grouped.set(key, { label: t.org_name || 'No Organisation', lists: [] })
-      sections.push(grouped.get(key))
-    }
-    grouped.get(key).lists.push(t)
-  })
-
-  tbody.innerHTML = sections.map(section => `
-    <tr>
-      <td colspan="6" style="padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">
-        ${escHtml(section.label)} (${section.lists.length})
-      </td>
-    </tr>
-    ${_renderTaskListRows(section.lists)}
-  `).join('')
+  let visible = taskLists
+  if (activeTaskListOrgTab === 'unassigned') visible = taskLists.filter(t => !t.org_id)
+  else if (activeTaskListOrgTab !== 'all') visible = taskLists.filter(t => t.org_id === activeTaskListOrgTab)
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists in this organisation</td></tr>'
+    return
+  }
+  tbody.innerHTML = _renderTaskListRows(visible)
 }
 
 async function toggleFeatureDragDrop(enabled) {
@@ -2059,7 +2084,7 @@ async function saveTaskList() {
     if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, org_id, location_id } })
     else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, org_id, location_id } })
     closeTaskListModal()
-    await loadTaskLists(); renderTaskListsTable()
+    await loadTaskLists(); renderTaskListOrgTabs(); renderTaskListsTable()
     toast('Task list saved', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
@@ -2067,7 +2092,7 @@ async function deleteTaskList(id, name) {
   if (!confirm(`Delete task list "${name}"? Any existing assignments will also be removed.`)) return
   try {
     await api(`/api/tasks/lists/${id}`, { method: 'DELETE' })
-    await loadTaskLists(); renderTaskListsTable()
+    await loadTaskLists(); renderTaskListOrgTabs(); renderTaskListsTable()
     toast('Task list deleted', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
@@ -2428,17 +2453,56 @@ async function saveOrgMembers(orgId) {
   } catch (err) { toast(err.message, 'error') }
 }
 
+let activeLocOrgTab = 'all'
+
 async function renderLocationsPanel() {
   const el = document.getElementById('panel-locations')
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Locations</h2>
-    <div style="margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add location</button></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+      <button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add location</button>
+    </div>
+    <div id="locOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;margin-top:12px"></div>
     <div class="card">
       <div class="table-wrap"><table>
         <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Organisation</th><th>Actions</th></tr></thead>
         <tbody id="locsBody"></tbody>
       </table></div>
     </div>`
+  renderLocOrgTabs()
+  renderLocsTable()
+}
+
+function renderLocOrgTabs() {
+  const bar = document.getElementById('locOrgTabBar')
+  if (!bar) return
+  const orgsWithLocs = orgs.filter(o => locations.some(l => l.org_id === o.id))
+  const hasUnassigned = locations.some(l => !l.org_id)
+  if (orgsWithLocs.length === 0 && !hasUnassigned) { bar.style.display = 'none'; return }
+  bar.style.display = 'flex'
+
+  const tabs = [{ key: 'all', label: 'All', count: locations.length }]
+  if (hasUnassigned) tabs.push({ key: 'unassigned', label: 'No Organisation', count: locations.filter(l => !l.org_id).length })
+  orgsWithLocs.forEach(o => tabs.push({ key: o.id, label: o.name, count: locations.filter(l => l.org_id === o.id).length }))
+
+  if (!tabs.find(t => t.key === activeLocOrgTab)) activeLocOrgTab = 'all'
+
+  bar.innerHTML = tabs.map(t => {
+    const active = t.key === activeLocOrgTab
+    return `<button onclick="switchLocOrgTab('${t.key}')" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 14px;border:none;background:none;cursor:pointer;
+      font-size:13px;font-weight:${active ? '600' : '500'};
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap
+    ">${escHtml(t.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${t.count}</span></button>`
+  }).join('')
+}
+
+function switchLocOrgTab(key) {
+  activeLocOrgTab = key
+  renderLocOrgTabs()
   renderLocsTable()
 }
 
@@ -2446,36 +2510,20 @@ function renderLocsTable() {
   const tbody = document.getElementById('locsBody')
   if (!tbody) return
   if (!locations.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No locations yet</td></tr>'; return }
-
-  const sections = []
-  const grouped = new Map()
-  locations.forEach(l => {
-    const key = l.org_id || 'none'
-    if (!grouped.has(key)) {
-      grouped.set(key, { label: l.org_name || 'No Organisation', locs: [] })
-      sections.push(grouped.get(key))
-    }
-    grouped.get(key).locs.push(l)
-  })
-
-  const multiSection = sections.length > 1
-  tbody.innerHTML = sections.map(section => `
-    ${multiSection ? `<tr>
-      <td colspan="5" style="padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">
-        ${escHtml(section.label)} (${section.locs.length})
-      </td>
-    </tr>` : ''}
-    ${section.locs.map(l => `<tr>
-      <td style="font-weight:600">${escHtml(l.name)}</td>
-      <td style="color:var(--text-3)">${l.address ? escHtml(l.address) : '—'}</td>
-      <td>${renderInlineColourSwatch(l.color, { size: 20, title: pickColourValue(l.color) || 'No colour' })}</td>
-      <td>${l.org_name ? `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(l.org_name)}</span>` : '<span style="font-size:12px;color:var(--text-3)">Open to all</span>'}</td>
-      <td><div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${escHtml(l.name).replace(/'/g,"\\'")}')">Delete</button>
-      </div></td>
-    </tr>`).join('')}
-  `).join('')
+  let visible = locations
+  if (activeLocOrgTab === 'unassigned') visible = locations.filter(l => !l.org_id)
+  else if (activeLocOrgTab !== 'all') visible = locations.filter(l => l.org_id === activeLocOrgTab)
+  if (!visible.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No locations in this organisation</td></tr>'; return }
+  tbody.innerHTML = visible.map(l => `<tr>
+    <td style="font-weight:600">${escHtml(l.name)}</td>
+    <td style="color:var(--text-3)">${l.address ? escHtml(l.address) : '—'}</td>
+    <td>${renderInlineColourSwatch(l.color, { size: 20, title: pickColourValue(l.color) || 'No colour' })}</td>
+    <td>${l.org_name ? `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(l.org_name)}</span>` : '<span style="font-size:12px;color:var(--text-3)">Open to all</span>'}</td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${escHtml(l.name).replace(/'/g,"\\'")}')">Delete</button>
+    </div></td>
+  </tr>`).join('')
 }
 
 function _populateLocOrgSelect(selectedOrgId) {
@@ -2517,7 +2565,7 @@ async function saveLoc() {
     if (editingLocId) await api(`/api/locations/${editingLocId}`, { method: 'PUT', body })
     else await api('/api/locations', { method: 'POST', body })
     closeLocModal()
-    await loadLocations(); renderLocsTable()
+    await loadLocations(); renderLocOrgTabs(); renderLocsTable()
     toast('Location saved', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
@@ -2525,7 +2573,7 @@ async function deleteLoc(id, name) {
   if (!confirm(`Delete location "${name}"?`)) return
   try {
     await api(`/api/locations/${id}`, { method: 'DELETE' })
-    await loadLocations(); renderLocsTable()
+    await loadLocations(); renderLocOrgTabs(); renderLocsTable()
     toast('Location deleted', 'success')
   } catch (err) { toast(err.message, 'error') }
 }
