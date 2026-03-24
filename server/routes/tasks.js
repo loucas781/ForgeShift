@@ -8,33 +8,31 @@ const { getShiftLeadScope } = require('../utils/scope')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
-// Admin: all lists. Others: ungrouped (public) lists + lists in groups they belong to.
+// Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
 router.get('/lists', requireAuth, (req, res) => {
   try {
     let lists
     if (req.user.role === 'admin') {
       lists = db.prepare(`
         SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
-               g.name as group_name, g.id as group_id
+               o.name as org_name, o.id as org_id
         FROM task_lists t
         LEFT JOIN users u ON u.id = t.created_by
         LEFT JOIN locations l ON l.id = t.location_id
-        LEFT JOIN task_list_groups g ON g.id = t.group_id
-        ORDER BY g.sort_order, g.name, t.sort_order, t.name
+        LEFT JOIN organisations o ON o.id = t.org_id
+        ORDER BY o.name, t.sort_order, t.name
       `).all()
     } else {
       lists = db.prepare(`
         SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
-               g.name as group_name, g.id as group_id
+               o.name as org_name, o.id as org_id
         FROM task_lists t
         LEFT JOIN users u ON u.id = t.created_by
         LEFT JOIN locations l ON l.id = t.location_id
-        LEFT JOIN task_list_groups g ON g.id = t.group_id
-        WHERE t.group_id IS NULL
-           OR t.group_id IN (
-             SELECT group_id FROM user_task_list_groups WHERE user_id = ?
-           )
-        ORDER BY g.sort_order, g.name, t.sort_order, t.name
+        LEFT JOIN organisations o ON o.id = t.org_id
+        WHERE t.org_id IS NULL
+           OR t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
+        ORDER BY o.name, t.sort_order, t.name
       `).all(req.user.id)
     }
     res.json(lists)
@@ -47,10 +45,10 @@ router.get('/lists', requireAuth, (req, res) => {
 // ── POST /api/tasks/lists — create a task list ────────────────────────────────
 router.post('/lists', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, color, description, location_id, sort_order, group_id } = req.body
+    const { name, color, description, location_id, sort_order, org_id } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
     const id = uuidv4()
-    db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, group_id, created_by) VALUES (?,?,?,?,?,?,?,?)')
+    db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, org_id, created_by) VALUES (?,?,?,?,?,?,?,?)')
       .run(
         id,
         name.trim(),
@@ -58,14 +56,14 @@ router.post('/lists', requireAuth, requireAdmin, (req, res) => {
         description?.trim() || null,
         location_id || null,
         sort_order ?? 0,
-        group_id || null,
+        org_id || null,
         req.user.id
       )
     const list = db.prepare(`
-      SELECT t.*, l.name as location_name, l.color as location_color, g.name as group_name
+      SELECT t.*, l.name as location_name, l.color as location_color, o.name as org_name
       FROM task_lists t
       LEFT JOIN locations l ON l.id = t.location_id
-      LEFT JOIN task_list_groups g ON g.id = t.group_id
+      LEFT JOIN organisations o ON o.id = t.org_id
       WHERE t.id = ?`).get(id)
     audit(req.user.id, 'task_list.create', 'task_list', id, name.trim())
     res.status(201).json(list)
@@ -80,23 +78,23 @@ router.put('/lists/:id', requireAuth, requireAdmin, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
-    const { name, color, description, location_id, sort_order, group_id } = req.body
-    db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, group_id=? WHERE id=?')
+    const { name, color, description, location_id, sort_order, org_id } = req.body
+    db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, org_id=? WHERE id=?')
       .run(
         name?.trim() || list.name,
         color !== undefined ? normalizeColorInput(color) : list.color,
         description !== undefined ? (description?.trim() || null) : list.description,
         location_id !== undefined ? (location_id || null) : list.location_id,
         sort_order ?? list.sort_order,
-        group_id !== undefined ? (group_id || null) : list.group_id,
+        org_id !== undefined ? (org_id || null) : list.org_id,
         req.params.id
       )
     const updated = db.prepare(`
       SELECT t.*, l.name as location_name, l.color as location_color,
-             g.name as group_name
+             o.name as org_name
       FROM task_lists t
       LEFT JOIN locations l ON l.id = t.location_id
-      LEFT JOIN task_list_groups g ON g.id = t.group_id
+      LEFT JOIN organisations o ON o.id = t.org_id
       WHERE t.id = ?`).get(req.params.id)
     audit(req.user.id, 'task_list.update', 'task_list', req.params.id, updated.name)
     res.json(updated)

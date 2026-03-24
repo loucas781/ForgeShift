@@ -13,29 +13,19 @@ router.get('/', requireAuth, (req, res) => {
   try {
     if (req.user.role === 'admin') {
       const locs = db.prepare(`
-        SELECT l.*, COUNT(DISTINCT lm.user_id) AS member_count
+        SELECT l.*, o.name AS org_name
         FROM locations l
-        LEFT JOIN location_members lm ON lm.location_id = l.id
-        GROUP BY l.id ORDER BY l.name
+        LEFT JOIN organisations o ON o.id = l.org_id
+        ORDER BY l.name
       `).all()
-      const members = db.prepare(`
-        SELECT lm.location_id, u.id, u.name, u.role, u.color, u.initials
-        FROM location_members lm JOIN users u ON u.id = lm.user_id ORDER BY u.name
-      `).all()
-      const byLoc = {}
-      members.forEach(m => {
-        if (!byLoc[m.location_id]) byLoc[m.location_id] = []
-        byLoc[m.location_id].push({ id: m.id, name: m.name, role: m.role, color: m.color, initials: m.initials })
-      })
-      locs.forEach(l => { l.members = byLoc[l.id] || [] })
       return res.json(locs)
     }
-    // Non-admin: unassigned (no members) OR user is a member
+    // Non-admin: unassigned (no org) OR user belongs to the location's org
     const locs = db.prepare(`
       SELECT l.*
       FROM locations l
-      WHERE l.id NOT IN (SELECT DISTINCT location_id FROM location_members)
-         OR l.id IN (SELECT location_id FROM location_members WHERE user_id = ?)
+      WHERE l.org_id IS NULL
+         OR l.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
       ORDER BY l.name
     `).all(req.user.id)
     res.json(locs)
@@ -47,11 +37,11 @@ router.get('/', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, address, color } = req.body
+    const { name, address, color, org_id } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
     const id = uuidv4()
-    db.prepare('INSERT INTO locations (id, name, address, color, created_by) VALUES (?,?,?,?,?)')
-      .run(id, name.trim(), address || null, resolveStoredColor(color, DEFAULT_COLOR), req.user.id)
+    db.prepare('INSERT INTO locations (id, name, address, color, org_id, created_by) VALUES (?,?,?,?,?,?)')
+      .run(id, name.trim(), address || null, resolveStoredColor(color, DEFAULT_COLOR), org_id || null, req.user.id)
     const loc = db.prepare('SELECT * FROM locations WHERE id = ?').get(id)
     audit(req.user.id, 'location.create', 'location', id, name.trim())
     res.status(201).json(loc)
@@ -62,14 +52,15 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, address, color } = req.body
+    const { name, address, color, org_id } = req.body
     const existing = db.prepare('SELECT * FROM locations WHERE id = ?').get(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Not found' })
-    db.prepare('UPDATE locations SET name=?, address=?, color=? WHERE id=?')
+    db.prepare('UPDATE locations SET name=?, address=?, color=?, org_id=? WHERE id=?')
       .run(
         name?.trim() || existing.name,
         address !== undefined ? (address || null) : existing.address,
         color !== undefined ? normalizeColorInput(color) : existing.color,
+        org_id !== undefined ? (org_id || null) : existing.org_id,
         req.params.id
       )
     const loc = db.prepare('SELECT * FROM locations WHERE id = ?').get(req.params.id)

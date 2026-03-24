@@ -95,7 +95,7 @@ function validateTemplatePayload(body) {
     return {
       name,
       description: body.description?.trim() || null,
-      group_id: body.group_id || null,
+      org_id: body.org_id || null,
       template_type: templateType,
       cycle_length: cycleLength,
       days_provided: Array.isArray(body.days),
@@ -113,25 +113,22 @@ router.get('/', requireAuth, (req, res) => {
   if (req.user.role === 'admin') {
     templates = db.prepare(`
       SELECT t.*, u.name as created_by_name,
-             g.name as group_name, g.id as group_id
+             o.name as org_name, o.id as org_id
       FROM shift_templates t
       LEFT JOIN users u ON u.id = t.created_by
-      LEFT JOIN template_groups g ON g.id = t.group_id
-      ORDER BY g.sort_order, g.name, t.name
+      LEFT JOIN organisations o ON o.id = t.org_id
+      ORDER BY o.name, t.name
     `).all()
   } else {
     templates = db.prepare(`
       SELECT t.*, u.name as created_by_name,
-             g.name as group_name, g.id as group_id
+             o.name as org_name, o.id as org_id
       FROM shift_templates t
       LEFT JOIN users u ON u.id = t.created_by
-      LEFT JOIN template_groups g ON g.id = t.group_id
-      WHERE t.group_id IS NULL
-         OR EXISTS (
-              SELECT 1 FROM user_template_groups utg
-              WHERE utg.user_id = ? AND utg.group_id = t.group_id
-            )
-      ORDER BY g.sort_order, g.name, t.name
+      LEFT JOIN organisations o ON o.id = t.org_id
+      WHERE t.org_id IS NULL
+         OR t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
+      ORDER BY o.name, t.name
     `).all(req.user.id)
   }
 
@@ -161,14 +158,14 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     const tx = db.transaction(() => {
       db.prepare(`
         INSERT INTO shift_templates (
-          id, name, description, group_id, created_by, template_type, cycle_length
+          id, name, description, org_id, created_by, template_type, cycle_length
         )
         VALUES (?,?,?,?,?,?,?)
       `).run(
         id,
         payload.name,
         payload.description,
-        payload.group_id,
+        payload.org_id,
         req.user.id,
         payload.template_type,
         payload.cycle_length
@@ -210,12 +207,12 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     const tx = db.transaction(() => {
       db.prepare(`
         UPDATE shift_templates
-        SET name = ?, description = ?, group_id = ?, template_type = ?, cycle_length = ?
+        SET name = ?, description = ?, org_id = ?, template_type = ?, cycle_length = ?
         WHERE id = ?
       `).run(
         payload.name,
         payload.description,
-        payload.group_id,
+        payload.org_id,
         payload.template_type,
         payload.cycle_length,
         req.params.id

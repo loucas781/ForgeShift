@@ -45,24 +45,33 @@ router.use((req, res, next) => {
 // ── GET /api/backup/export ────────────────────────────────────────────────────
 router.get('/export', (req, res) => {
   try {
+    const allTables = new Set(
+      db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name)
+    )
     const tables = {
       // Parents first
-      users:               db.prepare('SELECT * FROM users ORDER BY created_at').all(),
-      locations:           db.prepare('SELECT * FROM locations ORDER BY created_at').all(),
-      template_groups:     db.prepare('SELECT * FROM template_groups ORDER BY sort_order, created_at').all(),
+      users:                 db.prepare('SELECT * FROM users ORDER BY created_at').all(),
+      organisations:         allTables.has('organisations')
+                               ? db.prepare('SELECT * FROM organisations ORDER BY created_at').all() : [],
+      locations:             db.prepare('SELECT * FROM locations ORDER BY created_at').all(),
+      template_groups:       allTables.has('template_groups')
+                               ? db.prepare('SELECT * FROM template_groups ORDER BY sort_order, created_at').all() : [],
       // Children of the above
-      shift_templates:     db.prepare('SELECT * FROM shift_templates ORDER BY created_at').all(),
-      template_days:       db.prepare('SELECT * FROM template_days').all(),
+      shift_templates:       db.prepare('SELECT * FROM shift_templates ORDER BY created_at').all(),
+      template_days:         db.prepare('SELECT * FROM template_days').all(),
       template_pattern_days: db.prepare('SELECT * FROM template_pattern_days').all(),
-      user_template_groups:db.prepare('SELECT * FROM user_template_groups').all(),
-      teams:               db.prepare('SELECT * FROM teams ORDER BY created_at').all(),
-      team_members:        db.prepare('SELECT * FROM team_members ORDER BY added_at').all(),
-      shifts:              db.prepare('SELECT * FROM shifts ORDER BY date').all(),
-      task_lists:          db.prepare('SELECT * FROM task_lists ORDER BY sort_order, created_at').all(),
-      task_assignments:    db.prepare('SELECT * FROM task_assignments ORDER BY date').all(),
-      ical_tokens:         db.prepare('SELECT * FROM ical_tokens').all(),
-      app_preferences:     db.prepare('SELECT * FROM app_preferences').all(),
-      audit_log:           db.prepare('SELECT * FROM audit_log ORDER BY created_at LIMIT 10000').all(),
+      user_template_groups:  allTables.has('user_template_groups')
+                               ? db.prepare('SELECT * FROM user_template_groups').all() : [],
+      teams:                 db.prepare('SELECT * FROM teams ORDER BY created_at').all(),
+      team_members:          db.prepare('SELECT * FROM team_members ORDER BY added_at').all(),
+      organisation_members:  allTables.has('organisation_members')
+                               ? db.prepare('SELECT * FROM organisation_members ORDER BY added_at').all() : [],
+      shifts:                db.prepare('SELECT * FROM shifts ORDER BY date').all(),
+      task_lists:            db.prepare('SELECT * FROM task_lists ORDER BY sort_order, created_at').all(),
+      task_assignments:      db.prepare('SELECT * FROM task_assignments ORDER BY date').all(),
+      ical_tokens:           db.prepare('SELECT * FROM ical_tokens').all(),
+      app_preferences:       db.prepare('SELECT * FROM app_preferences').all(),
+      audit_log:             db.prepare('SELECT * FROM audit_log ORDER BY created_at LIMIT 10000').all(),
     }
 
     // ── Avatar files — stored separately from DB rows ─────────────────────────
@@ -135,6 +144,7 @@ router.post('/restore', (req, res) => {
   const teamCols     = new Set(db.prepare('PRAGMA table_info(teams)').all().map(c => c.name))
   const taskListCols = new Set(db.prepare('PRAGMA table_info(task_lists)').all().map(c => c.name))
   const templateCols = new Set(db.prepare('PRAGMA table_info(shift_templates)').all().map(c => c.name))
+  const locCols      = new Set(db.prepare('PRAGMA table_info(locations)').all().map(c => c.name))
 
   // Check which tables actually exist on this instance (feature flags may
   // mean some tables haven't been created yet).
@@ -203,7 +213,29 @@ router.post('/restore', (req, res) => {
       }
       stats.users = userCount
 
-      // ── 2. Locations ───────────────────────────────────────────────────────
+      // ── 2. Organisations ───────────────────────────────────────────────────
+      if (existingTables.has('organisations')) {
+        const upsertOrg = db.prepare(`
+          INSERT INTO organisations (id, name, color, created_by, created_at)
+          VALUES (@id, @name, @color, @created_by, @created_at)
+          ON CONFLICT(id) DO UPDATE SET
+            name=excluded.name, color=excluded.color
+        `)
+        let orgCount = 0
+        for (const o of (tables.organisations || [])) {
+          upsertOrg.run({
+            id:         o.id,
+            name:       o.name,
+            color:      o.color || '#0052cc',
+            created_by: o.created_by || null,
+            created_at: o.created_at,
+          })
+          orgCount++
+        }
+        stats.organisations = orgCount
+      }
+
+      // ── 3. Locations ───────────────────────────────────────────────────────
       // Two-step: re-key any existing row that shares the same name but has a
       // different id (e.g. a default location auto-created on fresh install),
       // then upsert on id so subsequent restores stay idempotent.
@@ -211,10 +243,15 @@ router.post('/restore', (req, res) => {
         UPDATE locations SET id = @id WHERE LOWER(TRIM(name)) = LOWER(TRIM(@name)) AND id != @id
       `)
       const upsertLoc = db.prepare(`
-        INSERT INTO locations (id, name, address, color, created_by, created_at)
-        VALUES (@id, @name, @address, @color, @created_by, @created_at)
+        INSERT INTO locations (id, name, address, color, created_by, created_at
+          ${locCols.has('org_id') ? ', org_id' : ''}
+        )
+        VALUES (@id, @name, @address, @color, @created_by, @created_at
+          ${locCols.has('org_id') ? ', @org_id' : ''}
+        )
         ON CONFLICT(id) DO UPDATE SET
           name=excluded.name, address=excluded.address, color=excluded.color
+          ${locCols.has('org_id') ? ', org_id=excluded.org_id' : ''}
       `)
       let locCount = 0
       for (const l of (tables.locations || [])) {
@@ -226,12 +263,13 @@ router.post('/restore', (req, res) => {
           color:      resolveStoredColor(l.color, DEFAULT_COLOR),
           created_by: l.created_by || null,
           created_at: l.created_at,
+          org_id:     l.org_id || null,
         })
         locCount++
       }
       stats.locations = locCount
 
-      // ── 3. Template Groups ─────────────────────────────────────────────────
+      // ── 4. Template Groups ─────────────────────────────────────────────────
       // Must come before shift_templates which references group_id.
       if (existingTables.has('template_groups')) {
         const upsertTmplGroup = db.prepare(`
@@ -254,29 +292,29 @@ router.post('/restore', (req, res) => {
         stats.templateGroups = tgCount
       }
 
-      // ── 4. Shift Templates ─────────────────────────────────────────────────
+      // ── 5. Shift Templates ─────────────────────────────────────────────────
       // Two-step: re-key existing rows sharing the same name under a different
       // id before upserting, matching the same pattern used for locations.
       const updateTmplIdByName = db.prepare(`
         UPDATE shift_templates SET id = @id WHERE LOWER(TRIM(name)) = LOWER(TRIM(@name)) AND id != @id
       `)
-      const tmplHasGroupId = templateCols.has('group_id')
+      const tmplHasOrgId = templateCols.has('org_id')
       const tmplHasType = templateCols.has('template_type')
       const tmplHasCycleLength = templateCols.has('cycle_length')
       const upsertTmpl = db.prepare(`
         INSERT INTO shift_templates (id, name, description, created_by, created_at
-          ${tmplHasGroupId ? ', group_id' : ''}
+          ${tmplHasOrgId ? ', org_id' : ''}
           ${tmplHasType ? ', template_type' : ''}
           ${tmplHasCycleLength ? ', cycle_length' : ''}
         )
         VALUES (@id, @name, @description, @created_by, @created_at
-          ${tmplHasGroupId ? ', @group_id' : ''}
+          ${tmplHasOrgId ? ', @org_id' : ''}
           ${tmplHasType ? ', @template_type' : ''}
           ${tmplHasCycleLength ? ', @cycle_length' : ''}
         )
         ON CONFLICT(id) DO UPDATE SET
           name=excluded.name, description=excluded.description
-          ${tmplHasGroupId ? ', group_id=excluded.group_id' : ''}
+          ${tmplHasOrgId ? ', org_id=excluded.org_id' : ''}
           ${tmplHasType ? ', template_type=excluded.template_type' : ''}
           ${tmplHasCycleLength ? ', cycle_length=excluded.cycle_length' : ''}
       `)
@@ -284,20 +322,21 @@ router.post('/restore', (req, res) => {
       for (const t of (tables.shift_templates || [])) {
         updateTmplIdByName.run({ id: t.id, name: t.name })
         upsertTmpl.run({
-          id:          t.id,
-          name:        t.name,
-          description: t.description || null,
-          created_by:  t.created_by || null,
-          created_at:  t.created_at,
-          group_id:    t.group_id || null,
+          id:            t.id,
+          name:          t.name,
+          description:   t.description || null,
+          created_by:    t.created_by || null,
+          created_at:    t.created_at,
+          // org_id is the new field; fall back to null (old backups won't have it)
+          org_id:        t.org_id || null,
           template_type: t.template_type || 'weekly',
-          cycle_length: t.cycle_length ?? 7,
+          cycle_length:  t.cycle_length ?? 7,
         })
         tmplCount++
       }
       stats.templates = tmplCount
 
-      // ── 5. Template Days ───────────────────────────────────────────────────
+      // ── 6. Template Days ───────────────────────────────────────────────────
       // UNIQUE(template_id, day_of_week) in addition to PK — handle both.
       const upsertTmplDay = db.prepare(`
         INSERT INTO template_days (id, template_id, day_of_week, location_id, start_time, end_time, notes, note_color, is_off)
@@ -328,7 +367,7 @@ router.post('/restore', (req, res) => {
       }
       stats.templateDays = tdCount
 
-      // ── 6. Pattern Template Days ──────────────────────────────────────────
+      // ── 7. Pattern Template Days ──────────────────────────────────────────
       if (existingTables.has('template_pattern_days')) {
         const upsertPatternDay = db.prepare(`
           INSERT INTO template_pattern_days (
@@ -364,7 +403,7 @@ router.post('/restore', (req, res) => {
         stats.templatePatternDays = patternDayCount
       }
 
-      // ── 7. User → Template Group assignments ───────────────────────────────
+      // ── 8. User → Template Group assignments ───────────────────────────────
       if (existingTables.has('user_template_groups')) {
         const upsertUTG = db.prepare(`
           INSERT OR IGNORE INTO user_template_groups (user_id, group_id, added_at)
@@ -382,18 +421,21 @@ router.post('/restore', (req, res) => {
         stats.userTemplateGroups = utgCount
       }
 
-      // ── 8. Teams ───────────────────────────────────────────────────────────
+      // ── 9. Teams ───────────────────────────────────────────────────────────
       if (existingTables.has('teams')) {
         const upsertTeam = db.prepare(`
           INSERT INTO teams (id, name, color, created_by, created_at
             ${teamCols.has('owned_by') ? ', owned_by' : ''}
+            ${teamCols.has('org_id')   ? ', org_id'   : ''}
           )
           VALUES (@id, @name, @color, @created_by, @created_at
             ${teamCols.has('owned_by') ? ', @owned_by' : ''}
+            ${teamCols.has('org_id')   ? ', @org_id'   : ''}
           )
           ON CONFLICT(id) DO UPDATE SET
             name=excluded.name, color=excluded.color
             ${teamCols.has('owned_by') ? ', owned_by=excluded.owned_by' : ''}
+            ${teamCols.has('org_id')   ? ', org_id=excluded.org_id'     : ''}
         `)
         let teamCount = 0
         for (const t of (tables.teams || [])) {
@@ -404,13 +446,14 @@ router.post('/restore', (req, res) => {
             created_by: t.created_by || null,
             created_at: t.created_at,
             owned_by:   t.owned_by || null,
+            org_id:     t.org_id || null,
           })
           teamCount++
         }
         stats.teams = teamCount
       }
 
-      // ── 8. Team Members ────────────────────────────────────────────────────
+      // ── 10. Team Members ───────────────────────────────────────────────────
       if (existingTables.has('team_members')) {
         const upsertTeamMember = db.prepare(`
           INSERT OR IGNORE INTO team_members (team_id, user_id, added_at)
@@ -428,7 +471,25 @@ router.post('/restore', (req, res) => {
         stats.teamMembers = tmCount
       }
 
-      // ── 9. Shifts ──────────────────────────────────────────────────────────
+      // ── 9. Organisation Members ────────────────────────────────────────────
+      if (existingTables.has('organisation_members')) {
+        const upsertOrgMember = db.prepare(`
+          INSERT OR IGNORE INTO organisation_members (org_id, user_id, added_at)
+          VALUES (@org_id, @user_id, @added_at)
+        `)
+        let omCount = 0
+        for (const m of (tables.organisation_members || [])) {
+          upsertOrgMember.run({
+            org_id:   m.org_id,
+            user_id:  m.user_id,
+            added_at: m.added_at || new Date().toISOString(),
+          })
+          omCount++
+        }
+        stats.organisationMembers = omCount
+      }
+
+      // ── 12. Shifts ─────────────────────────────────────────────────────────
       // UNIQUE(user_id, date) in addition to PK — handle both.
       const upsertShift = db.prepare(`
         INSERT INTO shifts (
@@ -475,22 +536,25 @@ router.post('/restore', (req, res) => {
       }
       stats.shifts = shiftCount
 
-      // ── 10. Task Lists ─────────────────────────────────────────────────────
+      // ── 13. Task Lists ─────────────────────────────────────────────────────
       // Must come before task_assignments which references task_list_id.
       if (existingTables.has('task_lists')) {
         const upsertTaskList = db.prepare(`
           INSERT INTO task_lists (id, name, color, sort_order, created_by, created_at
             ${taskListCols.has('description') ? ', description' : ''}
             ${taskListCols.has('location_id') ? ', location_id' : ''}
+            ${taskListCols.has('org_id')      ? ', org_id'      : ''}
           )
           VALUES (@id, @name, @color, @sort_order, @created_by, @created_at
             ${taskListCols.has('description') ? ', @description' : ''}
             ${taskListCols.has('location_id') ? ', @location_id' : ''}
+            ${taskListCols.has('org_id')      ? ', @org_id'      : ''}
           )
           ON CONFLICT(id) DO UPDATE SET
             name=excluded.name, color=excluded.color, sort_order=excluded.sort_order
             ${taskListCols.has('description') ? ', description=excluded.description' : ''}
             ${taskListCols.has('location_id') ? ', location_id=excluded.location_id' : ''}
+            ${taskListCols.has('org_id')      ? ', org_id=excluded.org_id'           : ''}
         `)
         let tlCount = 0
         for (const tl of (tables.task_lists || [])) {
@@ -503,13 +567,14 @@ router.post('/restore', (req, res) => {
             created_at:  tl.created_at,
             description: tl.description || null,
             location_id: tl.location_id || null,
+            org_id:      tl.org_id || null,
           })
           tlCount++
         }
         stats.taskLists = tlCount
       }
 
-      // ── 11. Task Assignments ───────────────────────────────────────────────
+      // ── 14. Task Assignments ───────────────────────────────────────────────
       // UNIQUE(user_id, task_list_id, date) in addition to PK — handle both.
       if (existingTables.has('task_assignments')) {
         const upsertTaskAssign = db.prepare(`
@@ -535,7 +600,7 @@ router.post('/restore', (req, res) => {
         stats.taskAssignments = taCount
       }
 
-      // ── 12. iCal Tokens ────────────────────────────────────────────────────
+      // ── 15. iCal Tokens ────────────────────────────────────────────────────
       // Two UNIQUE constraints (user_id + token) — delete first, then insert.
       const deleteIcal = db.prepare('DELETE FROM ical_tokens WHERE user_id = @user_id')
       const insertIcal = db.prepare(`
@@ -547,7 +612,7 @@ router.post('/restore', (req, res) => {
         insertIcal.run({ id: t.id, user_id: t.user_id, token: t.token, created_at: t.created_at })
       }
 
-      // ── 13. App Preferences ────────────────────────────────────────────────
+      // ── 16. App Preferences ────────────────────────────────────────────────
       const upsertPref = db.prepare(`
         INSERT INTO app_preferences (key, value, updated_at)
         VALUES (@key, @value, @updated_at)

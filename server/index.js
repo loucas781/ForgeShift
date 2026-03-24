@@ -85,12 +85,13 @@ const writeLimiter = rateLimit({
   skip: (req) => process.env.APP_ENV === 'development' || !['POST','PUT','PATCH','DELETE'].includes(req.method),
   message: { error: 'Too many requests — please slow down.' },
 })
-app.use('/api/shifts',    writeLimiter)
-app.use('/api/teams',     writeLimiter)
-app.use('/api/templates', writeLimiter)
-app.use('/api/users',     writeLimiter)
-app.use('/api/locations', writeLimiter)
-app.use('/api/tasks',     writeLimiter)
+app.use('/api/shifts',        writeLimiter)
+app.use('/api/teams',         writeLimiter)
+app.use('/api/templates',     writeLimiter)
+app.use('/api/users',         writeLimiter)
+app.use('/api/locations',     writeLimiter)
+app.use('/api/tasks',         writeLimiter)
+app.use('/api/organisations', writeLimiter)
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '../public'), { index: false }))
@@ -310,6 +311,7 @@ app.use('/api/templates',        require('./routes/templates'))
 app.use('/api/template-groups',  require('./routes/template-groups'))
 app.use('/api/locations',        require('./routes/locations'))
 app.use('/api/teams',            require('./routes/teams'))
+app.use('/api/organisations',    require('./routes/organisations'))
 app.use('/api/ical',             require('./routes/ical'))
 app.use('/api/backup',           require('./routes/backup'))
 app.use('/api/tasks',            require('./routes/tasks'))

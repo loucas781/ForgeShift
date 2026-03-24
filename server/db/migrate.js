@@ -454,6 +454,7 @@ try {
   migrateTeams()
   migrateHolidays()
   migrateLocationMembers()
+  migrateOrganisations()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)
@@ -494,6 +495,41 @@ function migrateHolidays() {
     VALUES ('holiday_last_fetched', '', datetime('now'))
   `).run()
   console.log('✓ Holiday overrides schema ready')
+}
+
+// Additive: unified organisations (safe on existing DBs)
+function migrateOrganisations() {
+  const db = require('./connection')
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS organisations (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      color      TEXT NOT NULL DEFAULT '#0052cc',
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS organisation_members (
+      org_id   TEXT NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (org_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_org_members_org  ON organisation_members(org_id);
+    CREATE INDEX IF NOT EXISTS idx_org_members_user ON organisation_members(user_id);
+  `)
+
+  // Add org_id to all item tables (additive, nullable)
+  const itemTables = ['locations', 'task_lists', 'shift_templates', 'teams']
+  for (const table of itemTables) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name)
+    if (!cols.includes('org_id')) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN org_id TEXT REFERENCES organisations(id) ON DELETE SET NULL`)
+      console.log(`✓ Added org_id to ${table}`)
+    }
+  }
+  console.log('✓ Organisations schema ready')
 }
 
 // Additive: location member assignment (safe on existing DBs)

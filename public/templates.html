@@ -73,9 +73,9 @@
         <input type="number" class="form-input" id="tmplCycleLength" min="1" max="42" value="7" onchange="onPatternLengthChange(this.value)">
       </div>
       <div class="form-group" id="tmplGroupRow">
-        <label class="form-label">Group</label>
+        <label class="form-label">Organisation</label>
         <select class="form-select" id="tmplGroup">
-          <option value="">No group</option>
+          <option value="">— None (visible to all) —</option>
         </select>
       </div>
       <h4 style="margin:16px 0 12px;font-size:13px" id="dayEditorHeading">Configure each day</h4>
@@ -247,9 +247,7 @@ async function init() {
 
 async function loadGroups() {
   try {
-    // Admins get full group list; others get their assigned groups only
-    const endpoint = cfg.user.role === 'admin' ? '/api/template-groups' : '/api/template-groups/my'
-    groups = await api(endpoint)
+    groups = await api('/api/organisations')
   } catch { groups = [] }
 }
 
@@ -283,13 +281,13 @@ function renderGroupFilterBar() {
   const allCount = templates.length
   const pills = [{ id: 'all', name: 'All', count: allCount }]
   groups.forEach(g => {
-    const count = templates.filter(t => t.group_id === g.id).length
+    const count = templates.filter(t => t.org_id === g.id).length
     pills.push({ id: g.id, name: g.name, count })
   })
-  // Add ungrouped pill if any ungrouped templates exist (admin only, informational)
-  const ungroupedCount = templates.filter(t => !t.group_id).length
+  // Add unassigned pill if any unassigned templates exist (admin only, informational)
+  const ungroupedCount = templates.filter(t => !t.org_id).length
   if (cfg.user.role === 'admin' && ungroupedCount > 0) {
-    pills.push({ id: 'ungrouped', name: 'Ungrouped', count: ungroupedCount })
+    pills.push({ id: 'ungrouped', name: 'Unassigned', count: ungroupedCount })
   }
 
   bar.innerHTML = pills.map(p => {
@@ -357,10 +355,10 @@ function renderTemplateCard(t) {
       </span>`
     : ''
 
-  const groupBadge = t.group_name
+  const groupBadge = t.org_name
     ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);margin-top:3px">
         <svg viewBox="0 0 20 20" fill="currentColor" width="9" height="9"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
-        ${t.group_name}
+        ${t.org_name}
       </span>`
     : ''
 
@@ -416,9 +414,9 @@ function renderTemplateGrid() {
   // Filter by active group
   let visible = templates
   if (activeGroupFilter === 'ungrouped') {
-    visible = templates.filter(t => !t.group_id)
+    visible = templates.filter(t => !t.org_id)
   } else if (activeGroupFilter !== 'all') {
-    visible = templates.filter(t => t.group_id === activeGroupFilter)
+    visible = templates.filter(t => t.org_id === activeGroupFilter)
   }
 
   if (!templates.length) {
@@ -443,11 +441,11 @@ function renderTemplateGrid() {
   if (activeGroupFilter === 'all' && groups.length > 0) {
     let html = ''
     // Ungrouped first (if any)
-    const ungrouped = visible.filter(t => !t.group_id)
+    const ungrouped = visible.filter(t => !t.org_id)
     // Then each group in order
     const grouped = groups.map(g => ({
       group: g,
-      items: visible.filter(t => t.group_id === g.id)
+      items: visible.filter(t => t.org_id === g.id)
     })).filter(x => x.items.length > 0)
 
     // If there are multiple sections, show section headings
@@ -487,10 +485,10 @@ function renderGroupSelect(selectedId) {
   const row = document.getElementById('tmplGroupRow')
   const el  = document.getElementById('tmplGroup')
   if (!el || !row) return
-  // Only admins can assign groups; hide the field for others
+  // Only admins can assign org; hide the field for others
   if (cfg.user.role !== 'admin' || groups.length === 0) { row.style.display = 'none'; return }
   row.style.display = ''
-  el.innerHTML = '<option value="">No group</option>' +
+  el.innerHTML = '<option value="">— None (visible to all) —</option>' +
     groups.map(g => `<option value="${g.id}"${g.id === selectedId ? ' selected' : ''}>${g.name}</option>`).join('')
 }
 
@@ -529,7 +527,7 @@ function openEditTmpl(id) {
   document.getElementById('tmplModalTitle').textContent = 'Edit Template'
   document.getElementById('tmplName').value = t.name
   document.getElementById('tmplDesc').value = t.description || ''
-  renderGroupSelect(t.group_id || null)
+  renderGroupSelect(t.org_id || null)
   syncTemplateEditorMode()
   renderDayEditor()
   document.getElementById('tmplModal').classList.add('open')
@@ -746,11 +744,11 @@ async function saveTmpl() {
     })
   }
 
-  const group_id = document.getElementById('tmplGroup')?.value || null
+  const org_id = document.getElementById('tmplGroup')?.value || null
   const body = {
     name,
     description: document.getElementById('tmplDesc').value.trim(),
-    group_id,
+    org_id,
     template_type: currentType,
     cycle_length: currentCycleLength,
     days,
@@ -820,7 +818,7 @@ async function duplicateTmpl(id) {
       body: {
         name: newName,
         description: t.description || '',
-        group_id: t.group_id || null,
+        org_id: t.org_id || null,
         template_type: type,
         cycle_length: cycleLength,
         days: (t.days || []).map(d => ({
