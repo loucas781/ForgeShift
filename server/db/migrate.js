@@ -450,6 +450,20 @@ function migrateAdditive() {
     CREATE INDEX IF NOT EXISTS idx_passkey_user ON passkey_credentials(user_id);
   `)
   console.log('✓ Passkey credentials schema ready')
+
+  // Per-device session tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip           TEXT,
+      user_agent   TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+  `)
+  console.log('✓ User sessions schema ready')
 }
 
 try {

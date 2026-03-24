@@ -377,6 +377,18 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
 .card-body { padding: 20px; }
 .card-title { font-size: 14px; font-weight: 700; }
 
+/* ── Collapsible settings sections ───────────────────────── */
+.section-collapse-btn {
+  background: none; border: none; cursor: pointer; padding: 2px; margin-left: auto;
+  color: var(--text-3); border-radius: var(--r-sm); flex-shrink: 0;
+  display: flex; align-items: center; transition: color .15s;
+}
+.section-collapse-btn:hover { color: var(--text-1); }
+.section-collapse-btn svg { transition: transform .2s ease; }
+.section-collapse-rotated svg { transform: rotate(-90deg); }
+.section-collapsed .card-body { display: none; }
+.section-collapsed .card-header { border-bottom: none; }
+
 /* ── Page header ──────────────────────────────────────────── */
 .page-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -433,6 +445,8 @@ a.topbar-icon-btn.active-icon:hover { color: #fff; background: rgba(255,255,255,
   color: var(--text-2); transition: background var(--t-fast);
 }
 .cal-today-btn:hover { background: var(--bg); }
+.cal-today-btn--away { border-color: var(--brand); color: var(--brand); }
+.cal-today-btn--away:hover { background: var(--brand-light); }
 .cal-view-tabs { display: flex; gap: 2px; margin-left: auto; }
 .cal-view-tab { padding: 5px 12px; border-radius: var(--r-md); font-size: 12px; font-weight: 600;
   border: 1px solid var(--border); background: var(--surface); color: var(--text-3);

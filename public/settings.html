@@ -546,6 +546,56 @@ async function init() {
   const hash = window.location.hash.slice(1)
   const validTab = tabs.find(t => t.id === hash)
   showTab(validTab ? hash : tabs[0].id)
+  initCollapsibleSections()
+}
+
+function initCollapsibleSections() {
+  const STORAGE_KEY = 'fs-settings-collapsed'
+  let collapsed = {}
+  try { collapsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch {}
+
+  document.querySelectorAll('.settings-panel .card-header').forEach(header => {
+    // Skip headers that already have a collapse toggle or contain interactive save buttons
+    if (header.querySelector('.section-collapse-btn')) return
+
+    const card = header.closest('.card')
+    if (!card) return
+    const body = card.querySelector('.card-body')
+    if (!body) return
+
+    // Derive a stable key from the heading text
+    const title = header.querySelector('.card-title')?.textContent?.trim() || header.textContent.trim()
+    const key   = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+    // Add chevron button
+    const btn = document.createElement('button')
+    btn.className = 'section-collapse-btn'
+    btn.setAttribute('aria-label', 'Toggle section')
+    btn.setAttribute('type', 'button')
+    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>'
+    header.appendChild(btn)
+    header.style.cursor = 'pointer'
+
+    function applyState(isCollapsed, animate) {
+      card.classList.toggle('section-collapsed', isCollapsed)
+      btn.classList.toggle('section-collapse-rotated', isCollapsed)
+      if (!animate) { body.style.transition = 'none'; requestAnimationFrame(() => body.style.transition = '') }
+    }
+
+    // Restore saved state
+    if (collapsed[key]) applyState(true, false)
+
+    header.addEventListener('click', e => {
+      // Don't collapse when clicking interactive elements inside the header (buttons, inputs, etc.)
+      if (e.target.closest('button:not(.section-collapse-btn), input, select, a')) return
+      const now = card.classList.contains('section-collapsed')
+      const next = !now
+      applyState(next, true)
+      collapsed[key] = next || undefined
+      if (!next) delete collapsed[key]
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed)) } catch {}
+    })
+  })
 }
 
 // ── Avatar helper — mirrors shell.js avatarEl ─────────────────────────────────
@@ -1104,6 +1154,12 @@ async function renderTeamPanel() {
             <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
             <!-- Tab description -->
             <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
+            <!-- Inactive toggle -->
+            <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;user-select:none">
+                <input type="checkbox" id="showInactive" onchange="renderTeamListFiltered()"> Show inactive
+              </label>
+            </div>
             <!-- Members list -->
             <div id="teamList">Loading…</div>
           </div>
@@ -1299,9 +1355,10 @@ function switchRoleTab(role) {
 function renderTeamListFiltered() {
   const el = document.getElementById('teamList')
   if (!el) return
-  const filtered = users.filter(u => u.role === activeRoleTab)
+  const showInactive = document.getElementById('showInactive')?.checked ?? false
+  const filtered = users.filter(u => u.role === activeRoleTab && (showInactive || u.is_active))
   if (!filtered.length) {
-    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${activeRoleTab === 'shift_lead' ? 'shift leads' : activeRoleTab + 's'} yet.</p>`
+    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${showInactive ? '' : 'active '}${activeRoleTab === 'shift_lead' ? 'shift leads' : activeRoleTab + 's'} yet.</p>`
     return
   }
   el.innerHTML = filtered.map(u => `
@@ -1731,7 +1788,7 @@ async function doInviteInline() {
           <div style="font-weight:600;color:var(--text);margin-bottom:6px">⚠️ Temporary Password — share securely, shown once only</div>
           <div style="display:flex;align-items:center;gap:8px">
             <code style="flex:1;font-size:14px;font-family:var(--mono);padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);word-break:break-all;color:var(--text);letter-spacing:.04em">${escHtml(r.tempPassword)}</code>
-            <button class="btn btn-secondary btn-sm" onclick="(function(b){navigator.clipboard.writeText(${JSON.stringify(r.tempPassword)}).then(()=>{b.textContent='✓ Copied';setTimeout(()=>b.textContent='Copy',2000)})})(this)" style="flex-shrink:0">Copy</button>
+            <button class="btn btn-secondary btn-sm" onclick="(function(b){navigator.clipboard.writeText(${escHtml(JSON.stringify(r.tempPassword))}).then(()=>{b.textContent='✓ Copied';setTimeout(()=>b.textContent='Copy',2000)})})(this)" style="flex-shrink:0">Copy</button>
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:6px">The user should change this password after first login.</div>
         </div>`
@@ -3325,6 +3382,13 @@ async function renderAuditPanel() {
           <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="margin-right:4px"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
           Refresh
         </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportAuditCSV()" style="height:34px" title="Download audit log as CSV">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="margin-right:4px"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          Export CSV
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAuditLog()" style="height:34px;color:var(--red)" title="Permanently delete all audit log entries">
+          Clear log
+        </button>
       </div>
     </div>
     <div class="card">
@@ -3405,6 +3469,25 @@ async function loadAudit(offset) {
   } catch (err) {
     document.getElementById('auditBody').innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:24px;text-align:center">${escHtml(err.message)}</td></tr>`
   }
+}
+
+function exportAuditCSV() {
+  const action  = document.getElementById('auditActionFilter')?.value || ''
+  const actorId = document.getElementById('auditUserFilter')?.value   || ''
+  const params  = new URLSearchParams()
+  if (action)  params.set('action',   action)
+  if (actorId) params.set('actor_id', actorId)
+  const qs = params.toString()
+  window.location.href = `/api/audit/export${qs ? '?' + qs : ''}`
+}
+
+async function clearAuditLog() {
+  if (!confirm('Permanently delete all audit log entries? This cannot be undone.')) return
+  try {
+    await api('/api/audit', { method: 'DELETE' })
+    toast('Audit log cleared', 'success')
+    await reloadAudit()
+  } catch (err) { toast(err.message, 'error') }
 }
 
 // ── Backup panel ──────────────────────────────────────────────────────────────
