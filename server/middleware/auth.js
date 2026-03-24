@@ -22,6 +22,21 @@ function requireAuth(req, res, next) {
       if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
       return res.redirect('/login.html')
     }
+    // Validate per-device session (JWTs with sid) and update last_used_at
+    if (req.user.sid) {
+      const sess = db.prepare('SELECT id, last_used_at FROM user_sessions WHERE id = ? AND user_id = ?')
+        .get(req.user.sid, req.user.id)
+      if (!sess) {
+        res.clearCookie('token', clearCookieOpts())
+        if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
+        return res.redirect('/login.html')
+      }
+      // Only write last_used_at if more than 60 seconds have passed (avoid excessive writes)
+      const lastUsed = new Date(sess.last_used_at).getTime()
+      if (Date.now() - lastUsed > 60000) {
+        db.prepare("UPDATE user_sessions SET last_used_at = datetime('now') WHERE id = ?").run(req.user.sid)
+      }
+    }
     next()
   } catch (err) {
     res.clearCookie('token', clearCookieOpts())

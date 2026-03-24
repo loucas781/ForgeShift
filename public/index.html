@@ -700,15 +700,21 @@ async function renderView() {
 
 function updateTitle() {
   const weekStart = prefs?.weekStartDay ?? 1
+  const todayNow = new Date()
+  let isCurrentPeriod
   if (view === 'month') {
     document.getElementById('calTitle').textContent = MONTH_NAMES[currentDate.getMonth()] + ' ' + currentDate.getFullYear()
+    isCurrentPeriod = currentDate.getFullYear() === todayNow.getFullYear() && currentDate.getMonth() === todayNow.getMonth()
   } else {
     const ws = startOfWeek(currentDate, weekStart)
     const we = new Date(ws); we.setDate(we.getDate() + 6)
     document.getElementById('calTitle').textContent =
       ws.getDate() + ' ' + MONTH_NAMES[ws.getMonth()].slice(0,3) + ' – ' +
       we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3) + ' ' + we.getFullYear()
+    isCurrentPeriod = todayNow >= ws && todayNow <= we
   }
+  const todayBtn = document.querySelector('.cal-today-btn')
+  if (todayBtn) todayBtn.classList.toggle('cal-today-btn--away', !isCurrentPeriod)
 }
 
 // ── Month render ───────────────────────────────────────────────────────────────

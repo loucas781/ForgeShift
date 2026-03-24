@@ -464,8 +464,6 @@ async function init() {
   const ALL_TABS = [
     { id: 'appearance', label: 'Appearance', roles: ['admin','shift_lead','member'],
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-    { id: 'ical', label: 'Calendar Feed', roles: ['admin','shift_lead','member'],
-      icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
     { id: 'preferences', label: 'Preferences', roles: ['admin','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
@@ -490,8 +488,6 @@ async function init() {
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
     { id: 'buildinfo', label: 'Build Info', roles: ['admin','shift_lead','member'],
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'account', label: 'Account', roles: ['admin','shift_lead','member'],
-      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
     { id: 'about', label: 'About', roles: ['admin','shift_lead','member'],
       icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
@@ -526,7 +522,6 @@ async function init() {
   euPwIndicator = document.getElementById('euPwIndicatorWrap')
   await Promise.all([
     renderAppearancePanel(),
-    renderIcalPanel(),
     renderPreferencesPanel(),
     isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
     isAdmin ? renderTeamPanel() : Promise.resolve(),
@@ -538,7 +533,6 @@ async function init() {
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
     renderBuildInfoPanel(),
-    renderAccountPanel(),
     renderAboutPanel(),
   ])
 
@@ -546,7 +540,10 @@ async function init() {
   const hash = window.location.hash.slice(1)
   const validTab = tabs.find(t => t.id === hash)
   showTab(validTab ? hash : tabs[0].id)
+  initCollapsibleSections('.settings-panel')
 }
+
+// initCollapsibleSections is defined in shell.js
 
 // ── Avatar helper — mirrors shell.js avatarEl ─────────────────────────────────
 // Returns an outerHTML string for an avatar element that shows the photo if
@@ -1104,6 +1101,12 @@ async function renderTeamPanel() {
             <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
             <!-- Tab description -->
             <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
+            <!-- Inactive toggle -->
+            <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;user-select:none">
+                <input type="checkbox" id="showInactive" onchange="renderTeamListFiltered()"> Show inactive
+              </label>
+            </div>
             <!-- Members list -->
             <div id="teamList">Loading…</div>
           </div>
@@ -1299,9 +1302,10 @@ function switchRoleTab(role) {
 function renderTeamListFiltered() {
   const el = document.getElementById('teamList')
   if (!el) return
-  const filtered = users.filter(u => u.role === activeRoleTab)
+  const showInactive = document.getElementById('showInactive')?.checked ?? false
+  const filtered = users.filter(u => u.role === activeRoleTab && (showInactive || u.is_active))
   if (!filtered.length) {
-    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${activeRoleTab === 'shift_lead' ? 'shift leads' : activeRoleTab + 's'} yet.</p>`
+    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${showInactive ? '' : 'active '}${activeRoleTab === 'shift_lead' ? 'shift leads' : activeRoleTab + 's'} yet.</p>`
     return
   }
   el.innerHTML = filtered.map(u => `
@@ -1731,7 +1735,7 @@ async function doInviteInline() {
           <div style="font-weight:600;color:var(--text);margin-bottom:6px">⚠️ Temporary Password — share securely, shown once only</div>
           <div style="display:flex;align-items:center;gap:8px">
             <code style="flex:1;font-size:14px;font-family:var(--mono);padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);word-break:break-all;color:var(--text);letter-spacing:.04em">${escHtml(r.tempPassword)}</code>
-            <button class="btn btn-secondary btn-sm" onclick="(function(b){navigator.clipboard.writeText(${JSON.stringify(r.tempPassword)}).then(()=>{b.textContent='✓ Copied';setTimeout(()=>b.textContent='Copy',2000)})})(this)" style="flex-shrink:0">Copy</button>
+            <button class="btn btn-secondary btn-sm" onclick="(function(b){navigator.clipboard.writeText(${escHtml(JSON.stringify(r.tempPassword))}).then(()=>{b.textContent='✓ Copied';setTimeout(()=>b.textContent='Copy',2000)})})(this)" style="flex-shrink:0">Copy</button>
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:6px">The user should change this password after first login.</div>
         </div>`
@@ -3325,6 +3329,13 @@ async function renderAuditPanel() {
           <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="margin-right:4px"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
           Refresh
         </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportAuditCSV()" style="height:34px" title="Download audit log as CSV">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="margin-right:4px"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          Export CSV
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAuditLog()" style="height:34px;color:var(--red)" title="Permanently delete all audit log entries">
+          Clear log
+        </button>
       </div>
     </div>
     <div class="card">
@@ -3405,6 +3416,25 @@ async function loadAudit(offset) {
   } catch (err) {
     document.getElementById('auditBody').innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:24px;text-align:center">${escHtml(err.message)}</td></tr>`
   }
+}
+
+function exportAuditCSV() {
+  const action  = document.getElementById('auditActionFilter')?.value || ''
+  const actorId = document.getElementById('auditUserFilter')?.value   || ''
+  const params  = new URLSearchParams()
+  if (action)  params.set('action',   action)
+  if (actorId) params.set('actor_id', actorId)
+  const qs = params.toString()
+  window.location.href = `/api/audit/export${qs ? '?' + qs : ''}`
+}
+
+async function clearAuditLog() {
+  if (!confirm('Permanently delete all audit log entries? This cannot be undone.')) return
+  try {
+    await api('/api/audit', { method: 'DELETE' })
+    toast('Audit log cleared', 'success')
+    await reloadAudit()
+  } catch (err) { toast(err.message, 'error') }
 }
 
 // ── Backup panel ──────────────────────────────────────────────────────────────

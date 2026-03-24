@@ -32,12 +32,36 @@ function clearCookieOpts() {
   const secure = process.env.COOKIE_SECURE === 'true'
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
 }
-function makeToken(user) {
+function makeToken(user, sessionId) {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role, tv: user.token_version || 0 },
+    { id: user.id, email: user.email, name: user.name, role: user.role, tv: user.token_version || 0, sid: sessionId },
     process.env.JWT_SECRET,
     { expiresIn: `${process.env.COOKIE_MAX_AGE_HOURS || 72}h` }
   )
+}
+
+function parseDeviceLabel(ua = '') {
+  let browser = 'Unknown browser'
+  let os      = 'Unknown OS'
+  if (/Edg\//.test(ua))            browser = 'Edge'
+  else if (/Chrome\//.test(ua))    browser = 'Chrome'
+  else if (/Firefox\//.test(ua))   browser = 'Firefox'
+  else if (/Safari\//.test(ua))    browser = 'Safari'
+  else if (/OPR\//.test(ua))       browser = 'Opera'
+  if (/Windows/.test(ua))          os = 'Windows'
+  else if (/Macintosh/.test(ua))   os = 'macOS'
+  else if (/Linux/.test(ua))       os = 'Linux'
+  else if (/Android/.test(ua))     os = 'Android'
+  else if (/iPhone|iPad/.test(ua)) os = 'iOS'
+  return `${browser} on ${os}`
+}
+
+function createSession(req, userId) {
+  const id = uuidv4()
+  const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
+  const ua = req.headers['user-agent'] || null
+  db.prepare('INSERT INTO user_sessions (id, user_id, ip, user_agent) VALUES (?,?,?,?)').run(id, userId, ip, ua)
+  return id
 }
 
 // ── POST /api/auth/signup ──────────────────────────────────────────────────────
@@ -67,7 +91,8 @@ router.post('/signup', async (req, res) => {
     db.prepare('INSERT INTO users (id, name, email, password, initials, color, role) VALUES (?,?,?,?,?,?,?)')
       .run(id, name.trim(), norm, hash, getInitials(name), COLORS[userCount % COLORS.length], role)
     const user = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(id)
-    res.cookie('token', makeToken(user), cookieOpts())
+    const sessionId = createSession(req, user.id)
+    res.cookie('token', makeToken(user, sessionId), cookieOpts())
     audit(user.id, 'user.signup', 'user', user.id, user.name)
     res.json({ ok: true, user })
   } catch (err) { logger.error('signup:', err.message); res.status(500).json({ error: 'Server error' }) }
@@ -87,14 +112,23 @@ router.post('/login', async (req, res) => {
     if (!pwOk) return res.status(401).json({ error: 'Invalid email or password.' })
     if (needsRehash) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(await hashPassword(password), user.id)
     const { password: _, ...pub } = user
-    res.cookie('token', makeToken(pub), cookieOpts())
-    audit(pub.id, 'user.login', 'user', pub.id, pub.name)
+    const sessionId = createSession(req, pub.id)
+    res.cookie('token', makeToken(pub, sessionId), cookieOpts())
+    const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
+    audit(pub.id, 'user.login', 'user', pub.id, pub.name, { ip, ua: req.headers['user-agent'] })
     res.json({ ok: true, user: pub })
   } catch (err) { logger.error('login:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/logout ──────────────────────────────────────────────────────
 router.post('/logout', (req, res) => {
+  try {
+    const token = req.cookies?.token
+    if (token) {
+      const decoded = jwt.decode(token)
+      if (decoded?.sid) db.prepare('DELETE FROM user_sessions WHERE id = ?').run(decoded.sid)
+    }
+  } catch {}
   res.clearCookie('token', clearCookieOpts())
   res.json({ ok: true })
 })
@@ -134,7 +168,10 @@ router.patch('/profile', requireAuth, async (req, res) => {
     }
     if (updates.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...vals) }
     const updated = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(user.id)
-    res.cookie('token', makeToken(updated), cookieOpts())
+    // Rotate session: delete old, create new so the session list stays accurate
+    if (req.user?.sid) db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.user.sid)
+    const newSid = createSession(req, updated.id)
+    res.cookie('token', makeToken(updated, newSid), cookieOpts())
     audit(user.id, 'user.profile_update', 'user', user.id, updated.name)
     res.json({ ok: true, user: updated })
   } catch (err) { logger.error('profile:', err.message); res.status(500).json({ error: 'Server error' }) }
@@ -323,41 +360,68 @@ router.post('/2fa/disable', requireAuth, (req, res) => {
   }
 })
 
-// ── GET /api/auth/sessions — return current session info ─────────────────────
-// ForgeShift uses stateless JWTs with one cookie per browser — there is no
-// server-side session store, so we return a single "current session" entry
-// derived from the decoded JWT payload, matching ForgeTrack's UI shape.
+// ── GET /api/auth/sessions — list all active sessions for current user ────────
 router.get('/sessions', requireAuth, (req, res) => {
   try {
-    const ua = req.headers['user-agent'] || ''
-    // Simple browser/OS detection from UA string
-    let browser = 'Unknown browser'
-    let os      = 'Unknown OS'
-    if (/Edg\//.test(ua))          browser = 'Edge'
-    else if (/Chrome\//.test(ua))  browser = 'Chrome'
-    else if (/Firefox\//.test(ua)) browser = 'Firefox'
-    else if (/Safari\//.test(ua))  browser = 'Safari'
-    else if (/OPR\//.test(ua))     browser = 'Opera'
-    if (/Windows/.test(ua))        os = 'Windows'
-    else if (/Macintosh/.test(ua)) os = 'macOS'
-    else if (/Linux/.test(ua))     os = 'Linux'
-    else if (/Android/.test(ua))   os = 'Android'
-    else if (/iPhone|iPad/.test(ua)) os = 'iOS'
-    res.json({
-      sessions: [{
-        id:        'current',
-        label:     `${browser} on ${os}`,
-        isCurrent: true,
-      }],
-      note: 'ForgeShift uses HTTP-only cookies — only one active session per browser is tracked.',
-    })
+    const rows = db.prepare(
+      'SELECT id, ip, user_agent, created_at, last_used_at FROM user_sessions WHERE user_id = ? ORDER BY last_used_at DESC'
+    ).all(req.user.id)
+    const sessions = rows.map(r => ({
+      id:          r.id,
+      label:       parseDeviceLabel(r.user_agent || ''),
+      ip:          r.ip,
+      createdAt:   r.created_at,
+      lastUsedAt:  r.last_used_at,
+      isCurrent:   r.id === req.user.sid,
+    }))
+    res.json({ sessions })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
   }
 })
 
-// ── POST /api/auth/logout-all — clear cookie (only session this browser has) ──
+// ── DELETE /api/auth/sessions/:id — revoke a specific session ─────────────────
+router.delete('/sessions/:id', requireAuth, (req, res) => {
+  try {
+    const sess = db.prepare('SELECT id FROM user_sessions WHERE id = ? AND user_id = ?')
+      .get(req.params.id, req.user.id)
+    if (!sess) return res.status(404).json({ error: 'Session not found' })
+    db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.params.id)
+    const isCurrent = req.params.id === req.user.sid
+    if (isCurrent) res.clearCookie('token', clearCookieOpts())
+    res.json({ ok: true, logout: isCurrent })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── GET /api/auth/login-history — last 10 logins for current user ─────────────
+router.get('/login-history', requireAuth, (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT id, meta, created_at FROM audit_log
+      WHERE actor_id = ? AND action = 'user.login'
+      ORDER BY created_at DESC LIMIT 10
+    `).all(req.user.id)
+    const history = rows.map(r => {
+      let meta = {}
+      try { meta = JSON.parse(r.meta || '{}') } catch {}
+      return {
+        id:        r.id,
+        createdAt: r.created_at,
+        ip:        meta.ip || null,
+        label:     parseDeviceLabel(meta.ua || ''),
+      }
+    })
+    res.json({ history })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/logout-all — clear cookie and delete all sessions ──────────
 router.post('/logout-all', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(req.user.id)
   res.clearCookie('token', clearCookieOpts())
   audit(req.user.id, 'user.logout_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
@@ -388,9 +452,10 @@ router.get('/export', requireAuth, (req, res) => {
   }
 })
 
-// ── POST /api/auth/revoke-all — invalidate all JWTs for this user ─────────────
+// ── POST /api/auth/revoke-all — invalidate all JWTs + delete all sessions ─────
 router.post('/revoke-all', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.user.id)
+  db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(req.user.id)
   res.clearCookie('token', clearCookieOpts())
   audit(req.user.id, 'user.revoke_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })

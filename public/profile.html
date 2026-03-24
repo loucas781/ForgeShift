@@ -27,7 +27,7 @@
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
   <main class="page-content" style="display:flex;flex-direction:column;align-items:center">
-      <div style="width:100%;max-width:560px">
+      <div style="width:100%;max-width:720px">
       <div class="page-header">
         <h1 class="page-title">My Profile</h1>
       </div>
@@ -100,6 +100,56 @@
               Subscribe to your shift rota in any calendar app (Google Calendar, Apple Calendar, Outlook) via iCal.
             </p>
             <div id="icalContent">Loading…</div>
+            <div id="icalPreview" style="margin-top:16px"></div>
+          </div>
+        </div>
+
+        <!-- Active Sessions -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Active Sessions</h3></div>
+          <div class="card-body">
+            <div id="sessionsContent">Loading…</div>
+            <button class="btn btn-danger btn-sm" style="margin-top:12px" onclick="signOutEverywhere()">Sign out all devices</button>
+          </div>
+        </div>
+
+        <!-- Login History -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Login History</h3></div>
+          <div class="card-body">
+            <div id="loginHistoryContent">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Export My Data -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Export My Data</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
+              Download a JSON file containing all your account data, shifts you have been assigned, and calendar feed tokens.
+            </p>
+            <a href="/api/auth/export" class="btn btn-secondary btn-sm" download style="display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              Download my data
+            </a>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="border-color:rgba(220,38,38,.3)">
+          <div class="card-header" style="border-bottom-color:rgba(220,38,38,.2)">
+            <h3 class="card-title" style="color:var(--red)">Danger Zone</h3>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:4px">
+              Permanently delete your account and all associated data. This cannot be undone.
+            </p>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:16px">
+              <strong>Note:</strong> As an admin, deleting your account will only work if at least one other admin exists.
+            </p>
+            <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="openDeleteAccountModal()">
+              Delete my account
+            </button>
           </div>
         </div>
 
@@ -236,9 +286,37 @@ async function loadIcal() {
         <a href="${data.feedUrl}" class="btn btn-secondary btn-sm" download>⬇ Download .ics</a>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="regenerateIcal()">Regenerate token</button>
       </div>`
+    loadIcalPreview()
   } catch (err) {
     document.getElementById('icalContent').textContent = 'Failed to load iCal token'
   }
+}
+
+async function loadIcalPreview() {
+  const el = document.getElementById('icalPreview')
+  if (!el || !cfg?.user?.id) return
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const future = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const shifts = await api(`/api/shifts?start=${today}&end=${future}&user_id=${cfg.user.id}`)
+    const upcoming = shifts.slice(0, 5)
+    if (!upcoming.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-3);margin:0">No upcoming shifts in the next 60 days.</p>'
+      return
+    }
+    const rows = upcoming.map(s => {
+      const d = new Date(s.date + 'T12:00:00')
+      const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+      const timeStr = s.is_off ? 'Day off' : (s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day')
+      const loc = s.location_name ? `<span style="color:var(--text-3)">${s.location_name}</span>` : ''
+      return `<div style="display:flex;gap:12px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:500;min-width:110px">${dateStr}</span>
+        <span style="font-size:13px">${timeStr}</span>
+        ${loc}
+      </div>`
+    }).join('')
+    el.innerHTML = `<p style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px">Upcoming shifts</p>${rows}`
+  } catch {}
 }
 
 function copyIcal() {
@@ -255,7 +333,136 @@ async function regenerateIcal() {
   } catch (err) { toast(err.message, 'error') }
 }
 
-init()
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins  = Math.floor(diff / 60000)
+  if (mins < 2)   return 'Just now'
+  if (mins < 60)  return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days  = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+async function loadSessions() {
+  const el = document.getElementById('sessionsContent')
+  try {
+    const data = await api('/api/auth/sessions')
+    if (!data.sessions.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-3);margin:0">No active sessions found. Re-login to register your device.</p>'
+      return
+    }
+    el.innerHTML = data.sessions.map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px">
+            ${s.label}
+            ${s.isCurrent ? '<span class="badge badge-green" style="font-size:10px">Current</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">
+            ${s.ip ? s.ip + ' · ' : ''}Last active ${timeAgo(s.lastUsedAt)}
+            <span title="${new Date(s.createdAt).toLocaleString()}" style="cursor:default"> · Since ${new Date(s.createdAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);flex-shrink:0" onclick="revokeSession('${s.id}',${s.isCurrent})">Revoke</button>
+      </div>`).join('')
+  } catch (err) {
+    el.textContent = 'Failed to load sessions'
+  }
+}
+
+async function revokeSession(id, isCurrent) {
+  if (!confirm(isCurrent ? 'Revoke this session? You will be signed out.' : 'Revoke this session?')) return
+  try {
+    const data = await api(`/api/auth/sessions/${id}`, { method: 'DELETE' })
+    if (data.logout) { window.location.href = '/login.html'; return }
+    toast('Session revoked', 'success')
+    loadSessions()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function loadLoginHistory() {
+  const el = document.getElementById('loginHistoryContent')
+  try {
+    const data = await api('/api/auth/login-history')
+    if (!data.history.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-3);margin:0">No login history yet.</p>'
+      return
+    }
+    el.innerHTML = data.history.map((h, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px">
+            ${h.label}
+            ${i === 0 ? '<span class="badge badge-blue" style="font-size:10px">Most recent</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">
+            ${h.ip ? h.ip + ' · ' : ''}
+            <span title="${new Date(h.createdAt).toLocaleString()}">${timeAgo(h.createdAt)}</span>
+            &nbsp;·&nbsp;${new Date(h.createdAt).toLocaleString()}
+          </div>
+        </div>
+      </div>`).join('')
+  } catch (err) {
+    el.textContent = 'Failed to load login history'
+  }
+}
+
+async function signOutEverywhere() {
+  if (!confirm('This will invalidate all active sessions across every device and browser, including this one. Continue?')) return
+  try {
+    await api('/api/auth/revoke-all', { method: 'POST' })
+    window.location.href = '/login.html'
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function openDeleteAccountModal() {
+  const existing = document.getElementById('deleteAccountModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'deleteAccountModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--red)">Delete My Account</h3>
+        <button class="modal-close" onclick="document.getElementById('deleteAccountModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="padding:12px 14px;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);border-radius:var(--r-md);font-size:13px;color:var(--red);margin-bottom:16px;line-height:1.5">
+          <strong>This action is permanent and cannot be undone.</strong> Your account, all shifts, and calendar tokens will be deleted immediately.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm your password</label>
+          <input type="password" class="form-input" id="deleteAccountPw" placeholder="Enter your password to confirm" autocomplete="current-password">
+        </div>
+        <div id="deleteAccountErr" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('deleteAccountModal').remove()">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="doDeleteAccount()">Delete my account</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('deleteAccountPw')?.focus(), 50)
+}
+
+async function doDeleteAccount() {
+  const pw  = document.getElementById('deleteAccountPw').value
+  const err = document.getElementById('deleteAccountErr')
+  if (!pw) { err.style.display = 'block'; err.textContent = 'Password is required.'; return }
+  err.style.display = 'none'
+  try {
+    await api('/api/auth/account', { method: 'DELETE', body: { password: pw } })
+    window.location.href = '/login.html'
+  } catch (e) { err.style.display = 'block'; err.textContent = e.message }
+}
+
+init().then(() => initCollapsibleSections())
+loadSessions()
+loadLoginHistory()
 </script>
 </body>
 </html>

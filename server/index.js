@@ -253,6 +253,42 @@ app.get('/api/audit', requireAuth, (req, res) => {
   res.json({ entries, total, limit, offset, actors })
 })
 
+app.get('/api/audit/export', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const db = require('./db/connection')
+  const action  = req.query.action   || ''
+  const actorId = req.query.actor_id || ''
+  const where = []; const params = []
+  if (action)  { where.push('a.action = ?');   params.push(action) }
+  if (actorId) { where.push('a.actor_id = ?'); params.push(actorId) }
+  const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : ''
+  const entries = db.prepare(`
+    SELECT a.created_at, u.name as actor_name, a.action, a.entity_type, a.entity_name, a.entity_id, a.detail
+    FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
+    ${whereClause} ORDER BY a.created_at DESC
+  `).all(...params)
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const header = ['Time', 'User', 'Action', 'Entity Type', 'Entity Name', 'Entity ID', 'Detail'].map(escape).join(',')
+  const rows = entries.map(e => [e.created_at, e.actor_name, e.action, e.entity_type, e.entity_name, e.entity_id, e.detail].map(escape).join(','))
+  res.setHeader('Content-Type', 'text/csv')
+  res.setHeader('Content-Disposition', `attachment; filename="audit-log-${new Date().toISOString().slice(0,10)}.csv"`)
+  res.send([header, ...rows].join('\r\n'))
+})
+
+app.delete('/api/audit', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  try {
+    const db = require('./db/connection')
+    const audit = require('./audit')
+    db.prepare('DELETE FROM audit_log').run()
+    audit(req.user.id, 'settings_change', 'audit_log', 'all', 'Audit Log', { detail: 'Cleared all audit log entries' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[audit clear]', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Short-lived cache helper (10 s public, stale-while-revalidate)
 function cacheShort(req, res, next) {
   res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
