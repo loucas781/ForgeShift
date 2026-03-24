@@ -96,6 +96,28 @@ function escHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
 
+// Render rich-text description HTML safely (allows only formatting tags, strips attributes/scripts)
+function sanitizeDescHtml(html) {
+  if (!html) return ''
+  const allowed = new Set(['B','STRONG','U','EM','UL','OL','LI','P','BR','DIV','SPAN'])
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  ;(function clean(node) {
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === 1) {
+        if (!allowed.has(child.tagName)) {
+          while (child.firstChild) node.insertBefore(child.firstChild, child)
+          child.remove()
+        } else {
+          Array.from(child.attributes).forEach(a => child.removeAttribute(a.name))
+          clean(child)
+        }
+      }
+    })
+  })(tmp)
+  return tmp.innerHTML
+}
+
 // ── Avatar helper ──────────────────────────────────────────────────────────────
 function avatarEl(user, size = '') {
   const el = document.createElement('div')
