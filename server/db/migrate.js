@@ -453,6 +453,7 @@ try {
   migrateAdditive()
   migrateTeams()
   migrateHolidays()
+  migrateLocationMembers()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)
@@ -493,4 +494,20 @@ function migrateHolidays() {
     VALUES ('holiday_last_fetched', '', datetime('now'))
   `).run()
   console.log('✓ Holiday overrides schema ready')
+}
+
+// Additive: location member assignment (safe on existing DBs)
+function migrateLocationMembers() {
+  const db = require('./connection')
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS location_members (
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      added_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (location_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_lm_location ON location_members(location_id);
+    CREATE INDEX IF NOT EXISTS idx_lm_user     ON location_members(user_id);
+  `)
+  console.log('✓ Location members schema ready')
 }

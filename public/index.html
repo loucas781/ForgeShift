@@ -496,20 +496,22 @@ function renderTaskAssignmentLocationOptions() {
   if (!wrap) return
 
   const groupFiltered = _taFilterByGroup(taskLists)
-  const locations = []
+  // Cross-reference with the membership-filtered locations array (non-admins only see their locations)
+  const accessibleLocIds = new Set(locations.map(l => l.id))
+  const visibleLocs = []
   const seen = new Set()
   groupFiltered.forEach(t => {
-    if (t.location_id && !seen.has(t.location_id)) {
+    if (t.location_id && accessibleLocIds.has(t.location_id) && !seen.has(t.location_id)) {
       seen.add(t.location_id)
-      locations.push({ id: t.location_id, name: t.location_name || 'Unknown' })
+      visibleLocs.push({ id: t.location_id, name: t.location_name || 'Unknown' })
     }
   })
 
-  if (locations.length <= 1) { wrap.style.display = 'none'; _taLocationFilter = 'all'; return }
+  if (visibleLocs.length <= 1) { wrap.style.display = 'none'; _taLocationFilter = 'all'; return }
 
   const options = [
     { id: 'all', label: 'All locations', count: groupFiltered.length },
-    ...locations.map(l => ({ id: l.id, label: l.name, count: groupFiltered.filter(t => t.location_id === l.id).length }))
+    ...visibleLocs.map(l => ({ id: l.id, label: l.name, count: groupFiltered.filter(t => t.location_id === l.id).length }))
   ]
   if (!options.some(o => o.id === _taLocationFilter)) _taLocationFilter = 'all'
   wrap.style.display = ''
