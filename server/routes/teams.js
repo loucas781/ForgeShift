@@ -29,13 +29,15 @@ router.get('/', requireAuth, (req, res) => {
       GROUP BY t.id ORDER BY t.name
     `).all()
   } else if (role === 'shift_lead') {
+    // Shift lead sees teams in their orgs, plus teams they own/created (fallback)
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
       FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
-      WHERE t.owned_by = ? OR t.created_by = ?
+      WHERE t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
+         OR t.owned_by = ? OR t.created_by = ?
       GROUP BY t.id ORDER BY t.name
-    `).all(userId, userId)
+    `).all(userId, userId, userId)
   } else {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
@@ -69,33 +71,34 @@ router.get('/', requireAuth, (req, res) => {
 
 // ── POST /api/teams — create (admin or shift_lead) ────────────────────────────
 router.post('/', requireAuth, requireShiftLead, (req, res) => {
-  const { name, color } = req.body
+  const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
   const count = db.prepare('SELECT COUNT(*) AS c FROM teams').get().c
   const teamColor = color || COLORS[count % COLORS.length]
   const id = uuidv4()
-  db.prepare('INSERT INTO teams (id, name, color, created_by, owned_by) VALUES (?,?,?,?,?)')
-    .run(id, name.trim(), teamColor, req.user.id, req.user.id)
+  db.prepare('INSERT INTO teams (id, name, color, org_id, created_by, owned_by) VALUES (?,?,?,?,?,?)')
+    .run(id, name.trim(), teamColor, org_id || null, req.user.id, req.user.id)
   audit(req.user.id, 'team.create', 'team', id, name.trim(), { by: req.user.name })
-  const team = db.prepare('SELECT id, name, color, created_at, owned_by FROM teams WHERE id = ?').get(id)
+  const team = db.prepare('SELECT id, name, color, org_id, created_at, owned_by FROM teams WHERE id = ?').get(id)
   team.members = []
   res.status(201).json(team)
 })
 
-// ── PATCH /api/teams/:id — rename / recolour ──────────────────────────────────
+// ── PATCH /api/teams/:id — rename / recolour / reassign org ──────────────────
 router.patch('/:id', requireAuth, requireShiftLead, (req, res) => {
-  const { name, color } = req.body
+  const { name, color, org_id } = req.body
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageTeam(req.user, team)) return res.status(403).json({ error: 'You can only edit your own teams' })
   const updates = []; const vals = []
-  if (name?.trim()) { updates.push('name = ?'); vals.push(name.trim()) }
-  if (color)        { updates.push('color = ?'); vals.push(color) }
+  if (name?.trim())         { updates.push('name = ?');   vals.push(name.trim()) }
+  if (color)                { updates.push('color = ?');  vals.push(color) }
+  if (org_id !== undefined) { updates.push('org_id = ?'); vals.push(org_id || null) }
   if (!updates.length) return res.status(400).json({ error: 'Nothing to update' })
   vals.push(req.params.id)
   db.prepare(`UPDATE teams SET ${updates.join(', ')} WHERE id = ?`).run(...vals)
   audit(req.user.id, 'team.update', 'team', req.params.id, name || team.name, { by: req.user.name })
-  res.json(db.prepare('SELECT id, name, color, created_at, owned_by FROM teams WHERE id = ?').get(req.params.id))
+  res.json(db.prepare('SELECT id, name, color, org_id, created_at, owned_by FROM teams WHERE id = ?').get(req.params.id))
 })
 
 // ── DELETE /api/teams/:id ─────────────────────────────────────────────────────

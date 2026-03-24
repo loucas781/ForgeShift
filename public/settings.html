@@ -410,7 +410,7 @@
           data-placeholder="Describe what this task list involves…"
           oninput="_tlDescUpdateToolbar()" onkeyup="_tlDescUpdateToolbar()" onmouseup="_tlDescUpdateToolbar()"></div>
       </div>
-      <div class="form-group"><label class="form-label">Group <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlGroup"><option value="">— Ungrouped (visible to all) —</option></select></div>
+      <div class="form-group"><label class="form-label">Organisation <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlOrg"><option value="">— None (visible to all) —</option></select></div>
       <div class="form-group"><label class="form-label">Linked location <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlLocation"><option value="">— None —</option></select></div>
       <div class="form-group"><label class="form-label">Colour</label><div id="tlColourPicker"></div></div>
     </div>
@@ -429,7 +429,8 @@
     </div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="lName" placeholder="e.g. Head Office"></div>
-      <div class="form-group"><label class="form-label">Address (optional)</label><input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London"></div>
+      <div class="form-group"><label class="form-label">Address <span style="color:var(--text-3);font-weight:400">(optional)</span></label><input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London"></div>
+      <div class="form-group"><label class="form-label">Organisation <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="lOrg"><option value="">— None (visible to all) —</option></select></div>
       <div class="form-group"><label class="form-label">Colour</label><div id="locColourPicker"></div></div>
     </div>
     <div class="modal-footer">
@@ -444,7 +445,7 @@
 <script>
 'use strict'
 
-let cfg = null, users = [], locations = []
+let cfg = null, users = [], locations = [], orgs = []
 let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
 let euPwIndicator = null
 let isAdmin = false, isShiftLead = false
@@ -472,6 +473,8 @@ async function init() {
 
     { id: 'team', label: 'Team', roles: ['admin'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
+    { id: 'organisations', label: 'Organisations', roles: ['admin'],
+      icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
     { id: 'locations', label: 'Locations', roles: ['admin'],
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
     { id: 'features', label: 'Features', roles: ['admin'],
@@ -514,7 +517,7 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  if (isAdmin) await Promise.all([loadUsers(), loadLocations()])
+  if (isAdmin) await Promise.all([loadUsers(), loadLocations(), loadOrgs()])
   if (isShiftLead) await Promise.all([loadUsers()])
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
@@ -526,6 +529,7 @@ async function init() {
     renderPreferencesPanel(),
     isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
     isAdmin ? renderTeamPanel() : Promise.resolve(),
+    isAdmin ? renderOrganisationsPanel() : Promise.resolve(),
     isAdmin ? renderLocationsPanel() : Promise.resolve(),
     isAdmin ? renderFeaturesPanel() : Promise.resolve(),
     renderSecurityPanel(),
@@ -574,6 +578,7 @@ function showTab(id) {
 
 async function loadUsers() { users = await api('/api/users') }
 async function loadLocations() { locations = await api('/api/locations') }
+async function loadOrgs() { try { orgs = await api('/api/organisations') } catch { orgs = [] } }
 
 // ── Appearance panel ───────────────────────────────────────────────────────────
 async function renderAppearancePanel() {
@@ -1145,18 +1150,6 @@ async function renderTeamPanel() {
           </div>
         </div>
 
-        <div style="margin-top:32px">
-          <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Template Groups</h2>
-          <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
-            Organise templates into groups and control which members can see them. Members only see templates belonging to groups they are assigned to. Ungrouped templates are visible to everyone.
-          </p>
-          <div class="team-section-actions">
-            <button class="btn btn-secondary btn-sm" onclick="openCreateTmplGroupModal()">+ Create group</button>
-          </div>
-          <div class="card">
-            <div class="card-body" id="tmplGroupsListEl">Loading…</div>
-          </div>
-        </div>
 
       </div>
 
@@ -1222,7 +1215,6 @@ async function renderTeamPanel() {
 
   renderTeamList()
   await loadSettingsTeams()
-  await loadTmplGroups()
 
   // Pre-fill CSV date range (current month)
   const now   = new Date()
@@ -1872,10 +1864,8 @@ async function deleteUser(id, name) {
 // ── Locations panel ────────────────────────────────────────────────────────────
 // ── Features panel ─────────────────────────────────────────────────────────────
 let taskLists = []
-let taskListGroups = []
 let editingTaskListId = null
 let tlColour = '#4f46e5'
-let selectedTaskListGroupFilter = 'all'
 
 async function renderFeaturesPanel() {
   const featData = await api('/api/features')
@@ -1910,110 +1900,25 @@ async function renderFeaturesPanel() {
     </div>
 
     <div id="taskListsSection" style="display:${featData.feature_tasks ? 'block' : 'none'}">
-      <div class="card section-card" style="margin-bottom:20px">
-        <div class="card-header">
-          <h3 class="card-title">Task List Groups</h3>
-          <button class="btn btn-secondary btn-sm" onclick="openCreateTaskListGroupModal()">+ Create group</button>
-        </div>
-        <div class="card-body">
-          <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">Organise task lists into groups and control which members can see them. Members only see task lists belonging to groups they are assigned to. Ungrouped task lists are visible to everyone.</p>
-          <div id="taskListGroupsEl">Loading…</div>
-        </div>
-      </div>
       <div class="card section-card">
         <div class="card-header">
           <h3 class="card-title">Task Lists</h3>
           <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
         </div>
         <div class="card-body" style="padding:0">
-          <div id="taskListFilterBar" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:16px 16px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Group</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
             <tbody id="taskListsBody"></tbody>
           </table></div>
         </div>
       </div>
     </div>`
-  await Promise.all([loadTaskLists(), loadTaskListGroups()])
+  await loadTaskLists()
   renderTaskListsTable()
 }
 
 async function loadTaskLists() {
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
-}
-async function loadTaskListGroups() {
-  try { taskListGroups = await api('/api/task-list-groups') } catch { taskListGroups = [] }
-  renderTaskListGroupsEl()
-}
-function _taskListGroupCount(groupId) {
-  if (groupId === 'all') return taskLists.length
-  if (groupId === 'ungrouped') return taskLists.filter(t => !t.group_id).length
-  return taskLists.filter(t => t.group_id === groupId).length
-}
-function _taskListFilterOptions() {
-  return [
-    { id: 'all', label: 'All' },
-    { id: 'ungrouped', label: 'General' },
-    ...taskListGroups.map(g => ({ id: g.id, label: g.name })),
-  ]
-}
-function renderTaskListFilterBar() {
-  const bar = document.getElementById('taskListFilterBar')
-  if (!bar) return
-  const options = _taskListFilterOptions()
-  if (!options.some(o => o.id === selectedTaskListGroupFilter)) selectedTaskListGroupFilter = 'all'
-  bar.innerHTML = options.map(o => {
-    const active = o.id === selectedTaskListGroupFilter
-    return `<button onclick="setTaskListGroupFilter('${o.id}')" type="button" style="
-      display:inline-flex;align-items:center;gap:6px;
-      padding:8px 14px;border:none;background:none;cursor:pointer;white-space:nowrap;
-      font-size:13px;font-weight:${active ? '600' : '500'};font-family:var(--font);
-      color:${active ? 'var(--blue)' : 'var(--text-2)'};
-      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
-      margin-bottom:-1px;transition:color .15s,border-color .15s
-    ">
-      ${escHtml(o.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${_taskListGroupCount(o.id)}</span>
-    </button>`
-  }).join('')
-}
-function setTaskListGroupFilter(groupId) {
-  selectedTaskListGroupFilter = groupId
-  renderTaskListFilterBar()
-  renderTaskListsTable()
-}
-function renderTaskListGroupsEl() {
-  const el = document.getElementById('taskListGroupsEl')
-  if (!el) return
-  if (!taskListGroups.length) {
-    el.innerHTML = '<p style="font-size:13px;color:var(--text-3)">No task list groups yet. Create one to start controlling task list visibility.</p>'
-    return
-  }
-  el.innerHTML = taskListGroups.map(g => {
-    const memberPills = (g.members || []).length
-      ? g.members.map(m => `
-          <span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
-            ${_avatarHTML(m, 'xs')}
-            ${m.name}
-          </span>`).join('')
-      : '<span style="font-size:12px;color:var(--text-3)">No members assigned</span>'
-    return `<div class="member-row">
-      <div class="member-info" style="flex:1;min-width:0">
-        <div style="min-width:0">
-          <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="color:var(--text-3);flex-shrink:0"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
-            ${g.name}
-            <span class="badge badge-gray" style="font-size:10px">${g.list_count} list${g.list_count !== 1 ? 's' : ''}</span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${memberPills}</div>
-        </div>
-      </div>
-      <div class="member-actions">
-        <button class="btn btn-ghost btn-sm" onclick="openTaskListGroupMembersModal('${g.id}')">Manage members</button>
-        <button class="btn btn-ghost btn-sm" onclick="openRenameTaskListGroupModal('${g.id}', '${g.name.replace(/'/g, "\\'")}')">Rename</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTaskListGroup('${g.id}','${g.name.replace(/'/g, "\\'")}')">Delete</button>
-      </div>
-    </div>`
-  }).join('')
 }
 
 function _renderTaskListRows(lists) {
@@ -2024,7 +1929,7 @@ function _renderTaskListRows(lists) {
     const safeName = JSON.stringify(t.name)
     return `<tr>
       <td style="font-weight:600">${escHtml(t.name)}</td>
-      <td style="font-size:13px">${t.group_name ? `<span style="display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" style="color:var(--text-3)"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>${escHtml(t.group_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td style="font-size:13px">${t.org_name ? `<span class="badge badge-gray">${escHtml(t.org_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td style="color:var(--text-2);font-size:13px;max-width:260px">${description}</td>
       <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${escHtml(t.location_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
@@ -2039,34 +1944,17 @@ function _renderTaskListRows(lists) {
 function renderTaskListsTable() {
   const tbody = document.getElementById('taskListsBody')
   if (!tbody) return
-  renderTaskListFilterBar()
   if (!taskLists.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
-    return
-  }
-  let filtered = taskLists
-  if (selectedTaskListGroupFilter === 'ungrouped') filtered = taskLists.filter(t => !t.group_id)
-  else if (selectedTaskListGroupFilter !== 'all') filtered = taskLists.filter(t => t.group_id === selectedTaskListGroupFilter)
-
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists in this group yet.</td></tr>'
-    return
-  }
-
-  if (selectedTaskListGroupFilter !== 'all') {
-    tbody.innerHTML = _renderTaskListRows(filtered)
     return
   }
 
   const sections = []
   const grouped = new Map()
-  filtered.forEach(t => {
-    const key = t.group_id || 'ungrouped'
+  taskLists.forEach(t => {
+    const key = t.org_id || 'none'
     if (!grouped.has(key)) {
-      grouped.set(key, {
-        label: t.group_name || 'General',
-        lists: [],
-      })
+      grouped.set(key, { label: t.org_name || 'No Organisation', lists: [] })
       sections.push(grouped.get(key))
     }
     grouped.get(key).lists.push(t)
@@ -2096,7 +1984,7 @@ async function toggleFeatureTasks(enabled) {
   try {
     await api('/api/features', { method: 'PATCH', body: { feature_tasks: enabled } })
     document.getElementById('taskListsSection').style.display = enabled ? 'block' : 'none'
-    if (enabled) await Promise.all([loadTaskLists(), loadTaskListGroups()])
+    if (enabled) await loadTaskLists()
     toast('Feature ' + (enabled ? 'enabled' : 'disabled'), 'success')
   } catch (err) {
     toast(err.message, 'error')
@@ -2105,10 +1993,10 @@ async function toggleFeatureTasks(enabled) {
 }
 
 function _populateTlGroupSelect(selectedId) {
-  const sel = document.getElementById('tlGroup')
+  const sel = document.getElementById('tlOrg')
   if (!sel) return
-  sel.innerHTML = '<option value="">— Ungrouped (visible to all) —</option>' +
-    taskListGroups.map(g => `<option value="${g.id}"${g.id === selectedId ? ' selected' : ''}>${g.name}</option>`).join('')
+  sel.innerHTML = '<option value="">— None (visible to all) —</option>' +
+    orgs.map(o => `<option value="${o.id}"${o.id === selectedId ? ' selected' : ''}>${escHtml(o.name)}</option>`).join('')
 }
 function openCreateTaskList() {
   editingTaskListId = null; tlColour = '#4f46e5'
@@ -2117,6 +2005,7 @@ function openCreateTaskList() {
   document.getElementById('tlDescEditor').innerHTML = ''
   _populateTlGroupSelect(null)
   _populateTlLocationSelect(null)
+
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
 }
@@ -2126,7 +2015,7 @@ function openEditTaskList(id) {
   document.getElementById('taskListModalTitle').textContent = 'Edit Task List'
   document.getElementById('tlName').value = t.name
   document.getElementById('tlDescEditor').innerHTML = t.description || ''
-  _populateTlGroupSelect(t.group_id)
+  _populateTlGroupSelect(t.org_id)
   _populateTlLocationSelect(t.location_id)
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
@@ -2163,12 +2052,12 @@ function setupTlColour() {
 async function saveTaskList() {
   const name = document.getElementById('tlName').value.trim()
   const description = _getTlDescHtml() || null
-  const group_id = document.getElementById('tlGroup').value || null
+  const org_id = document.getElementById('tlOrg').value || null
   const location_id = document.getElementById('tlLocation').value || null
   if (!name) { toast('Name required', 'error'); return }
   try {
-    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, group_id, location_id } })
-    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, group_id, location_id } })
+    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, org_id, location_id } })
+    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, org_id, location_id } })
     closeTaskListModal()
     await loadTaskLists(); renderTaskListsTable()
     toast('Task list saved', 'success')
@@ -2332,6 +2221,213 @@ async function saveTLGroupMembers(groupId) {
   } catch (err) { toast(err.message, 'error') }
 }
 
+// ── Organisations panel ─────────────────────────────────────────────────────────
+async function renderOrganisationsPanel() {
+  const el = document.getElementById('panel-organisations')
+  if (!el) return
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Organisations</h2>
+    <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+      Create organisations (e.g. NHS, Aldi) to group your locations, task lists, templates, and teams. Users assigned to an organisation can see all items linked to it. Members remain read-only — only Shift Leads and Admins can create or edit anything.
+    </p>
+    <div style="margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="openCreateOrgModal()">+ Create organisation</button></div>
+    <div class="card">
+      <div class="card-body" id="orgsListEl">Loading…</div>
+    </div>`
+  renderOrgsList()
+}
+
+function renderOrgsList() {
+  const el = document.getElementById('orgsListEl')
+  if (!el) return
+  if (!orgs.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-3)">No organisations yet. Create one to start grouping your resources.</p>'
+    return
+  }
+  el.innerHTML = orgs.map(o => {
+    const memberPills = (o.members || []).length
+      ? o.members.slice(0, 5).map(m => `
+          <span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px">
+            ${_avatarHTML(m, 'xs')}
+            ${escHtml(m.name)}
+          </span>`).join('') + (o.members.length > 5 ? `<span style="font-size:11px;color:var(--text-3)">+${o.members.length - 5} more</span>` : '')
+      : '<span style="font-size:12px;color:var(--text-3)">No members assigned</span>'
+    const counts = [
+      o.location_count > 0 ? `${o.location_count} location${o.location_count !== 1 ? 's' : ''}` : null,
+      o.task_list_count > 0 ? `${o.task_list_count} task list${o.task_list_count !== 1 ? 's' : ''}` : null,
+      o.template_count > 0 ? `${o.template_count} template${o.template_count !== 1 ? 's' : ''}` : null,
+      o.team_count > 0 ? `${o.team_count} team${o.team_count !== 1 ? 's' : ''}` : null,
+    ].filter(Boolean).join(' · ')
+    const safeName = JSON.stringify(o.name)
+    return `<div class="member-row">
+      <div class="member-info" style="flex:1;min-width:0">
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${o.color};flex-shrink:0"></span>
+            ${escHtml(o.name)}
+            <span class="badge badge-gray" style="font-size:10px">${o.member_count} member${o.member_count !== 1 ? 's' : ''}</span>
+          </div>
+          ${counts ? `<div style="font-size:11px;color:var(--text-3);margin-top:3px">${counts}</div>` : ''}
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${memberPills}</div>
+        </div>
+      </div>
+      <div class="member-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openOrgMembersModal('${o.id}')">Members</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRenameOrgModal('${o.id}', ${safeName})">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteOrg("${o.id}", ${safeName})'>Delete</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function openCreateOrgModal() {
+  const existing = document.getElementById('createOrgModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'createOrgModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Organisation</h3>
+        <button class="modal-close" onclick="document.getElementById('createOrgModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-input" id="coName" placeholder="e.g. NHS, Aldi, Site A">
+        </div>
+        <div id="coError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('createOrgModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doCreateOrg()">Create</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('coName').focus(), 50)
+}
+
+async function doCreateOrg() {
+  const name = document.getElementById('coName').value.trim()
+  const errEl = document.getElementById('coError')
+  if (!name) { errEl.style.display = 'block'; errEl.textContent = 'Name is required.'; return }
+  try {
+    const org = await api('/api/organisations', { method: 'POST', body: { name } })
+    orgs.push(org)
+    document.getElementById('createOrgModal').remove()
+    renderOrgsList()
+    toast('Organisation created', 'success')
+  } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
+}
+
+function openRenameOrgModal(id, currentName) {
+  const existing = document.getElementById('renameOrgModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'renameOrgModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Organisation</h3>
+        <button class="modal-close" onclick="document.getElementById('renameOrgModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" class="form-input" id="roName" value="${escHtml(currentName)}">
+        </div>
+        <div id="roError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('renameOrgModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doRenameOrg('${id}')">Save</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+}
+
+async function doRenameOrg(id) {
+  const name = document.getElementById('roName').value.trim()
+  const errEl = document.getElementById('roError')
+  if (!name) { errEl.style.display = 'block'; errEl.textContent = 'Name is required.'; return }
+  try {
+    await api(`/api/organisations/${id}`, { method: 'PATCH', body: { name } })
+    document.getElementById('renameOrgModal').remove()
+    await loadOrgs(); renderOrgsList()
+    toast('Organisation updated', 'success')
+  } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
+}
+
+async function deleteOrg(id, name) {
+  if (!confirm(`Delete organisation "${name}"? Linked locations, task lists, and templates will become visible to all users.`)) return
+  try {
+    await api(`/api/organisations/${id}`, { method: 'DELETE' })
+    await loadOrgs(); renderOrgsList()
+    toast('Organisation deleted', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function openOrgMembersModal(orgId) {
+  const org = orgs.find(o => o.id === orgId)
+  if (!org) return
+  const memberIds = new Set((org.members || []).map(m => m.id))
+  const existing = document.getElementById('orgMembersModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'orgMembersModal'
+  modal.className = 'modal-overlay'
+  const assignableUsers = users.filter(u => u.is_active)
+  const rows = assignableUsers.length
+    ? assignableUsers.map(u => `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
+          <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}
+            style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+          ${_avatarHTML(u, 'md')}
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:13px">${escHtml(u.name)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${escHtml(u.email)} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role}</span></div>
+          </div>
+        </label>`).join('')
+    : '<p style="font-size:13px;color:var(--text-3);padding:8px 0">No users found.</p>'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Members — ${escHtml(org.name)}</h3>
+        <button class="modal-close" onclick="document.getElementById('orgMembersModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">
+          Selected users will have access to all locations, task lists, templates, and teams linked to <strong>${escHtml(org.name)}</strong>. Members remain read-only — write access requires Shift Lead or Admin role.
+        </p>
+        <div id="orgMemberRows" style="max-height:360px;overflow-y:auto">${rows}</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('orgMembersModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveOrgMembers('${orgId}')">Save</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+}
+
+async function saveOrgMembers(orgId) {
+  const checkboxes = document.querySelectorAll('#orgMemberRows input[type=checkbox]')
+  const user_ids = Array.from(checkboxes).filter(c => c.checked).map(c => c.value)
+  try {
+    await api(`/api/organisations/${orgId}/members`, { method: 'PUT', body: { user_ids } })
+    document.getElementById('orgMembersModal').remove()
+    await loadOrgs(); renderOrgsList()
+    toast('Members updated', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
 async function renderLocationsPanel() {
   const el = document.getElementById('panel-locations')
   el.innerHTML = `
@@ -2339,7 +2435,7 @@ async function renderLocationsPanel() {
     <div style="margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add location</button></div>
     <div class="card">
       <div class="table-wrap"><table>
-        <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Members</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Organisation</th><th>Actions</th></tr></thead>
         <tbody id="locsBody"></tbody>
       </table></div>
     </div>`
@@ -2351,17 +2447,15 @@ function renderLocsTable() {
   if (!tbody) return
   if (!locations.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No locations yet</td></tr>'; return }
   tbody.innerHTML = locations.map(l => {
-    const mc = l.member_count ?? (l.members ? l.members.length : 0)
-    const memberCell = mc > 0
-      ? `<span class="badge badge-gray" style="white-space:nowrap">${mc} member${mc === 1 ? '' : 's'}</span>`
+    const orgCell = l.org_name
+      ? `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(l.org_name)}</span>`
       : `<span style="font-size:12px;color:var(--text-3)">Open to all</span>`
     return `<tr>
       <td style="font-weight:600">${escHtml(l.name)}</td>
       <td style="color:var(--text-3)">${l.address ? escHtml(l.address) : '—'}</td>
       <td>${renderInlineColourSwatch(l.color, { size: 20, title: pickColourValue(l.color) || 'No colour' })}</td>
-      <td>${memberCell}</td>
+      <td>${orgCell}</td>
       <td><div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-sm" onclick="openLocationMembersModal('${l.id}')">Members</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${escHtml(l.name).replace(/'/g,"\\'")}')">Delete</button>
       </div></td>
@@ -2369,11 +2463,18 @@ function renderLocsTable() {
   }).join('')
 }
 
+function _populateLocOrgSelect(selectedOrgId) {
+  const sel = document.getElementById('lOrg')
+  if (!sel) return
+  sel.innerHTML = '<option value="">— None (visible to all) —</option>' +
+    orgs.map(o => `<option value="${o.id}" ${o.id === selectedOrgId ? 'selected' : ''}>${escHtml(o.name)}</option>`).join('')
+}
 function openCreateLoc() {
   editingLocId = null; locColour = '#4f46e5'
   document.getElementById('locModalTitle').textContent = 'Add Location'
   document.getElementById('lName').value = ''
   document.getElementById('lAddress').value = ''
+  _populateLocOrgSelect(null)
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
 }
@@ -2383,6 +2484,7 @@ function openEditLoc(id) {
   document.getElementById('locModalTitle').textContent = 'Edit Location'
   document.getElementById('lName').value = l.name
   document.getElementById('lAddress').value = l.address || ''
+  _populateLocOrgSelect(l.org_id || null)
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
 }
@@ -2394,7 +2496,8 @@ function setupLocColour() {
 async function saveLoc() {
   const name = document.getElementById('lName').value.trim()
   if (!name) { toast('Name required', 'error'); return }
-  const body = { name, address: document.getElementById('lAddress').value.trim() || null, color: locColour }
+  const org_id = document.getElementById('lOrg').value || null
+  const body = { name, address: document.getElementById('lAddress').value.trim() || null, color: locColour, org_id }
   try {
     if (editingLocId) await api(`/api/locations/${editingLocId}`, { method: 'PUT', body })
     else await api('/api/locations', { method: 'POST', body })
