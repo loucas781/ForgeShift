@@ -496,20 +496,22 @@ function renderTaskAssignmentLocationOptions() {
   if (!wrap) return
 
   const groupFiltered = _taFilterByGroup(taskLists)
-  const locations = []
+  // Cross-reference with the membership-filtered locations array (non-admins only see their locations)
+  const accessibleLocIds = new Set(locations.map(l => l.id))
+  const visibleLocs = []
   const seen = new Set()
   groupFiltered.forEach(t => {
-    if (t.location_id && !seen.has(t.location_id)) {
+    if (t.location_id && accessibleLocIds.has(t.location_id) && !seen.has(t.location_id)) {
       seen.add(t.location_id)
-      locations.push({ id: t.location_id, name: t.location_name || 'Unknown' })
+      visibleLocs.push({ id: t.location_id, name: t.location_name || 'Unknown' })
     }
   })
 
-  if (locations.length <= 1) { wrap.style.display = 'none'; _taLocationFilter = 'all'; return }
+  if (visibleLocs.length <= 1) { wrap.style.display = 'none'; _taLocationFilter = 'all'; return }
 
   const options = [
     { id: 'all', label: 'All locations', count: groupFiltered.length },
-    ...locations.map(l => ({ id: l.id, label: l.name, count: groupFiltered.filter(t => t.location_id === l.id).length }))
+    ...visibleLocs.map(l => ({ id: l.id, label: l.name, count: groupFiltered.filter(t => t.location_id === l.id).length }))
   ]
   if (!options.some(o => o.id === _taLocationFilter)) _taLocationFilter = 'all'
   wrap.style.display = ''
@@ -1597,7 +1599,7 @@ function showTaskPopover(event, a) {
   document.getElementById('taskDetailUser').textContent = a.user_name || ''
   const descEl = document.getElementById('taskDetailDesc')
   if (a.task_list_description) {
-    descEl.textContent = a.task_list_description
+    descEl.innerHTML = sanitizeDescHtml(a.task_list_description)
     descEl.style.display = ''
   } else {
     descEl.style.display = 'none'
@@ -1923,9 +1925,14 @@ function openShiftPanel(shiftId) {
   let tasksHtml = ''
   if (relatedTasks.length) {
     const cards = relatedTasks.map(a => {
-      const descHtml  = a.task_list_description ? `<div class="shift-panel-task-desc">${escHtml(a.task_list_description)}</div>` : ''
       const notesHtml = a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : ''
-      return `<div class="shift-panel-task-card"><div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}</div>${descHtml}${notesHtml}</div>`
+      const descBody  = a.task_list_description
+        ? `<div class="shift-panel-task-desc-body">${sanitizeDescHtml(a.task_list_description)}</div>`
+        : ''
+      return `<div class="shift-panel-task-wrap${descBody ? ' has-desc' : ''}">` +
+        `<div class="shift-panel-task-card"><div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}</div>${notesHtml}</div>` +
+        descBody +
+        `</div>`
     }).join('')
     tasksHtml = `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks for this day</div>${cards}</div>`
   }
@@ -2551,8 +2558,18 @@ init()
   gap: 4px;
 }
 .shift-panel-task-name { font-size: 13px; font-weight: 600; }
-.shift-panel-task-desc  { font-size: 12px; color: var(--text-3); line-height: 1.5; font-style: italic; }
 .shift-panel-task-notes { font-size: 12px; color: var(--text-2); line-height: 1.5; white-space: pre-wrap; }
+.shift-panel-task-desc-body {
+  font-size: 13px; color: var(--text-2); line-height: 1.6;
+  padding: 8px 12px;
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px; background: var(--bg-2);
+}
+.shift-panel-task-wrap.has-desc .shift-panel-task-card { border-radius: 8px 8px 0 0; }
+.shift-panel-task-desc-body ul, .shift-panel-task-desc-body ol { margin: 2px 0; padding-left: 20px; }
+.shift-panel-task-desc-body li { margin: 2px 0; }
+.shift-panel-task-desc-body p { margin: 0 0 4px; }
+.shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
   .shift-panel { width: 100%; border-left: none; border-radius: 20px 20px 0 0; top: auto; bottom: -100%; right: 0; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
   .shift-panel.open { bottom: 0; right: 0; }
