@@ -45,10 +45,10 @@ router.get('/lists', requireAuth, (req, res) => {
 // ── POST /api/tasks/lists — create a task list ────────────────────────────────
 router.post('/lists', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { name, color, description, location_id, sort_order, org_id } = req.body
+    const { name, color, description, location_id, sort_order, org_id, label } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
     const id = uuidv4()
-    db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, org_id, created_by) VALUES (?,?,?,?,?,?,?,?)')
+    db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, org_id, label, created_by) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(
         id,
         name.trim(),
@@ -57,6 +57,7 @@ router.post('/lists', requireAuth, requireAdmin, (req, res) => {
         location_id || null,
         sort_order ?? 0,
         org_id || null,
+        label?.trim() || null,
         req.user.id
       )
     const list = db.prepare(`
@@ -78,8 +79,8 @@ router.put('/lists/:id', requireAuth, requireAdmin, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
-    const { name, color, description, location_id, sort_order, org_id } = req.body
-    db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, org_id=? WHERE id=?')
+    const { name, color, description, location_id, sort_order, org_id, label } = req.body
+    db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, org_id=?, label=? WHERE id=?')
       .run(
         name?.trim() || list.name,
         color !== undefined ? normalizeColorInput(color) : list.color,
@@ -87,6 +88,7 @@ router.put('/lists/:id', requireAuth, requireAdmin, (req, res) => {
         location_id !== undefined ? (location_id || null) : list.location_id,
         sort_order ?? list.sort_order,
         org_id !== undefined ? (org_id || null) : list.org_id,
+        label !== undefined ? (label?.trim() || null) : list.label,
         req.params.id
       )
     const updated = db.prepare(`
