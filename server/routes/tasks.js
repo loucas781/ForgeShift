@@ -15,21 +15,23 @@ router.get('/lists', requireAuth, (req, res) => {
     if (req.user.role === 'admin') {
       lists = db.prepare(`
         SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
-               o.name as org_name, o.id as org_id
+               o.name as org_name, o.id as org_id, g.name as group_name
         FROM task_lists t
         LEFT JOIN users u ON u.id = t.created_by
         LEFT JOIN locations l ON l.id = t.location_id
         LEFT JOIN organisations o ON o.id = t.org_id
+        LEFT JOIN task_list_groups g ON g.id = t.group_id
         ORDER BY o.name, t.sort_order, t.name
       `).all()
     } else {
       lists = db.prepare(`
         SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
-               o.name as org_name, o.id as org_id
+               o.name as org_name, o.id as org_id, g.name as group_name
         FROM task_lists t
         LEFT JOIN users u ON u.id = t.created_by
         LEFT JOIN locations l ON l.id = t.location_id
         LEFT JOIN organisations o ON o.id = t.org_id
+        LEFT JOIN task_list_groups g ON g.id = t.group_id
         WHERE t.org_id IS NULL
            OR t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
         ORDER BY o.name, t.sort_order, t.name
