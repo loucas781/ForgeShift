@@ -1888,7 +1888,7 @@ async function renderFeaturesPanel() {
           <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
         </div>
         <div class="card-body" style="padding:0">
-          <div id="taskListFilterBar" style="display:flex;gap:8px;flex-wrap:wrap;padding:16px 16px 0"></div>
+          <div id="taskListFilterBar" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:16px 16px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
           <div class="table-wrap"><table>
             <thead><tr><th>Name</th><th>Group</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
             <tbody id="taskListsBody"></tbody>
@@ -1924,11 +1924,19 @@ function renderTaskListFilterBar() {
   if (!bar) return
   const options = _taskListFilterOptions()
   if (!options.some(o => o.id === selectedTaskListGroupFilter)) selectedTaskListGroupFilter = 'all'
-  bar.innerHTML = options.map(o => `
-    <button class="pref-choice-btn${selectedTaskListGroupFilter === o.id ? ' active' : ''}" onclick="setTaskListGroupFilter('${o.id}')" type="button">
-      ${escHtml(o.label)} (${_taskListGroupCount(o.id)})
-    </button>
-  `).join('')
+  bar.innerHTML = options.map(o => {
+    const active = o.id === selectedTaskListGroupFilter
+    return `<button onclick="setTaskListGroupFilter('${o.id}')" type="button" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 14px;border:none;background:none;cursor:pointer;white-space:nowrap;
+      font-size:13px;font-weight:${active ? '600' : '500'};font-family:var(--font);
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s
+    ">
+      ${escHtml(o.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${_taskListGroupCount(o.id)}</span>
+    </button>`
+  }).join('')
 }
 function setTaskListGroupFilter(groupId) {
   selectedTaskListGroupFilter = groupId
