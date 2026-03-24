@@ -1,6 +1,6 @@
 {
   "name": "forgeshift",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "Self-hosted shift rota management — vanilla HTML/CSS/JS + Node.js/Express + SQLite",
   "main": "server/index.js",
   "scripts": {
