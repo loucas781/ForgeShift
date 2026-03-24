@@ -193,11 +193,11 @@
         </div>
         <div id="taDayPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       </div>
-      <div class="form-group" id="taTaskGroupWrap" style="display:none">
-        <label class="form-label">Task group</label>
-        <select class="form-select" id="taTaskGroup" onchange="renderTaskAssignmentTaskListOptions()">
-          <option value="all">All task lists</option>
-        </select>
+      <div id="taGroupTabsWrap" style="display:none;margin-bottom:4px">
+        <div id="taGroupTabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
+      </div>
+      <div id="taLocationTabsWrap" style="display:none;margin-bottom:4px">
+        <div id="taLocationTabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Task list</label>
@@ -439,99 +439,133 @@ async function loadTaskLists() {
   if (!cfg.featureTasks) return
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
   renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentLocationOptions()
   renderTaskAssignmentTaskListOptions()
 }
 
+function _taFilterByGroup(lists) {
+  if (_taGroupFilter === 'all')       return lists
+  if (_taGroupFilter === 'ungrouped') return lists.filter(t => !t.group_id)
+  return lists.filter(t => t.group_id === _taGroupFilter)
+}
+
+function _taTabBar(containerId, options, activeId, onClickFn) {
+  const bar = document.getElementById(containerId)
+  if (!bar) return
+  bar.innerHTML = options.map(o => {
+    const active = o.id === activeId
+    return `<button onclick="${onClickFn}('${o.id}')" type="button" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 14px;border:none;background:none;cursor:pointer;white-space:nowrap;
+      font-size:13px;font-weight:${active ? '600' : '500'};font-family:var(--font);
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s
+    ">${escHtml(o.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${o.count}</span></button>`
+  }).join('')
+}
+
 function renderTaskAssignmentTaskGroupOptions() {
-  const wrap = document.getElementById('taTaskGroupWrap')
-  const sel = document.getElementById('taTaskGroup')
-  if (!wrap || !sel) return
+  const wrap = document.getElementById('taGroupTabsWrap')
+  if (!wrap) return
 
   const groups = []
   const seen = new Set()
   let hasUngrouped = false
   taskLists.forEach(t => {
     if (t.group_id) {
-      if (!seen.has(t.group_id)) {
-        seen.add(t.group_id)
-        groups.push({ id: t.group_id, name: t.group_name || 'Unnamed group' })
-      }
-    } else {
-      hasUngrouped = true
-    }
+      if (!seen.has(t.group_id)) { seen.add(t.group_id); groups.push({ id: t.group_id, name: t.group_name || 'Unnamed group' }) }
+    } else { hasUngrouped = true }
   })
 
   const bucketCount = groups.length + (hasUngrouped ? 1 : 0)
-  if (bucketCount <= 1) {
-    wrap.style.display = 'none'
-    sel.innerHTML = '<option value="all">All task lists</option>'
-    sel.value = 'all'
-    return
-  }
+  if (bucketCount <= 1) { wrap.style.display = 'none'; _taGroupFilter = 'all'; return }
 
+  const options = [
+    { id: 'all',       label: 'All',     count: taskLists.length },
+    ...(hasUngrouped ? [{ id: 'ungrouped', label: 'General', count: taskLists.filter(t => !t.group_id).length }] : []),
+    ...groups.map(g => ({ id: g.id, label: g.name, count: taskLists.filter(t => t.group_id === g.id).length }))
+  ]
+  if (!options.some(o => o.id === _taGroupFilter)) _taGroupFilter = 'all'
   wrap.style.display = ''
-  const current = sel.value || 'all'
-  sel.innerHTML =
-    '<option value="all">All task lists</option>' +
-    (hasUngrouped ? '<option value="ungrouped">General</option>' : '') +
-    groups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('')
-  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : 'all'
+  _taTabBar('taGroupTabs', options, _taGroupFilter, 'setTaGroupFilter')
+}
+
+function renderTaskAssignmentLocationOptions() {
+  const wrap = document.getElementById('taLocationTabsWrap')
+  if (!wrap) return
+
+  const groupFiltered = _taFilterByGroup(taskLists)
+  const locations = []
+  const seen = new Set()
+  groupFiltered.forEach(t => {
+    if (t.location_id && !seen.has(t.location_id)) {
+      seen.add(t.location_id)
+      locations.push({ id: t.location_id, name: t.location_name || 'Unknown' })
+    }
+  })
+
+  if (locations.length <= 1) { wrap.style.display = 'none'; _taLocationFilter = 'all'; return }
+
+  const options = [
+    { id: 'all', label: 'All locations', count: groupFiltered.length },
+    ...locations.map(l => ({ id: l.id, label: l.name, count: groupFiltered.filter(t => t.location_id === l.id).length }))
+  ]
+  if (!options.some(o => o.id === _taLocationFilter)) _taLocationFilter = 'all'
+  wrap.style.display = ''
+  _taTabBar('taLocationTabs', options, _taLocationFilter, 'setTaLocationFilter')
+}
+
+function setTaGroupFilter(id) {
+  _taGroupFilter = id
+  _taLocationFilter = 'all'
+  renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentLocationOptions()
+  renderTaskAssignmentTaskListOptions()
+}
+
+function setTaLocationFilter(id) {
+  _taLocationFilter = id
+  renderTaskAssignmentLocationOptions()
+  renderTaskAssignmentTaskListOptions()
 }
 
 function renderTaskAssignmentTaskListOptions() {
   const sel = document.getElementById('taTaskList')
   if (!sel) return
 
-  while (sel.options.length > 1) sel.remove(1)
+  sel.innerHTML = '<option value="">— Select a task list —</option>'
 
-  const groupFilter = document.getElementById('taTaskGroup')?.value || 'all'
-  let visibleTaskLists = taskLists
-  if (groupFilter === 'ungrouped') visibleTaskLists = taskLists.filter(t => !t.group_id)
-  else if (groupFilter !== 'all') visibleTaskLists = taskLists.filter(t => t.group_id === groupFilter)
+  let visible = _taFilterByGroup(taskLists)
+  if (_taLocationFilter !== 'all') visible = visible.filter(t => t.location_id === _taLocationFilter)
 
-  const grouped = {}
-  const ungrouped = []
-  visibleTaskLists.forEach(t => {
-    if (t.group_id) {
-      if (!grouped[t.group_id]) grouped[t.group_id] = { name: t.group_name, lists: [] }
-      grouped[t.group_id].lists.push(t)
-    } else {
-      ungrouped.push(t)
-    }
-  })
-
-  const hasGroups = groupFilter === 'all' && Object.keys(grouped).length > 0
-  if (hasGroups) {
+  const needsGrouping = _taGroupFilter === 'all' && visible.some(t => t.group_id)
+  if (needsGrouping) {
+    const grouped = {}
+    const ungrouped = []
+    visible.forEach(t => {
+      if (t.group_id) {
+        if (!grouped[t.group_id]) grouped[t.group_id] = { name: t.group_name, lists: [] }
+        grouped[t.group_id].lists.push(t)
+      } else { ungrouped.push(t) }
+    })
     if (ungrouped.length) {
       const grp = document.createElement('optgroup')
       grp.label = 'General'
-      ungrouped.forEach(t => {
-        const o = document.createElement('option')
-        o.value = t.id
-        o.textContent = t.name
-        grp.appendChild(o)
-      })
+      ungrouped.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
       sel.appendChild(grp)
     }
     Object.values(grouped).forEach(g => {
       const grp = document.createElement('optgroup')
       grp.label = g.name
-      g.lists.forEach(t => {
-        const o = document.createElement('option')
-        o.value = t.id
-        o.textContent = t.name
-        grp.appendChild(o)
-      })
+      g.lists.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
       sel.appendChild(grp)
     })
     return
   }
 
-  visibleTaskLists.forEach(t => {
-    const o = document.createElement('option')
-    o.value = t.id
-    o.textContent = t.name
-    sel.appendChild(o)
+  visible.forEach(t => {
+    const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o)
   })
 }
 
@@ -1596,6 +1630,8 @@ function hideTaskPopover() {
 // ── Task Assignment Modal ──────────────────────────────────────────────────────
 // _taWeekDates: array of 7 date strings [Mon..Sun] for the current modal week
 let _taWeekDates = []
+let _taGroupFilter    = 'all'
+let _taLocationFilter = 'all'
 
 function openTaskAssignModal(dateStr, userId) {
   // Derive the Monday of the week containing dateStr
@@ -1622,9 +1658,11 @@ function openTaskAssignModal(dateStr, userId) {
   // Build day-of-week pill checkboxes
   _buildDayPicker(dateStr)
 
-  // Reset task list
-  const taGroupSel = document.getElementById('taTaskGroup')
-  if (taGroupSel) taGroupSel.value = 'all'
+  // Reset filters and task list
+  _taGroupFilter    = 'all'
+  _taLocationFilter = 'all'
+  renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentLocationOptions()
   renderTaskAssignmentTaskListOptions()
   const taSel = document.getElementById('taTaskList')
   if (taSel) taSel.value = ''
@@ -1643,9 +1681,9 @@ function _buildDayPicker(preselectedDate) {
   container.innerHTML = _taWeekDates.map((ds, i) => {
     const checked = ds === preselectedDate
     const isWeekend = i >= 5  // Sat, Sun
-    return `<label style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
       <input type="checkbox" class="ta-day-cb" data-date="${ds}" ${checked ? 'checked' : ''}
-        style="display:none" onchange="_updateDayPillStyle(this)">
+        style="display:none">
       <span class="ta-day-pill" data-date="${ds}"
         style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;
                border:2px solid ${checked ? 'var(--accent)' : 'var(--border)'};
@@ -1655,7 +1693,7 @@ function _buildDayPicker(preselectedDate) {
         onclick="_toggleDayPill('${ds}')">
         ${_DAY_ABBRS[i]}<br><span style="font-size:10px;font-weight:400">${new Date(ds + 'T00:00:00').getDate()}</span>
       </span>
-    </label>`
+    </div>`
   }).join('')
 }
 
@@ -1885,8 +1923,9 @@ function openShiftPanel(shiftId) {
   let tasksHtml = ''
   if (relatedTasks.length) {
     const cards = relatedTasks.map(a => {
+      const descHtml  = a.task_list_description ? `<div class="shift-panel-task-desc">${escHtml(a.task_list_description)}</div>` : ''
       const notesHtml = a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : ''
-      return `<div class="shift-panel-task-card"><div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}</div>${notesHtml}</div>`
+      return `<div class="shift-panel-task-card"><div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}</div>${descHtml}${notesHtml}</div>`
     }).join('')
     tasksHtml = `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks for this day</div>${cards}</div>`
   }
@@ -2512,6 +2551,7 @@ init()
   gap: 4px;
 }
 .shift-panel-task-name { font-size: 13px; font-weight: 600; }
+.shift-panel-task-desc  { font-size: 12px; color: var(--text-3); line-height: 1.5; font-style: italic; }
 .shift-panel-task-notes { font-size: 12px; color: var(--text-2); line-height: 1.5; white-space: pre-wrap; }
 @media (max-width: 640px) {
   .shift-panel { width: 100%; border-left: none; border-radius: 20px 20px 0 0; top: auto; bottom: -100%; right: 0; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
