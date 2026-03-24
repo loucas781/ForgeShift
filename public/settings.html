@@ -319,6 +319,12 @@
     .tl-desc-editor ul { margin: 4px 0; padding-left: 20px; }
     .tl-desc-editor li { margin: 2px 0; }
     .tl-desc-editor p { margin: 0 0 4px; }
+    /* Desktop: let settings panels expand to full content height (no inner scroll) */
+    @media (min-width: 821px) {
+      .app-shell { height: auto !important; overflow: visible !important; }
+      .app-body  { overflow: visible !important; }
+      #settingsPanelsWrap { flex: none !important; overflow-y: unset !important; }
+    }
   </style>
 </head>
 <body>
@@ -2342,7 +2348,7 @@ function renderOrgsList() {
       </div>
       <div class="member-actions">
         <button class="btn btn-ghost btn-sm" onclick="openOrgMembersModal('${o.id}')">Members</button>
-        <button class="btn btn-ghost btn-sm" onclick="openRenameOrgModal('${o.id}', ${safeName})">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick='openRenameOrgModal("${o.id}", ${safeName})'>Edit</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteOrg("${o.id}", ${safeName})'>Delete</button>
       </div>
     </div>`
