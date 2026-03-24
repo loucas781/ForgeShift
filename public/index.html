@@ -443,10 +443,21 @@ async function loadTaskLists() {
   renderTaskAssignmentTaskListOptions()
 }
 
+function _taBucketId(t) {
+  if (t.label)  return `label_${t.label}`
+  if (t.org_id) return `org_${t.org_id}`
+  return 'ungrouped'
+}
+
+function _taBucketName(t) {
+  if (t.label)  return t.label
+  if (t.org_id) return t.org_name || 'Unknown'
+  return 'General'
+}
+
 function _taFilterByGroup(lists) {
-  if (_taGroupFilter === 'all')       return lists
-  if (_taGroupFilter === 'ungrouped') return lists.filter(t => !t.group_id)
-  return lists.filter(t => t.group_id === _taGroupFilter)
+  if (_taGroupFilter === 'all') return lists
+  return lists.filter(t => _taBucketId(t) === _taGroupFilter)
 }
 
 function _taTabBar(containerId, options, activeId, onClickFn) {
@@ -469,22 +480,18 @@ function renderTaskAssignmentTaskGroupOptions() {
   const wrap = document.getElementById('taGroupTabsWrap')
   if (!wrap) return
 
-  const groups = []
-  const seen = new Set()
-  let hasUngrouped = false
+  const buckets = new Map()
   taskLists.forEach(t => {
-    if (t.group_id) {
-      if (!seen.has(t.group_id)) { seen.add(t.group_id); groups.push({ id: t.group_id, name: t.group_name || 'Unnamed group' }) }
-    } else { hasUngrouped = true }
+    const id = _taBucketId(t)
+    if (!buckets.has(id)) buckets.set(id, { id, name: _taBucketName(t), count: 0 })
+    buckets.get(id).count++
   })
 
-  const bucketCount = groups.length + (hasUngrouped ? 1 : 0)
-  if (bucketCount <= 1) { wrap.style.display = 'none'; _taGroupFilter = 'all'; return }
+  if (buckets.size <= 1) { wrap.style.display = 'none'; _taGroupFilter = 'all'; return }
 
   const options = [
-    { id: 'all',       label: 'All',     count: taskLists.length },
-    ...(hasUngrouped ? [{ id: 'ungrouped', label: 'General', count: taskLists.filter(t => !t.group_id).length }] : []),
-    ...groups.map(g => ({ id: g.id, label: g.name, count: taskLists.filter(t => t.group_id === g.id).length }))
+    { id: 'all', label: 'All', count: taskLists.length },
+    ...Array.from(buckets.values()).map(b => ({ id: b.id, label: b.name, count: b.count }))
   ]
   if (!options.some(o => o.id === _taGroupFilter)) _taGroupFilter = 'all'
   wrap.style.display = ''
@@ -541,26 +548,18 @@ function renderTaskAssignmentTaskListOptions() {
   let visible = _taFilterByGroup(taskLists)
   if (_taLocationFilter !== 'all') visible = visible.filter(t => t.location_id === _taLocationFilter)
 
-  const needsGrouping = _taGroupFilter === 'all' && visible.some(t => t.group_id)
+  const needsGrouping = _taGroupFilter === 'all' && new Set(visible.map(_taBucketId)).size > 1
   if (needsGrouping) {
-    const grouped = {}
-    const ungrouped = []
+    const buckets = new Map()
     visible.forEach(t => {
-      if (t.group_id) {
-        if (!grouped[t.group_id]) grouped[t.group_id] = { name: t.group_name, lists: [] }
-        grouped[t.group_id].lists.push(t)
-      } else { ungrouped.push(t) }
+      const id = _taBucketId(t)
+      if (!buckets.has(id)) buckets.set(id, { name: _taBucketName(t), lists: [] })
+      buckets.get(id).lists.push(t)
     })
-    if (ungrouped.length) {
+    buckets.forEach(b => {
       const grp = document.createElement('optgroup')
-      grp.label = 'General'
-      ungrouped.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
-      sel.appendChild(grp)
-    }
-    Object.values(grouped).forEach(g => {
-      const grp = document.createElement('optgroup')
-      grp.label = g.name
-      g.lists.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
+      grp.label = b.name
+      b.lists.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
       sel.appendChild(grp)
     })
     return

@@ -67,7 +67,7 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
-    .settings-panel { display:none; width:100%; max-width:700px; min-width:0; padding:24px; }
+    .settings-panel { display:none; width:100%; max-width:960px; min-width:0; padding:24px; }
     #panel-team { width:100%; max-width:960px; min-width:0; }
     #settingsPanelsWrap { width:100%; min-width:0; overflow-x:hidden; padding-bottom:calc(var(--mobile-ui-clearance) + var(--safe-bottom)); }
     .settings-panel.active { display:block; }
@@ -319,12 +319,6 @@
     .tl-desc-editor ul { margin: 4px 0; padding-left: 20px; }
     .tl-desc-editor li { margin: 2px 0; }
     .tl-desc-editor p { margin: 0 0 4px; }
-    /* Desktop: let settings panels expand to full content height (no inner scroll) */
-    @media (min-width: 821px) {
-      .app-shell { height: auto !important; overflow: visible !important; }
-      .app-body  { overflow: visible !important; }
-      #settingsPanelsWrap { flex: none !important; overflow-y: unset !important; }
-    }
   </style>
 </head>
 <body>
@@ -2348,7 +2342,7 @@ function renderOrgsList() {
       </div>
       <div class="member-actions">
         <button class="btn btn-ghost btn-sm" onclick="openOrgMembersModal('${o.id}')">Members</button>
-        <button class="btn btn-ghost btn-sm" onclick='openRenameOrgModal("${o.id}", ${safeName})'>Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRenameOrgModal('${o.id}', ${safeName})">Edit</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteOrg("${o.id}", ${safeName})'>Delete</button>
       </div>
     </div>`
