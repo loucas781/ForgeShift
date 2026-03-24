@@ -67,8 +67,8 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
-    .settings-panel { display:none; width:100%; max-width:960px; min-width:0; padding:24px; }
-    #panel-team { width:100%; max-width:960px; min-width:0; }
+    .settings-panel { display:none; width:100%; max-width:720px; min-width:0; padding:24px; }
+    #panel-team { width:100%; max-width:720px; min-width:0; }
     #settingsPanelsWrap { width:100%; min-width:0; overflow-x:hidden; padding-bottom:calc(var(--mobile-ui-clearance) + var(--safe-bottom)); }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
@@ -464,8 +464,6 @@ async function init() {
   const ALL_TABS = [
     { id: 'appearance', label: 'Appearance', roles: ['admin','shift_lead','member'],
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-    { id: 'ical', label: 'Calendar Feed', roles: ['admin','shift_lead','member'],
-      icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
     { id: 'preferences', label: 'Preferences', roles: ['admin','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
@@ -490,8 +488,6 @@ async function init() {
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
     { id: 'buildinfo', label: 'Build Info', roles: ['admin','shift_lead','member'],
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'account', label: 'Account', roles: ['admin','shift_lead','member'],
-      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
     { id: 'about', label: 'About', roles: ['admin','shift_lead','member'],
       icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
@@ -526,7 +522,6 @@ async function init() {
   euPwIndicator = document.getElementById('euPwIndicatorWrap')
   await Promise.all([
     renderAppearancePanel(),
-    renderIcalPanel(),
     renderPreferencesPanel(),
     isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
     isAdmin ? renderTeamPanel() : Promise.resolve(),
@@ -538,7 +533,6 @@ async function init() {
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
     renderBuildInfoPanel(),
-    renderAccountPanel(),
     renderAboutPanel(),
   ])
 
@@ -557,6 +551,7 @@ function initCollapsibleSections() {
   document.querySelectorAll('.settings-panel .card-header').forEach(header => {
     // Skip headers that already have a collapse toggle or contain interactive save buttons
     if (header.querySelector('.section-collapse-btn')) return
+    if (header.querySelector('button:not(.section-collapse-btn)')) return
 
     const card = header.closest('.card')
     if (!card) return

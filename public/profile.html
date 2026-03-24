@@ -27,7 +27,7 @@
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
   <main class="page-content" style="display:flex;flex-direction:column;align-items:center">
-      <div style="width:100%;max-width:560px">
+      <div style="width:100%;max-width:720px">
       <div class="page-header">
         <h1 class="page-title">My Profile</h1>
       </div>
@@ -109,6 +109,7 @@
           <div class="card-header"><h3 class="card-title">Active Sessions</h3></div>
           <div class="card-body">
             <div id="sessionsContent">Loading…</div>
+            <button class="btn btn-danger btn-sm" style="margin-top:12px" onclick="signOutEverywhere()">Sign out all devices</button>
           </div>
         </div>
 
@@ -117,6 +118,38 @@
           <div class="card-header"><h3 class="card-title">Login History</h3></div>
           <div class="card-body">
             <div id="loginHistoryContent">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Export My Data -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Export My Data</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
+              Download a JSON file containing all your account data, shifts you have been assigned, and calendar feed tokens.
+            </p>
+            <a href="/api/auth/export" class="btn btn-secondary btn-sm" download style="display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              Download my data
+            </a>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="border-color:rgba(220,38,38,.3)">
+          <div class="card-header" style="border-bottom-color:rgba(220,38,38,.2)">
+            <h3 class="card-title" style="color:var(--red)">Danger Zone</h3>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:4px">
+              Permanently delete your account and all associated data. This cannot be undone.
+            </p>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:16px">
+              <strong>Note:</strong> As an admin, deleting your account will only work if at least one other admin exists.
+            </p>
+            <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="openDeleteAccountModal()">
+              Delete my account
+            </button>
           </div>
         </div>
 
@@ -373,6 +406,58 @@ async function loadLoginHistory() {
   } catch (err) {
     el.textContent = 'Failed to load login history'
   }
+}
+
+async function signOutEverywhere() {
+  if (!confirm('This will invalidate all active sessions across every device and browser, including this one. Continue?')) return
+  try {
+    await api('/api/auth/revoke-all', { method: 'POST' })
+    window.location.href = '/login.html'
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function openDeleteAccountModal() {
+  const existing = document.getElementById('deleteAccountModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'deleteAccountModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--red)">Delete My Account</h3>
+        <button class="modal-close" onclick="document.getElementById('deleteAccountModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="padding:12px 14px;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);border-radius:var(--r-md);font-size:13px;color:var(--red);margin-bottom:16px;line-height:1.5">
+          <strong>This action is permanent and cannot be undone.</strong> Your account, all shifts, and calendar tokens will be deleted immediately.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm your password</label>
+          <input type="password" class="form-input" id="deleteAccountPw" placeholder="Enter your password to confirm" autocomplete="current-password">
+        </div>
+        <div id="deleteAccountErr" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('deleteAccountModal').remove()">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="doDeleteAccount()">Delete my account</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('deleteAccountPw')?.focus(), 50)
+}
+
+async function doDeleteAccount() {
+  const pw  = document.getElementById('deleteAccountPw').value
+  const err = document.getElementById('deleteAccountErr')
+  if (!pw) { err.style.display = 'block'; err.textContent = 'Password is required.'; return }
+  err.style.display = 'none'
+  try {
+    await api('/api/auth/account', { method: 'DELETE', body: { password: pw } })
+    window.location.href = '/login.html'
+  } catch (e) { err.style.display = 'block'; err.textContent = e.message }
 }
 
 init()

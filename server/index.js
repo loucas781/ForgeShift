@@ -277,11 +277,16 @@ app.get('/api/audit/export', requireAuth, (req, res) => {
 
 app.delete('/api/audit', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
-  const db = require('./db/connection')
-  const auditModule = require('./audit')
-  db.prepare('DELETE FROM audit_log').run()
-  auditModule.log(db, { actor_id: req.user.id, action: 'settings_change', entity_type: 'audit_log', entity_id: 'all', entity_name: 'Audit Log', detail: 'Cleared all audit log entries' })
-  res.json({ ok: true })
+  try {
+    const db = require('./db/connection')
+    const audit = require('./audit')
+    db.prepare('DELETE FROM audit_log').run()
+    audit(req.user.id, 'settings_change', 'audit_log', 'all', 'Audit Log', { detail: 'Cleared all audit log entries' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('[audit clear]', err)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // Short-lived cache helper (10 s public, stale-while-revalidate)
