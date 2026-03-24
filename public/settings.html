@@ -2446,21 +2446,36 @@ function renderLocsTable() {
   const tbody = document.getElementById('locsBody')
   if (!tbody) return
   if (!locations.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No locations yet</td></tr>'; return }
-  tbody.innerHTML = locations.map(l => {
-    const orgCell = l.org_name
-      ? `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(l.org_name)}</span>`
-      : `<span style="font-size:12px;color:var(--text-3)">Open to all</span>`
-    return `<tr>
+
+  const sections = []
+  const grouped = new Map()
+  locations.forEach(l => {
+    const key = l.org_id || 'none'
+    if (!grouped.has(key)) {
+      grouped.set(key, { label: l.org_name || 'No Organisation', locs: [] })
+      sections.push(grouped.get(key))
+    }
+    grouped.get(key).locs.push(l)
+  })
+
+  const multiSection = sections.length > 1
+  tbody.innerHTML = sections.map(section => `
+    ${multiSection ? `<tr>
+      <td colspan="5" style="padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">
+        ${escHtml(section.label)} (${section.locs.length})
+      </td>
+    </tr>` : ''}
+    ${section.locs.map(l => `<tr>
       <td style="font-weight:600">${escHtml(l.name)}</td>
       <td style="color:var(--text-3)">${l.address ? escHtml(l.address) : '—'}</td>
       <td>${renderInlineColourSwatch(l.color, { size: 20, title: pickColourValue(l.color) || 'No colour' })}</td>
-      <td>${orgCell}</td>
+      <td>${l.org_name ? `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(l.org_name)}</span>` : '<span style="font-size:12px;color:var(--text-3)">Open to all</span>'}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${escHtml(l.name).replace(/'/g,"\\'")}')">Delete</button>
       </div></td>
-    </tr>`
-  }).join('')
+    </tr>`).join('')}
+  `).join('')
 }
 
 function _populateLocOrgSelect(selectedOrgId) {
