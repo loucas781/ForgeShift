@@ -412,6 +412,7 @@
       </div>
       <div class="form-group"><label class="form-label">Organisation <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlOrg"><option value="">— None (visible to all) —</option></select></div>
       <div class="form-group"><label class="form-label">Linked location <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlLocation"><option value="">— None —</option></select></div>
+      <div class="form-group"><label class="form-label">Label <span style="color:var(--text-3);font-weight:400">(optional — e.g. new, old, archived)</span></label><input type="text" class="form-input" id="tlLabel" placeholder="e.g. new, old, archived"></div>
       <div class="form-group"><label class="form-label">Colour</label><div id="tlColourPicker"></div></div>
     </div>
     <div class="modal-footer">
@@ -1906,9 +1907,10 @@ async function renderFeaturesPanel() {
           <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
         </div>
         <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
+        <div id="taskListLabelTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface-2)"></div>
         <div class="card-body" style="padding:0">
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Label</th><th>Colour</th><th>Actions</th></tr></thead>
             <tbody id="taskListsBody"></tbody>
           </table></div>
         </div>
@@ -1916,10 +1918,12 @@ async function renderFeaturesPanel() {
     </div>`
   await loadTaskLists()
   renderTaskListOrgTabs()
+  renderTaskListLabelTabs()
   renderTaskListsTable()
 }
 
 let activeTaskListOrgTab = 'all'
+let activeTaskListLabelTab = 'all'
 
 async function loadTaskLists() {
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
@@ -1955,6 +1959,41 @@ function renderTaskListOrgTabs() {
 function switchTaskListOrgTab(key) {
   activeTaskListOrgTab = key
   renderTaskListOrgTabs()
+  renderTaskListLabelTabs()
+  renderTaskListsTable()
+}
+
+function renderTaskListLabelTabs() {
+  const bar = document.getElementById('taskListLabelTabBar')
+  if (!bar) return
+  // Determine which lists are visible under the current org filter
+  let orgFiltered = taskLists
+  if (activeTaskListOrgTab === 'unassigned') orgFiltered = taskLists.filter(t => !t.org_id)
+  else if (activeTaskListOrgTab !== 'all') orgFiltered = taskLists.filter(t => t.org_id === activeTaskListOrgTab)
+
+  const labels = [...new Set(orgFiltered.map(t => t.label).filter(Boolean))].sort()
+  if (labels.length === 0) { bar.style.display = 'none'; return }
+  bar.style.display = 'flex'
+
+  if (!['all', ...labels].includes(activeTaskListLabelTab)) activeTaskListLabelTab = 'all'
+
+  const tabs = [{ key: 'all', label: 'All labels', count: orgFiltered.length }, ...labels.map(l => ({ key: l, label: l, count: orgFiltered.filter(t => t.label === l).length }))]
+  bar.innerHTML = tabs.map(t => {
+    const active = t.key === activeTaskListLabelTab
+    return `<button onclick="switchTaskListLabelTab('${escHtml(t.key)}')" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:7px 14px;border:none;background:none;cursor:pointer;
+      font-size:12px;font-weight:${active ? '600' : '500'};
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap
+    ">${escHtml(t.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-3,var(--surface-2))'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${t.count}</span></button>`
+  }).join('')
+}
+
+function switchTaskListLabelTab(key) {
+  activeTaskListLabelTab = key
+  renderTaskListLabelTabs()
   renderTaskListsTable()
 }
 
@@ -1969,6 +2008,7 @@ function _renderTaskListRows(lists) {
       <td style="font-size:13px">${t.org_name ? `<span class="badge badge-gray">${escHtml(t.org_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td style="color:var(--text-2);font-size:13px;max-width:260px">${description}</td>
       <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${escHtml(t.location_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td>${t.label ? `<span class="badge badge-gray">${escHtml(t.label)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
@@ -1982,14 +2022,15 @@ function renderTaskListsTable() {
   const tbody = document.getElementById('taskListsBody')
   if (!tbody) return
   if (!taskLists.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
     return
   }
   let visible = taskLists
-  if (activeTaskListOrgTab === 'unassigned') visible = taskLists.filter(t => !t.org_id)
-  else if (activeTaskListOrgTab !== 'all') visible = taskLists.filter(t => t.org_id === activeTaskListOrgTab)
+  if (activeTaskListOrgTab === 'unassigned') visible = visible.filter(t => !t.org_id)
+  else if (activeTaskListOrgTab !== 'all') visible = visible.filter(t => t.org_id === activeTaskListOrgTab)
+  if (activeTaskListLabelTab !== 'all') visible = visible.filter(t => t.label === activeTaskListLabelTab)
   if (!visible.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists in this organisation</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists match the selected filters</td></tr>'
     return
   }
   tbody.innerHTML = _renderTaskListRows(visible)
@@ -2028,6 +2069,7 @@ function openCreateTaskList() {
   document.getElementById('taskListModalTitle').textContent = 'Add Task List'
   document.getElementById('tlName').value = ''
   document.getElementById('tlDescEditor').innerHTML = ''
+  document.getElementById('tlLabel').value = ''
   _populateTlGroupSelect(null)
   _populateTlLocationSelect(null)
 
@@ -2040,6 +2082,7 @@ function openEditTaskList(id) {
   document.getElementById('taskListModalTitle').textContent = 'Edit Task List'
   document.getElementById('tlName').value = t.name
   document.getElementById('tlDescEditor').innerHTML = t.description || ''
+  document.getElementById('tlLabel').value = t.label || ''
   _populateTlGroupSelect(t.org_id)
   _populateTlLocationSelect(t.location_id)
   setupTlColour()
@@ -2079,12 +2122,13 @@ async function saveTaskList() {
   const description = _getTlDescHtml() || null
   const org_id = document.getElementById('tlOrg').value || null
   const location_id = document.getElementById('tlLocation').value || null
+  const label = document.getElementById('tlLabel').value.trim() || null
   if (!name) { toast('Name required', 'error'); return }
   try {
-    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, org_id, location_id } })
-    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, org_id, location_id } })
+    if (editingTaskListId) await api(`/api/tasks/lists/${editingTaskListId}`, { method: 'PUT', body: { name, color: tlColour, description, org_id, location_id, label } })
+    else await api('/api/tasks/lists', { method: 'POST', body: { name, color: tlColour, description, org_id, location_id, label } })
     closeTaskListModal()
-    await loadTaskLists(); renderTaskListOrgTabs(); renderTaskListsTable()
+    await loadTaskLists(); renderTaskListOrgTabs(); renderTaskListLabelTabs(); renderTaskListsTable()
     toast('Task list saved', 'success')
   } catch (err) { toast(err.message, 'error') }
 }

@@ -322,6 +322,10 @@ function migrateAdditive() {
     db.exec("ALTER TABLE task_lists ADD COLUMN location_id TEXT REFERENCES locations(id) ON DELETE SET NULL")
     console.log('✓ Added location_id to task_lists')
   }
+  if (!taskListCols.includes('label')) {
+    db.exec("ALTER TABLE task_lists ADD COLUMN label TEXT")
+    console.log('✓ Added label to task_lists')
+  }
 
   // Expand role CHECK to include shift_lead — SQLite can't ALTER constraints
   // so we check if the constraint is already expanded and rebuild if not.
