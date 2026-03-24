@@ -67,8 +67,8 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:16px; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); }
     .qr-wrap canvas, .qr-wrap img { border-radius:var(--r-md); }
-    .settings-panel { display:none; width:100%; max-width:720px; min-width:0; padding:24px; }
-    #panel-team { width:100%; max-width:720px; min-width:0; }
+    .settings-panel { display:none; width:100%; max-width:960px; min-width:0; padding:24px; }
+    #panel-team { width:100%; max-width:960px; min-width:0; }
     #settingsPanelsWrap { width:100%; min-width:0; overflow-x:hidden; padding-bottom:calc(var(--mobile-ui-clearance) + var(--safe-bottom)); }
     .settings-panel.active { display:block; }
     .section-card { margin-bottom:20px; }
@@ -540,58 +540,10 @@ async function init() {
   const hash = window.location.hash.slice(1)
   const validTab = tabs.find(t => t.id === hash)
   showTab(validTab ? hash : tabs[0].id)
-  initCollapsibleSections()
+  initCollapsibleSections('.settings-panel')
 }
 
-function initCollapsibleSections() {
-  const STORAGE_KEY = 'fs-settings-collapsed'
-  let collapsed = {}
-  try { collapsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch {}
-
-  document.querySelectorAll('.settings-panel .card-header').forEach(header => {
-    // Skip headers that already have a collapse toggle or contain interactive save buttons
-    if (header.querySelector('.section-collapse-btn')) return
-    if (header.querySelector('button:not(.section-collapse-btn)')) return
-
-    const card = header.closest('.card')
-    if (!card) return
-    const body = card.querySelector('.card-body')
-    if (!body) return
-
-    // Derive a stable key from the heading text
-    const title = header.querySelector('.card-title')?.textContent?.trim() || header.textContent.trim()
-    const key   = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-
-    // Add chevron button
-    const btn = document.createElement('button')
-    btn.className = 'section-collapse-btn'
-    btn.setAttribute('aria-label', 'Toggle section')
-    btn.setAttribute('type', 'button')
-    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>'
-    header.appendChild(btn)
-    header.style.cursor = 'pointer'
-
-    function applyState(isCollapsed, animate) {
-      card.classList.toggle('section-collapsed', isCollapsed)
-      btn.classList.toggle('section-collapse-rotated', isCollapsed)
-      if (!animate) { body.style.transition = 'none'; requestAnimationFrame(() => body.style.transition = '') }
-    }
-
-    // Restore saved state
-    if (collapsed[key]) applyState(true, false)
-
-    header.addEventListener('click', e => {
-      // Don't collapse when clicking interactive elements inside the header (buttons, inputs, etc.)
-      if (e.target.closest('button:not(.section-collapse-btn), input, select, a')) return
-      const now = card.classList.contains('section-collapsed')
-      const next = !now
-      applyState(next, true)
-      collapsed[key] = next || undefined
-      if (!next) delete collapsed[key]
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed)) } catch {}
-    })
-  })
-}
+// initCollapsibleSections is defined in shell.js
 
 // ── Avatar helper — mirrors shell.js avatarEl ─────────────────────────────────
 // Returns an outerHTML string for an avatar element that shows the photo if

@@ -1,4 +1,65 @@
 /* shell.js — shared layout, theme, toast, nav helpers */
+
+// ── Collapsible card sections ──────────────────────────────────────────────────
+// containerSelector: optional CSS selector to scope which .card-header elements
+// are made collapsible (e.g. '.settings-panel'). Defaults to all .card-header.
+function initCollapsibleSections(containerSelector) {
+  const STORAGE_KEY = 'fs-settings-collapsed'
+  let collapsed = {}
+  try { collapsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch {}
+
+  const selector = containerSelector ? `${containerSelector} .card-header` : '.card-header'
+
+  document.querySelectorAll(selector).forEach(header => {
+    if (header.querySelector('.section-collapse-btn')) return
+
+    const card = header.closest('.card')
+    if (!card) return
+    const body = card.querySelector('.card-body')
+    if (!body) return
+
+    const title = header.querySelector('.card-title')?.textContent?.trim() || header.textContent.trim()
+    const key   = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+    const btn = document.createElement('button')
+    btn.className = 'section-collapse-btn'
+    btn.setAttribute('aria-label', 'Toggle section')
+    btn.setAttribute('type', 'button')
+    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>'
+
+    // If the header already has action buttons, group them with the chevron so
+    // they all sit neatly on the right side without crushing the title.
+    const existingBtns = [...header.querySelectorAll('button:not(.section-collapse-btn)')]
+    if (existingBtns.length > 0) {
+      const group = document.createElement('div')
+      group.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0'
+      existingBtns.forEach(b => group.appendChild(b))
+      group.appendChild(btn)
+      header.appendChild(group)
+    } else {
+      header.appendChild(btn)
+    }
+
+    header.style.cursor = 'pointer'
+
+    function applyState(isCollapsed, animate) {
+      card.classList.toggle('section-collapsed', isCollapsed)
+      btn.classList.toggle('section-collapse-rotated', isCollapsed)
+      if (!animate) { body.style.transition = 'none'; requestAnimationFrame(() => body.style.transition = '') }
+    }
+
+    if (collapsed[key]) applyState(true, false)
+
+    header.addEventListener('click', e => {
+      if (e.target.closest('button:not(.section-collapse-btn), input, select, a')) return
+      const now  = card.classList.contains('section-collapsed')
+      const next = !now
+      applyState(next, true)
+      if (next) { collapsed[key] = true } else { delete collapsed[key] }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed)) } catch {}
+    })
+  })
+}
 'use strict'
 
 // ── Config ─────────────────────────────────────────────────────────────────────

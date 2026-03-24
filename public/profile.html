@@ -460,7 +460,7 @@ async function doDeleteAccount() {
   } catch (e) { err.style.display = 'block'; err.textContent = e.message }
 }
 
-init()
+init().then(() => initCollapsibleSections())
 loadSessions()
 loadLoginHistory()
 </script>
