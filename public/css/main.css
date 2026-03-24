@@ -71,6 +71,7 @@
   --safe-right:  env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left:   env(safe-area-inset-left, 0px);
+  --mobile-ui-clearance: 0px;
 }
 
 /* ── Dark theme ───────────────────────────────────────────── */
@@ -146,9 +147,9 @@ h4 { font-size: 13px; font-weight: 600; }
 [data-theme="oled"] ::-webkit-scrollbar-thumb { background: var(--gray-700); }
 
 /* ── App shell ────────────────────────────────────────────── */
-.app-shell   { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app-shell   { display: flex; flex-direction: column; min-height: 100vh; height: 100vh; height: 100dvh; overflow: hidden; }
 .app-body    { display: flex; flex: 1; overflow: hidden; min-height: 0; flex-direction: column; }
-.page-content { flex: 1; overflow-y: auto; padding: 24px; min-height: 0; }
+.page-content { flex: 1; overflow-y: auto; padding: 24px; padding-bottom: calc(24px + var(--safe-bottom)); min-height: 0; }
 
 /* ── Topbar ───────────────────────────────────────────────── */
 .topbar {
@@ -1073,7 +1074,17 @@ tr:hover td { background: var(--surface-2); }
     padding: 12px 16px 10px;
   }
 
-  .page-content { padding: 16px; }
+  :root {
+    --mobile-ui-clearance: 40px;
+  }
+  .standalone-app {
+    --mobile-ui-clearance: 72px;
+  }
+  .page-content { padding: 16px; padding-bottom: calc(16px + var(--mobile-ui-clearance) + var(--safe-bottom)); }
+  .cal-grid {
+    padding-bottom: calc(16px + var(--mobile-ui-clearance) + var(--safe-bottom));
+    scroll-padding-bottom: calc(16px + var(--mobile-ui-clearance) + var(--safe-bottom));
+  }
   .cal-toolbar { padding: 12px 16px 8px; }
   .cal-view-tabs .cal-view-tab span { display: none; }
   .cal-view-tabs .cal-view-tab-icon { display: inline-block; }

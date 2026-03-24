@@ -4,6 +4,14 @@
 // ── Config ─────────────────────────────────────────────────────────────────────
 let _config = null
 
+function _isStandaloneApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+}
+
+function _syncStandaloneClass() {
+  document.documentElement.classList.toggle('standalone-app', _isStandaloneApp())
+}
+
 async function loadConfig() {
   if (_config) return _config
   const r = await fetch('/api/config')
@@ -32,6 +40,7 @@ function getTheme() {
 
 // Apply theme immediately (called inline on every page — no flash)
 ;(function() {
+  _syncStandaloneClass()
   const t = localStorage.getItem('fs-theme') || 'system'
   if (t === 'system') {
     if (window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -48,6 +57,11 @@ function getTheme() {
       if (!e.matches) document.documentElement.removeAttribute('data-theme')
     }
   })
+  const standaloneMq = window.matchMedia('(display-mode: standalone)')
+  const handleStandaloneChange = () => _syncStandaloneClass()
+  if (standaloneMq.addEventListener) standaloneMq.addEventListener('change', handleStandaloneChange)
+  else if (standaloneMq.addListener) standaloneMq.addListener(handleStandaloneChange)
+  window.addEventListener('pageshow', handleStandaloneChange)
 })()
 
 // ── Toast notifications ────────────────────────────────────────────────────────
