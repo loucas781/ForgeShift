@@ -1837,6 +1837,7 @@ let taskLists = []
 let taskListGroups = []
 let editingTaskListId = null
 let tlColour = '#4f46e5'
+let selectedTaskListGroupFilter = 'all'
 
 async function renderFeaturesPanel() {
   const featData = await api('/api/features')
@@ -1887,6 +1888,7 @@ async function renderFeaturesPanel() {
           <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
         </div>
         <div class="card-body" style="padding:0">
+          <div id="taskListFilterBar" style="display:flex;gap:8px;flex-wrap:wrap;padding:16px 16px 0"></div>
           <div class="table-wrap"><table>
             <thead><tr><th>Name</th><th>Group</th><th>Description</th><th>Location</th><th>Colour</th><th>Actions</th></tr></thead>
             <tbody id="taskListsBody"></tbody>
@@ -1904,6 +1906,34 @@ async function loadTaskLists() {
 async function loadTaskListGroups() {
   try { taskListGroups = await api('/api/task-list-groups') } catch { taskListGroups = [] }
   renderTaskListGroupsEl()
+}
+function _taskListGroupCount(groupId) {
+  if (groupId === 'all') return taskLists.length
+  if (groupId === 'ungrouped') return taskLists.filter(t => !t.group_id).length
+  return taskLists.filter(t => t.group_id === groupId).length
+}
+function _taskListFilterOptions() {
+  return [
+    { id: 'all', label: 'All' },
+    { id: 'ungrouped', label: 'General' },
+    ...taskListGroups.map(g => ({ id: g.id, label: g.name })),
+  ]
+}
+function renderTaskListFilterBar() {
+  const bar = document.getElementById('taskListFilterBar')
+  if (!bar) return
+  const options = _taskListFilterOptions()
+  if (!options.some(o => o.id === selectedTaskListGroupFilter)) selectedTaskListGroupFilter = 'all'
+  bar.innerHTML = options.map(o => `
+    <button class="pref-choice-btn${selectedTaskListGroupFilter === o.id ? ' active' : ''}" onclick="setTaskListGroupFilter('${o.id}')" type="button">
+      ${escHtml(o.label)} (${_taskListGroupCount(o.id)})
+    </button>
+  `).join('')
+}
+function setTaskListGroupFilter(groupId) {
+  selectedTaskListGroupFilter = groupId
+  renderTaskListFilterBar()
+  renderTaskListsTable()
 }
 function renderTaskListGroupsEl() {
   const el = document.getElementById('taskListGroupsEl')
@@ -1940,24 +1970,70 @@ function renderTaskListGroupsEl() {
   }).join('')
 }
 
+function _renderTaskListRows(lists) {
+  return lists.map(t => {
+    const description = t.description
+      ? `<span title="${escHtml(t.description)}">${escHtml(t.description.length > 80 ? t.description.slice(0, 80) + '…' : t.description)}</span>`
+      : '<span style="color:var(--text-3)">—</span>'
+    const safeName = JSON.stringify(t.name)
+    return `<tr>
+      <td style="font-weight:600">${escHtml(t.name)}</td>
+      <td style="font-size:13px">${t.group_name ? `<span style="display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" style="color:var(--text-3)"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>${escHtml(t.group_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td style="color:var(--text-2);font-size:13px;max-width:260px">${description}</td>
+      <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${escHtml(t.location_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteTaskList("${t.id}", ${safeName})'>Delete</button>
+      </div></td>
+    </tr>`
+  }).join('')
+}
+
 function renderTaskListsTable() {
   const tbody = document.getElementById('taskListsBody')
   if (!tbody) return
+  renderTaskListFilterBar()
   if (!taskLists.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists yet — add one to get started</td></tr>'
     return
   }
-  tbody.innerHTML = taskLists.map(t => `<tr>
-    <td style="font-weight:600">${t.name}</td>
-    <td style="font-size:13px">${t.group_name ? `<span style="display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" style="color:var(--text-3)"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>${t.group_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
-    <td style="color:var(--text-2);font-size:13px;max-width:260px">${t.description ? `<span title="${t.description.replace(/"/g,'&quot;')}">${t.description.length>80?t.description.slice(0,80)+'…':t.description}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
-    <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${t.location_name}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
-    <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
-    <td><div style="display:flex;gap:4px">
-      <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
-      <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTaskList('${t.id}','${t.name}')">Delete</button>
-    </div></td>
-  </tr>`).join('')
+  let filtered = taskLists
+  if (selectedTaskListGroupFilter === 'ungrouped') filtered = taskLists.filter(t => !t.group_id)
+  else if (selectedTaskListGroupFilter !== 'all') filtered = taskLists.filter(t => t.group_id === selectedTaskListGroupFilter)
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists in this group yet.</td></tr>'
+    return
+  }
+
+  if (selectedTaskListGroupFilter !== 'all') {
+    tbody.innerHTML = _renderTaskListRows(filtered)
+    return
+  }
+
+  const sections = []
+  const grouped = new Map()
+  filtered.forEach(t => {
+    const key = t.group_id || 'ungrouped'
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        label: t.group_name || 'General',
+        lists: [],
+      })
+      sections.push(grouped.get(key))
+    }
+    grouped.get(key).lists.push(t)
+  })
+
+  tbody.innerHTML = sections.map(section => `
+    <tr>
+      <td colspan="6" style="padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">
+        ${escHtml(section.label)} (${section.lists.length})
+      </td>
+    </tr>
+    ${_renderTaskListRows(section.lists)}
+  `).join('')
 }
 
 async function toggleFeatureDragDrop(enabled) {

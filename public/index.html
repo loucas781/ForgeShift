@@ -41,11 +41,6 @@
               <option value="">My shifts</option>
             </select>
           </div>
-          <div id="locationFilterWrap" style="display:none">
-            <select class="cal-user-filter" id="locationFilter" onchange="renderView()" title="Filter by location">
-              <option value="">All locations</option>
-            </select>
-          </div>
           <div class="cal-toolbar-end">
             <span id="hoursStat" class="cal-hours-stat"></span>
             <button id="copyWeekBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week">
@@ -198,6 +193,12 @@
         </div>
         <div id="taDayPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       </div>
+      <div class="form-group" id="taTaskGroupWrap" style="display:none">
+        <label class="form-label">Task group</label>
+        <select class="form-select" id="taTaskGroup" onchange="renderTaskAssignmentTaskListOptions()">
+          <option value="all">All task lists</option>
+        </select>
+      </div>
       <div class="form-group">
         <label class="form-label">Task list</label>
         <select class="form-select" id="taTaskList">
@@ -333,23 +334,13 @@ async function init() {
 async function loadLocations() {
   locations = await api('/api/locations')
   const sel = document.getElementById('modalLocation')
-  const locFilter = document.getElementById('locationFilter')
   const selFrag = document.createDocumentFragment()
-  const filterFrag = document.createDocumentFragment()
   locations.forEach(l => {
     const o = document.createElement('option')
     o.value = l.id; o.textContent = l.name
     selFrag.appendChild(o)
-    const o2 = document.createElement('option')
-    o2.value = l.id; o2.textContent = l.name
-    filterFrag.appendChild(o2)
   })
   sel.appendChild(selFrag)
-  locFilter.appendChild(filterFrag)
-  // Only show the location filter if there are multiple locations
-  if (locations.length > 1) {
-    document.getElementById('locationFilterWrap').style.display = 'block'
-  }
 }
 
 async function loadUsers() {
@@ -447,41 +438,101 @@ async function loadTeams() {
 async function loadTaskLists() {
   if (!cfg.featureTasks) return
   try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
-  // Populate task assignment modal select — grouped using optgroup when groups exist
-  const sel = document.getElementById('taTaskList')
-  if (sel) {
-    while (sel.options.length > 1) sel.remove(1)
-    // Group lists by group_id
-    const grouped = {}
-    const ungrouped = []
-    taskLists.forEach(t => {
-      if (t.group_id) {
-        if (!grouped[t.group_id]) grouped[t.group_id] = { name: t.group_name, lists: [] }
-        grouped[t.group_id].lists.push(t)
-      } else {
-        ungrouped.push(t)
+  renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentTaskListOptions()
+}
+
+function renderTaskAssignmentTaskGroupOptions() {
+  const wrap = document.getElementById('taTaskGroupWrap')
+  const sel = document.getElementById('taTaskGroup')
+  if (!wrap || !sel) return
+
+  const groups = []
+  const seen = new Set()
+  let hasUngrouped = false
+  taskLists.forEach(t => {
+    if (t.group_id) {
+      if (!seen.has(t.group_id)) {
+        seen.add(t.group_id)
+        groups.push({ id: t.group_id, name: t.group_name || 'Unnamed group' })
       }
-    })
-    const hasGroups = Object.keys(grouped).length > 0
-    if (hasGroups) {
-      // Ungrouped first
-      if (ungrouped.length) {
-        const grp = document.createElement('optgroup'); grp.label = 'General'
-        ungrouped.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
-        sel.appendChild(grp)
-      }
-      Object.values(grouped).forEach(g => {
-        const grp = document.createElement('optgroup'); grp.label = g.name
-        g.lists.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
-        sel.appendChild(grp)
-      })
     } else {
-      taskLists.forEach(t => {
-        const o = document.createElement('option'); o.value = t.id; o.textContent = t.name
-        sel.appendChild(o)
-      })
+      hasUngrouped = true
     }
+  })
+
+  const bucketCount = groups.length + (hasUngrouped ? 1 : 0)
+  if (bucketCount <= 1) {
+    wrap.style.display = 'none'
+    sel.innerHTML = '<option value="all">All task lists</option>'
+    sel.value = 'all'
+    return
   }
+
+  wrap.style.display = ''
+  const current = sel.value || 'all'
+  sel.innerHTML =
+    '<option value="all">All task lists</option>' +
+    (hasUngrouped ? '<option value="ungrouped">General</option>' : '') +
+    groups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('')
+  sel.value = Array.from(sel.options).some(o => o.value === current) ? current : 'all'
+}
+
+function renderTaskAssignmentTaskListOptions() {
+  const sel = document.getElementById('taTaskList')
+  if (!sel) return
+
+  while (sel.options.length > 1) sel.remove(1)
+
+  const groupFilter = document.getElementById('taTaskGroup')?.value || 'all'
+  let visibleTaskLists = taskLists
+  if (groupFilter === 'ungrouped') visibleTaskLists = taskLists.filter(t => !t.group_id)
+  else if (groupFilter !== 'all') visibleTaskLists = taskLists.filter(t => t.group_id === groupFilter)
+
+  const grouped = {}
+  const ungrouped = []
+  visibleTaskLists.forEach(t => {
+    if (t.group_id) {
+      if (!grouped[t.group_id]) grouped[t.group_id] = { name: t.group_name, lists: [] }
+      grouped[t.group_id].lists.push(t)
+    } else {
+      ungrouped.push(t)
+    }
+  })
+
+  const hasGroups = groupFilter === 'all' && Object.keys(grouped).length > 0
+  if (hasGroups) {
+    if (ungrouped.length) {
+      const grp = document.createElement('optgroup')
+      grp.label = 'General'
+      ungrouped.forEach(t => {
+        const o = document.createElement('option')
+        o.value = t.id
+        o.textContent = t.name
+        grp.appendChild(o)
+      })
+      sel.appendChild(grp)
+    }
+    Object.values(grouped).forEach(g => {
+      const grp = document.createElement('optgroup')
+      grp.label = g.name
+      g.lists.forEach(t => {
+        const o = document.createElement('option')
+        o.value = t.id
+        o.textContent = t.name
+        grp.appendChild(o)
+      })
+      sel.appendChild(grp)
+    })
+    return
+  }
+
+  visibleTaskLists.forEach(t => {
+    const o = document.createElement('option')
+    o.value = t.id
+    o.textContent = t.name
+    sel.appendChild(o)
+  })
 }
 
 async function loadTemplates() {
@@ -643,8 +694,7 @@ function renderMonth() {
   const startOffset = (first.getDay() - weekStart + 7) % 7
   const totalCells  = Math.ceil((startOffset + last.getDate()) / 7) * 7
 
-  const locFilterVal = document.getElementById('locationFilter')?.value || ''
-  const visibleShifts = locFilterVal ? shifts.filter(s => s.location_id === locFilterVal) : shifts
+  const visibleShifts = shifts
 
   const shiftMap = {}
   visibleShifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
@@ -769,9 +819,8 @@ function renderMonth() {
   const bannerBtn = document.getElementById('calEmptyBannerBtn')
   if (banner) {
     if (!hasShiftsThisMonth) {
-      const isLocFiltered = locFilterVal !== ''
-      bannerMsg.textContent = isLocFiltered ? 'No shifts at this location.' : 'No shifts this month.'
-      if (canManage() && !isLocFiltered) {
+      bannerMsg.textContent = 'No shifts this month.'
+      if (canManage()) {
         bannerBtn.textContent = '+ Add first shift'
         bannerBtn.onclick = () => openCreateModal(toDateStr(new Date()))
         bannerBtn.style.display = ''
@@ -811,8 +860,7 @@ function renderWeek() {
   const _fv       = document.getElementById('teamFilter')?.value || ''
   const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
 
-  const locFilterVal = document.getElementById('locationFilter')?.value || ''
-  const visibleShiftsWeek = locFilterVal ? shifts.filter(s => s.location_id === locFilterVal) : shifts
+  const visibleShiftsWeek = shifts
 
   const shiftMap = {}
   visibleShiftsWeek.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
@@ -1575,6 +1623,9 @@ function openTaskAssignModal(dateStr, userId) {
   _buildDayPicker(dateStr)
 
   // Reset task list
+  const taGroupSel = document.getElementById('taTaskGroup')
+  if (taGroupSel) taGroupSel.value = 'all'
+  renderTaskAssignmentTaskListOptions()
   const taSel = document.getElementById('taTaskList')
   if (taSel) taSel.value = ''
 
