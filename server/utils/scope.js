@@ -23,8 +23,12 @@ function getShiftLeadScope(userId) {
     return ids
   }
 
-  // Fallback: teams they own or created (pre-organisations behaviour)
-  const teams = db.prepare('SELECT id FROM teams WHERE owned_by = ? OR created_by = ?').all(userId, userId)
+  // Fallback: teams they own, created, or are a member of (pre-organisations behaviour)
+  const teams = db.prepare(`
+    SELECT DISTINCT t.id FROM teams t
+    LEFT JOIN team_members tm ON tm.team_id = t.id
+    WHERE t.owned_by = ? OR t.created_by = ? OR tm.user_id = ?
+  `).all(userId, userId, userId)
   if (!teams.length) return new Set([userId])
   const teamIds = teams.map(t => t.id)
   const members = db.prepare(

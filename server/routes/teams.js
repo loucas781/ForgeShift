@@ -29,15 +29,16 @@ router.get('/', requireAuth, (req, res) => {
       GROUP BY t.id ORDER BY t.name
     `).all()
   } else if (role === 'shift_lead') {
-    // Shift lead sees teams in their orgs, plus teams they own/created (fallback)
+    // Shift lead sees teams in their orgs, teams they own/created, or teams they're a member of
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
       FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
       WHERE t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
          OR t.owned_by = ? OR t.created_by = ?
+         OR t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
       GROUP BY t.id ORDER BY t.name
-    `).all(userId, userId, userId)
+    `).all(userId, userId, userId, userId)
   } else {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
@@ -73,6 +74,17 @@ router.get('/', requireAuth, (req, res) => {
 router.post('/', requireAuth, requireShiftLead, (req, res) => {
   const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
+
+  // Shift leads can only create a team if they're not already in one
+  if (req.user.role === 'shift_lead') {
+    const existing = db.prepare(`
+      SELECT 1 FROM teams t
+      LEFT JOIN team_members tm ON tm.team_id = t.id
+      WHERE t.owned_by = ? OR t.created_by = ? OR tm.user_id = ?
+      LIMIT 1
+    `).get(req.user.id, req.user.id, req.user.id)
+    if (existing) return res.status(400).json({ error: 'You are already in a team.' })
+  }
   const count = db.prepare('SELECT COUNT(*) AS c FROM teams').get().c
   const teamColor = color || COLORS[count % COLORS.length]
   const id = uuidv4()
