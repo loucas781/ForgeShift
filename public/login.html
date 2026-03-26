@@ -35,11 +35,22 @@
         <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
       </div>
       <div class="form-group">
-        <label class="form-label" style="display:flex;justify-content:space-between;">
-          Password
-          <a href="/forgot-password.html" id="forgotPwLink" style="font-weight:400;font-size:12px;">Forgot password?</a>
-        </label>
+        <label class="form-label">Password</label>
         <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="position:relative;flex-shrink:0">
+            <input type="checkbox" id="rememberToggle" style="appearance:none;-webkit-appearance:none;width:36px;height:20px;border-radius:10px;background:var(--border);cursor:pointer;transition:background .2s;display:block" onchange="onRememberChange(this)">
+            <span style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;pointer-events:none;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)" id="rememberKnob"></span>
+          </div>
+          <label for="rememberToggle" style="font-size:13px;font-weight:500;color:var(--text-1);cursor:pointer;line-height:1">Remember login details</label>
+        </div>
+        <a href="/forgot-password.html" id="forgotPwLink" style="font-size:13px;font-weight:400;white-space:nowrap">Forgot password?</a>
+      </div>
+      <div id="rememberWarning" style="display:none;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(217,119,6,.35);background:rgba(217,119,6,.08)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <p style="margin:0;font-size:13px;color:#d97706;line-height:1.45">Only enable on private devices you own and trust. Credentials will be saved in your browser.</p>
       </div>
       <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
     </div>
@@ -72,6 +83,32 @@
 </div>
 
 <script>
+  // Remember login details toggle
+  function onRememberChange(cb) {
+    const knob = document.getElementById('rememberKnob')
+    const warning = document.getElementById('rememberWarning')
+    cb.style.background = cb.checked ? '#4f46e5' : 'var(--border)'
+    knob.style.transform = cb.checked ? 'translateX(16px)' : 'translateX(0)'
+    warning.style.display = cb.checked ? 'flex' : 'none'
+    if (!cb.checked) {
+      localStorage.removeItem('fs-saved-email')
+      localStorage.removeItem('fs-saved-password')
+    }
+  }
+
+  // Restore saved credentials
+  ;(function restoreSaved() {
+    const savedEmail = localStorage.getItem('fs-saved-email')
+    const savedPassword = localStorage.getItem('fs-saved-password')
+    if (savedEmail && savedPassword) {
+      document.getElementById('email').value = savedEmail
+      document.getElementById('password').value = savedPassword
+      const cb = document.getElementById('rememberToggle')
+      cb.checked = true
+      onRememberChange(cb)
+    }
+  })()
+
   // Apply saved theme
   const t = localStorage.getItem('fs-theme') || 'system'
   if (t === 'system') { if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme','dark') }
@@ -181,6 +218,13 @@
       const r = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
       const d = await r.json()
       if (!r.ok) { err.textContent = d.error || 'Login failed'; err.classList.add('show'); return }
+      if (document.getElementById('rememberToggle').checked) {
+        localStorage.setItem('fs-saved-email', email)
+        localStorage.setItem('fs-saved-password', password)
+      } else {
+        localStorage.removeItem('fs-saved-email')
+        localStorage.removeItem('fs-saved-password')
+      }
       if (d.requiresTOTP) {
         _pendingToken = d.pendingToken
         document.getElementById('credentialsForm').style.display = 'none'
