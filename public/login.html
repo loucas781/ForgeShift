@@ -38,7 +38,7 @@
         <label class="form-label">Password</label>
         <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div id="rememberRow" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="position:relative;flex-shrink:0">
             <input type="checkbox" id="rememberToggle" style="appearance:none;-webkit-appearance:none;width:36px;height:20px;border-radius:10px;background:var(--border);cursor:pointer;transition:background .2s;display:block" onchange="onRememberChange(this)">
@@ -123,6 +123,13 @@
       const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
       document.getElementById('versionFooter').innerHTML =
         `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
+      // Disable "remember login details" on non-production builds
+      if (d.appEnv === 'development') {
+        document.getElementById('rememberRow').style.display = 'none'
+        document.getElementById('rememberWarning').style.display = 'none'
+        localStorage.removeItem('fs-saved-email')
+        localStorage.removeItem('fs-saved-password')
+      }
       // Update forgot-password link hint based on SMTP
       const fpLink = document.getElementById('forgotPwLink')
       if (fpLink && !d.smtpEnabled) {
