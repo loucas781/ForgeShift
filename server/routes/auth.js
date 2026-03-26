@@ -111,6 +111,15 @@ router.post('/login', async (req, res) => {
     const { ok: pwOk, needsRehash } = await comparePassword(password, user.password)
     if (!pwOk) return res.status(401).json({ error: 'Invalid email or password.' })
     if (needsRehash) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(await hashPassword(password), user.id)
+    // If 2FA is enabled, return a short-lived pending token instead of a full session
+    if (user.totp_enabled) {
+      const pendingToken = jwt.sign(
+        { totp_pending: true, uid: user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: '5m' }
+      )
+      return res.json({ ok: true, requiresTOTP: true, pendingToken })
+    }
     const { password: _, ...pub } = user
     const sessionId = createSession(req, pub.id)
     res.cookie('token', makeToken(pub, sessionId), cookieOpts())
@@ -118,6 +127,34 @@ router.post('/login', async (req, res) => {
     audit(pub.id, 'user.login', 'user', pub.id, pub.name, { ip, ua: req.headers['user-agent'] })
     res.json({ ok: true, user: pub })
   } catch (err) { logger.error('login:', err.message); res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── POST /api/auth/2fa/login ───────────────────────────────────────────────────
+router.post('/2fa/login', async (req, res) => {
+  try {
+    const { pendingToken, code } = req.body
+    if (!pendingToken || !code)
+      return res.status(400).json({ error: 'Pending token and code are required.' })
+    let payload
+    try {
+      payload = jwt.verify(pendingToken, process.env.JWT_SECRET)
+    } catch {
+      return res.status(401).json({ error: 'Session expired. Please sign in again.' })
+    }
+    if (!payload.totp_pending || !payload.uid)
+      return res.status(401).json({ error: 'Invalid token.' })
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.uid)
+    if (!user || !user.totp_enabled || !user.totp_secret)
+      return res.status(401).json({ error: 'Invalid token.' })
+    const isValid = authenticator.verify({ token: code.replace(/\s/g, ''), secret: user.totp_secret })
+    if (!isValid) return res.status(401).json({ error: 'Invalid authentication code.' })
+    const { password: _, ...pub } = user
+    const sessionId = createSession(req, pub.id)
+    res.cookie('token', makeToken(pub, sessionId), cookieOpts())
+    const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
+    audit(pub.id, 'user.login', 'user', pub.id, pub.name, { ip, ua: req.headers['user-agent'] })
+    res.json({ ok: true, user: pub })
+  } catch (err) { logger.error('2fa/login:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
 // ── POST /api/auth/logout ──────────────────────────────────────────────────────

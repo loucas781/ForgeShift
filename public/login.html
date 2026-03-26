@@ -29,19 +29,30 @@
 
     <div class="auth-error" id="loginError"></div>
 
-    <div class="form-group">
-      <label class="form-label">Email address</label>
-      <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
-    </div>
-    <div class="form-group">
-      <label class="form-label" style="display:flex;justify-content:space-between;">
-        Password
-        <a href="/forgot-password.html" id="forgotPwLink" style="font-weight:400;font-size:12px;">Forgot password?</a>
-      </label>
-      <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
+    <div id="credentialsForm">
+      <div class="form-group">
+        <label class="form-label">Email address</label>
+        <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;justify-content:space-between;">
+          Password
+          <a href="/forgot-password.html" id="forgotPwLink" style="font-weight:400;font-size:12px;">Forgot password?</a>
+        </label>
+        <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
     </div>
 
-    <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
+    <div id="totpForm" style="display:none">
+      <p style="font-size:14px;color:var(--text-2);margin-bottom:16px">Enter the 6-digit code from your authenticator app.</p>
+      <div class="form-group">
+        <label class="form-label">Authentication code</label>
+        <input type="text" class="form-input" id="totpCode" placeholder="000000" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      </div>
+      <button class="btn btn-primary auth-btn" id="totpBtn" onclick="doTOTPLogin()">Verify</button>
+      <button type="button" style="width:100%;margin-top:8px;background:none;border:none;color:var(--text-3);font-size:13px;cursor:pointer;padding:4px 0" onclick="cancelTOTP()">Back to sign in</button>
+    </div>
 
     <div id="passkeyDivider" style="display:none;align-items:center;gap:10px;margin:16px 0">
       <hr style="flex:1;border:none;border-top:1px solid var(--border)">
@@ -89,7 +100,11 @@
   }
   init()
 
-  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return
+    if (document.getElementById('totpForm').style.display !== 'none') doTOTPLogin()
+    else doLogin()
+  })
 
   function _b64url(str) {
     const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
@@ -152,6 +167,8 @@
     }
   }
 
+  let _pendingToken = null
+
   async function doLogin() {
     const btn = document.getElementById('loginBtn')
     const err = document.getElementById('loginError')
@@ -164,6 +181,13 @@
       const r = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
       const d = await r.json()
       if (!r.ok) { err.textContent = d.error || 'Login failed'; err.classList.add('show'); return }
+      if (d.requiresTOTP) {
+        _pendingToken = d.pendingToken
+        document.getElementById('credentialsForm').style.display = 'none'
+        document.getElementById('totpForm').style.display = ''
+        document.getElementById('totpCode').focus()
+        return
+      }
       window.location.href = '/'
     } catch {
       err.textContent = 'Connection error — please try again'
@@ -171,6 +195,34 @@
     } finally {
       btn.disabled = false; btn.textContent = 'Sign in'
     }
+  }
+
+  async function doTOTPLogin() {
+    const btn = document.getElementById('totpBtn')
+    const err = document.getElementById('loginError')
+    const code = document.getElementById('totpCode').value.trim()
+    err.classList.remove('show')
+    if (!code) { err.textContent = 'Please enter your authentication code.'; err.classList.add('show'); return }
+    btn.disabled = true; btn.textContent = 'Verifying…'
+    try {
+      const r = await fetch('/api/auth/2fa/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pendingToken: _pendingToken, code }) })
+      const d = await r.json()
+      if (!r.ok) { err.textContent = d.error || 'Verification failed'; err.classList.add('show'); return }
+      window.location.href = '/'
+    } catch {
+      err.textContent = 'Connection error — please try again'
+      err.classList.add('show')
+    } finally {
+      btn.disabled = false; btn.textContent = 'Verify'
+    }
+  }
+
+  function cancelTOTP() {
+    _pendingToken = null
+    document.getElementById('totpForm').style.display = 'none'
+    document.getElementById('credentialsForm').style.display = ''
+    document.getElementById('loginError').classList.remove('show')
+    document.getElementById('totpCode').value = ''
   }
 </script>
 </body>
