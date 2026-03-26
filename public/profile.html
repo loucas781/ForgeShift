@@ -196,7 +196,8 @@ async function init() {
   renderAvatar(u)
   document.getElementById('profileName').textContent = u.name
   document.getElementById('profileEmail').textContent = u.email
-  document.getElementById('profileRole').textContent = u.role
+  const roleLabels = { admin: 'Admin', manager: 'Manager', shift_lead: 'Shift Lead', member: 'Member' }
+  document.getElementById('profileRole').textContent = roleLabels[u.role] || u.role
   document.getElementById('editName').value = u.name
 
   profileColour = u.color || '#4f46e5'

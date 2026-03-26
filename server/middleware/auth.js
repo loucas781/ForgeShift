@@ -59,11 +59,18 @@ function requireAdmin(req, res, next) {
   next()
 }
 
-// Passes for admin or shift_lead
+// Passes for admin or manager
+function requireAdminOrManager(req, res, next) {
+  if (!req.user || !['admin', 'manager'].includes(req.user.role))
+    return res.status(403).json({ error: 'Admin or manager only' })
+  next()
+}
+
+// Passes for admin, manager, or shift_lead
 function requireShiftLead(req, res, next) {
-  if (!req.user || !['admin', 'shift_lead'].includes(req.user.role))
+  if (!req.user || !['admin', 'manager', 'shift_lead'].includes(req.user.role))
     return res.status(403).json({ error: 'Insufficient permissions' })
   next()
 }
 
-module.exports = { requireAuth, optionalAuth, requireAdmin, requireShiftLead }
+module.exports = { requireAuth, optionalAuth, requireAdmin, requireAdminOrManager, requireShiftLead }

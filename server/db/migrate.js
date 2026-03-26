@@ -363,6 +363,40 @@ function migrateAdditive() {
     }
   }
 
+  // Expand role CHECK to include manager
+  const tableSQL3 = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get()
+  if (tableSQL3 && !tableSQL3.sql.includes('manager')) {
+    db.pragma('foreign_keys = OFF')
+    try {
+      db.exec(`
+        BEGIN;
+        CREATE TABLE users_new (
+          id           TEXT PRIMARY KEY,
+          name         TEXT NOT NULL,
+          email        TEXT NOT NULL UNIQUE,
+          password     TEXT NOT NULL,
+          initials     TEXT NOT NULL,
+          color        TEXT NOT NULL DEFAULT '#0052cc',
+          avatar       TEXT,
+          role         TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','manager','shift_lead','member')),
+          is_active    INTEGER NOT NULL DEFAULT 1,
+          totp_secret  TEXT,
+          totp_enabled INTEGER NOT NULL DEFAULT 0,
+          prefs        TEXT NOT NULL DEFAULT '{}',
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          token_version INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at, COALESCE(token_version,0) FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
+        COMMIT;
+      `)
+      console.log('✓ Expanded users.role CHECK to include manager')
+    } finally {
+      db.pragma('foreign_keys = ON')
+    }
+  }
+
   // team_owned_by: track which shift_lead owns a team
   const teamCols = db.prepare("PRAGMA table_info(teams)").all().map(c => c.name)
   if (!teamCols.includes('owned_by')) {

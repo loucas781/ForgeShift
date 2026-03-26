@@ -9,7 +9,7 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 
 // Can this user rename or delete the team?
 function canManageTeam(user, team) {
-  if (user.role === 'admin') return true
+  if (user.role === 'admin' || user.role === 'manager') return true
   if (user.role === 'shift_lead') return team.owned_by === user.id || team.created_by === user.id
   return false
 }
@@ -17,7 +17,7 @@ function canManageTeam(user, team) {
 // Can this user add/remove members from the team?
 // Shift leads can manage members of any team they belong to (owned or assigned).
 function canManageMembers(user, team, db) {
-  if (user.role === 'admin') return true
+  if (user.role === 'admin' || user.role === 'manager') return true
   if (user.role === 'shift_lead') {
     if (team.owned_by === user.id || team.created_by === user.id) return true
     const row = db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
@@ -32,7 +32,7 @@ router.get('/', requireAuth, (req, res) => {
   const { role, id: userId } = req.user
   let teams
 
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'manager') {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
@@ -86,15 +86,12 @@ router.post('/', requireAuth, requireShiftLead, (req, res) => {
   const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
 
-  // Shift leads can only create a team if they're not already in one
+  // Shift leads can only create a team if they don't already own one
   if (req.user.role === 'shift_lead') {
     const existing = db.prepare(`
-      SELECT 1 FROM teams t
-      LEFT JOIN team_members tm ON tm.team_id = t.id
-      WHERE t.owned_by = ? OR t.created_by = ? OR tm.user_id = ?
-      LIMIT 1
-    `).get(req.user.id, req.user.id, req.user.id)
-    if (existing) return res.status(400).json({ error: 'You are already in a team.' })
+      SELECT 1 FROM teams WHERE owned_by = ? OR created_by = ? LIMIT 1
+    `).get(req.user.id, req.user.id)
+    if (existing) return res.status(400).json({ error: 'You already own a team.' })
   }
   const count = db.prepare('SELECT COUNT(*) AS c FROM teams').get().c
   const teamColor = color || COLORS[count % COLORS.length]
@@ -144,9 +141,9 @@ router.put('/:id/members', requireAuth, requireShiftLead, (req, res) => {
 
   let resolvedIds = user_ids
   if (req.user.role === 'shift_lead' && user_ids.length > 0) {
-    // Only allow members (and themselves) — not other admins/shift_leads
+    // Only allow members and shift_leads (and themselves) — not admins/managers
     const safePlaceholders = user_ids.map(() => '?').join(',')
-    const allowed = db.prepare(`SELECT id FROM users WHERE id IN (${safePlaceholders}) AND role = 'member'`).all(...user_ids).map(u => u.id)
+    const allowed = db.prepare(`SELECT id FROM users WHERE id IN (${safePlaceholders}) AND role IN ('member','shift_lead')`).all(...user_ids).map(u => u.id)
     if (!allowed.includes(req.user.id)) allowed.push(req.user.id)
     resolvedIds = allowed
   }
@@ -165,8 +162,8 @@ router.post('/:id/members/:userId', requireAuth, requireShiftLead, (req, res) =>
   if (!canManageMembers(req.user, team, db)) return res.status(403).json({ error: 'You can only manage members of your own teams' })
   const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(req.params.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
-  if (req.user.role === 'shift_lead' && user.role !== 'member' && user.id !== req.user.id)
-    return res.status(403).json({ error: 'Shift leads can only add members to teams' })
+  if (req.user.role === 'shift_lead' && (user.role === 'admin' || user.role === 'manager') && user.id !== req.user.id)
+    return res.status(403).json({ error: 'Shift leads cannot add admins or managers to teams' })
   if (req.user.role === 'shift_lead') {
     const alreadyInTeam = db.prepare('SELECT 1 FROM team_members WHERE user_id = ? AND team_id != ?').get(req.params.userId, req.params.id)
     if (alreadyInTeam) return res.status(400).json({ error: 'That member is already assigned to another team. Only an admin can move members between teams.' })
@@ -182,6 +179,11 @@ router.delete('/:id/members/:userId', requireAuth, requireShiftLead, (req, res) 
   if (!canManageMembers(req.user, team, db)) return res.status(403).json({ error: 'You can only manage members of your own teams' })
   if (req.user.role === 'shift_lead' && req.params.userId === req.user.id)
     return res.status(403).json({ error: 'You cannot remove yourself from the team.' })
+  if (req.user.role === 'shift_lead') {
+    const targetUser = db.prepare('SELECT role FROM users WHERE id = ?').get(req.params.userId)
+    if (targetUser && targetUser.role === 'shift_lead')
+      return res.status(403).json({ error: 'Shift leads cannot remove other shift leads. Contact a manager or admin.' })
+  }
   db.prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?').run(req.params.id, req.params.userId)
   res.json({ ok: true })
 })
