@@ -619,7 +619,7 @@ async function loadShifts() {
 
   if (role === 'member') {
     params.set('user_id', cfg.user.id)
-  } else if (role === 'admin' || role === 'shift_lead') {
+  } else if (role === 'admin' || role === 'manager' || role === 'shift_lead') {
     if (filterVal === '') {
       // No filter selected — show own shifts only
       params.set('user_id', cfg.user.id)

@@ -323,7 +323,7 @@ router.post('/invite', requireAuth, async (req, res) => {
     const tempPassword = crypto.randomBytes(8).toString('base64url') + 'A1!'
     const id = uuidv4()
     db.prepare('INSERT INTO users (id, name, email, password, initials, color, role) VALUES (?,?,?,?,?,?,?)')
-      .run(id, name.trim(), norm, await hashPassword(tempPassword), getInitials(name.trim()), COLORS[count % COLORS.length], ['admin','shift_lead','member'].includes(role) ? role : 'member')
+      .run(id, name.trim(), norm, await hashPassword(tempPassword), getInitials(name.trim()), COLORS[count % COLORS.length], ['admin','manager','shift_lead','member'].includes(role) ? role : 'member')
 
     // Send invite email if SMTP is configured
     const smtp = emailSvc.getSmtpConfig()

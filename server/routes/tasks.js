@@ -140,8 +140,8 @@ router.get('/assignments', requireAuth, (req, res) => {
     if (end)     { sql += ' AND a.date <= ?'; params.push(end) }
     if (user_id) { sql += ' AND a.user_id = ?'; params.push(user_id) }
 
-    if (req.user.role === 'admin') {
-      // no extra filter — admins see all assignments, including individual user views
+    if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // no extra filter — admins and managers see all assignments
     } else if (req.user.role === 'shift_lead') {
       // Always constrain to team scope whether or not a specific user_id was requested.
       const scope = getShiftLeadScope(req.user.id)
