@@ -9,6 +9,7 @@ const fs      = require('fs')
 const path    = require('path')
 const multer  = require('multer')
 const logger  = require('../utils/logger')
+const { loadOverrides } = require('../utils/overrides')
 
 // ── Avatar upload storage ──────────────────────────────────────────────────────
 const AVATARS_DIR = path.join(__dirname, '../../public/uploads/avatars')
@@ -27,11 +28,8 @@ const avatarUpload = multer({
   },
 })
 
-function loadOverrides() {
-  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
-}
 function getInitials(name) {
-  return name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
@@ -120,7 +118,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req, res) => {
     const vals    = []
     if (name?.trim())       { updates.push('name = ?, initials = ?'); vals.push(name.trim(), getInitials(name.trim())) }
     if (email?.trim())      { updates.push('email = ?'); vals.push(email.trim().toLowerCase()) }
-    if (role)               { updates.push('role = ?'); vals.push(['admin','shift_lead','member'].includes(role) ? role : 'member') }
+    if (role)               { updates.push('role = ?'); vals.push(['admin','manager','shift_lead','member'].includes(role) ? role : 'member') }
     if (is_active !== undefined) { updates.push('is_active = ?'); vals.push(is_active ? 1 : 0) }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' })
 

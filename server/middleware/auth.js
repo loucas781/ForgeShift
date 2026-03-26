@@ -2,6 +2,21 @@
 const jwt = require('jsonwebtoken')
 const db  = require('../db/connection')
 
+// ── Inactivity timeout (cached, refreshed every 30s) ──────────────────────────
+let _inactivityCache = null
+let _inactivityCachedAt = 0
+function getInactivityTimeoutMs() {
+  if (Date.now() - _inactivityCachedAt < 30000) return _inactivityCache
+  try {
+    const { loadOverrides } = require('../utils/overrides')
+    const ov = loadOverrides()
+    const mins = ov.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(ov.INACTIVITY_TIMEOUT_MINUTES) : 15
+    _inactivityCache = mins > 0 ? mins * 60 * 1000 : 0
+  } catch { _inactivityCache = 15 * 60 * 1000 }
+  _inactivityCachedAt = Date.now()
+  return _inactivityCache
+}
+
 function clearCookieOpts() {
   const secure = process.env.COOKIE_SECURE === 'true'
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
@@ -31,8 +46,16 @@ function requireAuth(req, res, next) {
         if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
         return res.redirect('/login.html')
       }
-      // Only write last_used_at if more than 60 seconds have passed (avoid excessive writes)
+      // Check inactivity timeout (server-side enforcement, client handles UX)
       const lastUsed = new Date(sess.last_used_at).getTime()
+      const inactivityMs = getInactivityTimeoutMs()
+      if (inactivityMs > 0 && Date.now() - lastUsed > inactivityMs) {
+        db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.user.sid)
+        res.clearCookie('token', clearCookieOpts())
+        if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Signed out due to inactivity', code: 'INACTIVITY_TIMEOUT' })
+        return res.redirect('/login.html?reason=inactivity')
+      }
+      // Only write last_used_at if more than 60 seconds have passed (avoid excessive writes)
       if (Date.now() - lastUsed > 60000) {
         db.prepare("UPDATE user_sessions SET last_used_at = datetime('now') WHERE id = ?").run(req.user.sid)
       }
@@ -59,11 +82,18 @@ function requireAdmin(req, res, next) {
   next()
 }
 
-// Passes for admin or shift_lead
+// Passes for admin or manager
+function requireAdminOrManager(req, res, next) {
+  if (!req.user || !['admin', 'manager'].includes(req.user.role))
+    return res.status(403).json({ error: 'Admin or manager only' })
+  next()
+}
+
+// Passes for admin, manager, or shift_lead
 function requireShiftLead(req, res, next) {
-  if (!req.user || !['admin', 'shift_lead'].includes(req.user.role))
+  if (!req.user || !['admin', 'manager', 'shift_lead'].includes(req.user.role))
     return res.status(403).json({ error: 'Insufficient permissions' })
   next()
 }
 
-module.exports = { requireAuth, optionalAuth, requireAdmin, requireShiftLead }
+module.exports = { requireAuth, optionalAuth, requireAdmin, requireAdminOrManager, requireShiftLead, clearCookieOpts }

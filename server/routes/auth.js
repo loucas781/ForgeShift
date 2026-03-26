@@ -5,17 +5,12 @@ const jwt     = require('jsonwebtoken')
 const crypto  = require('crypto')
 const { v4: uuidv4 } = require('uuid')
 const db      = require('../db/connection')
-const { requireAuth } = require('../middleware/auth')
+const { requireAuth, clearCookieOpts } = require('../middleware/auth')
 const audit   = require('../audit')
 const emailSvc = require('../email')
 const { authenticator } = require('otplib')
-const fs      = require('fs')
-const path    = require('path')
 const logger  = require('../utils/logger')
-
-function loadOverrides() {
-  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
-}
+const { loadOverrides } = require('../utils/overrides')
 function hashToken(raw) {
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
@@ -27,10 +22,6 @@ function cookieOpts() {
   const hours  = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
   const secure = process.env.COOKIE_SECURE === 'true'
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', maxAge: hours * 3600000, path: '/' }
-}
-function clearCookieOpts() {
-  const secure = process.env.COOKIE_SECURE === 'true'
-  return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
 }
 function makeToken(user, sessionId) {
   return jwt.sign(
@@ -214,6 +205,76 @@ router.patch('/profile', requireAuth, async (req, res) => {
   } catch (err) { logger.error('profile:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
+// ── POST /api/auth/email-change/request ───────────────────────────────────────
+// Sends a verification link to the new email address.
+// Requires SMTP — returns 400 if not configured (UI should show "contact admin").
+router.post('/email-change/request', requireAuth, async (req, res) => {
+  try {
+    const smtp = emailSvc.getSmtpConfig()
+    if (!smtp.enabled) return res.status(400).json({ error: 'Email changes require SMTP. Contact your administrator.' })
+
+    const { newEmail } = req.body
+    if (!newEmail?.trim()) return res.status(400).json({ error: 'New email address is required.' })
+    const norm = newEmail.trim().toLowerCase()
+    if (norm.length > 254) return res.status(400).json({ error: 'Email address is too long.' })
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(norm)) return res.status(400).json({ error: 'Please enter a valid email address.' })
+
+    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(req.user.id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    if (norm === user.email) return res.status(400).json({ error: 'This is already your current email address.' })
+    if (db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(norm, user.id))
+      return res.status(409).json({ error: 'This email address is already in use.' })
+
+    // Invalidate any previous pending requests for this user
+    db.prepare('UPDATE email_change_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(user.id)
+
+    const rawToken  = crypto.randomBytes(32).toString('hex')
+    const tokenHash = hashToken(rawToken)
+    const expires   = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour
+    db.prepare('INSERT INTO email_change_tokens (id, user_id, new_email, token, expires_at) VALUES (?,?,?,?,?)')
+      .run(uuidv4(), user.id, norm, tokenHash, expires)
+
+    const origin    = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`
+    const verifyUrl = `${origin}/api/auth/email-change/confirm?token=${rawToken}`
+    await emailSvc.sendEmailChangeVerification({ to: norm, name: user.name, verifyUrl })
+
+    audit(user.id, 'user.email_change_requested', 'user', user.id, user.name, { newEmail: norm })
+    res.json({ ok: true })
+  } catch (err) { logger.error('email-change/request:', err.message); res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── GET /api/auth/email-change/confirm ────────────────────────────────────────
+// Validates the token from the verification email, updates the user's email,
+// then redirects to profile with a success flag.
+router.get('/email-change/confirm', async (req, res) => {
+  const { token } = req.query
+  const failUrl = '/profile.html?emailChangeFailed=1'
+  if (!token) return res.redirect(failUrl)
+  try {
+    const tokenHash = hashToken(token)
+    const row = db.prepare(`
+      SELECT e.id, e.user_id, e.new_email, e.used, e.expires_at, u.name, u.email AS old_email
+      FROM email_change_tokens e JOIN users u ON u.id = e.user_id
+      WHERE e.token = ?
+    `).get(tokenHash)
+
+    if (!row || row.used || new Date(row.expires_at) < new Date()) return res.redirect(failUrl)
+
+    // Check new_email is still available (could have been taken since request)
+    if (db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(row.new_email, row.user_id))
+      return res.redirect(failUrl + '&reason=taken')
+
+    db.prepare('UPDATE email_change_tokens SET used = 1 WHERE id = ?').run(row.id)
+    db.prepare('UPDATE users SET email = ? WHERE id = ?').run(row.new_email, row.user_id)
+    // Invalidate all existing sessions so the new email is reflected everywhere
+    db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(row.user_id)
+    db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(row.user_id)
+
+    audit(row.user_id, 'user.email_changed', 'user', row.user_id, row.name, { from: row.old_email, to: row.new_email })
+    res.redirect('/profile.html?emailChanged=1')
+  } catch (err) { logger.error('email-change/confirm:', err.message); res.redirect(failUrl) }
+})
+
 // ── POST /api/auth/forgot-password ────────────────────────────────────────────
 // Never leaks the token in the response. Token stored for admin to retrieve.
 router.post('/forgot-password', async (req, res) => {
@@ -323,7 +384,7 @@ router.post('/invite', requireAuth, async (req, res) => {
     const tempPassword = crypto.randomBytes(8).toString('base64url') + 'A1!'
     const id = uuidv4()
     db.prepare('INSERT INTO users (id, name, email, password, initials, color, role) VALUES (?,?,?,?,?,?,?)')
-      .run(id, name.trim(), norm, await hashPassword(tempPassword), getInitials(name.trim()), COLORS[count % COLORS.length], ['admin','shift_lead','member'].includes(role) ? role : 'member')
+      .run(id, name.trim(), norm, await hashPassword(tempPassword), getInitials(name.trim()), COLORS[count % COLORS.length], ['admin','manager','shift_lead','member'].includes(role) ? role : 'member')
 
     // Send invite email if SMTP is configured
     const smtp = emailSvc.getSmtpConfig()

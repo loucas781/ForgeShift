@@ -414,6 +414,103 @@ async function doLogout() {
   window.location.href = '/login.html'
 }
 
+// ── Inactivity timeout watcher ─────────────────────────────────────────────────
+;(function () {
+  const WARN_BEFORE_MS = 60 * 1000   // show warning 60s before logout
+  const MIN_WARN_MS    = 20 * 1000   // minimum warning window
+
+  let timeoutMs       = 0
+  let lastActivity    = Date.now()
+  let warnTimer       = null
+  let logoutTimer     = null
+  let countdownIv     = null
+  let warningShown    = false
+
+  function scheduleTimers() {
+    clearTimeout(warnTimer)
+    clearTimeout(logoutTimer)
+    if (!timeoutMs) return
+    const warnIn = timeoutMs - Math.max(Math.min(WARN_BEFORE_MS, timeoutMs - MIN_WARN_MS), MIN_WARN_MS)
+    warnTimer   = setTimeout(showWarning, Math.max(warnIn, 0))
+    logoutTimer = setTimeout(performLogout, timeoutMs)
+  }
+
+  function onActivity() {
+    if (warningShown) return   // only the "Stay signed in" button dismisses the warning
+    lastActivity = Date.now()
+    scheduleTimers()
+  }
+
+  function showWarning() {
+    warningShown = true
+    const warnMs = Math.max(Math.min(WARN_BEFORE_MS, timeoutMs - MIN_WARN_MS), MIN_WARN_MS)
+    let secsLeft = Math.ceil(warnMs / 1000)
+
+    let modal = document.getElementById('fs-inactivity-modal')
+    if (!modal) {
+      modal = document.createElement('div')
+      modal.id = 'fs-inactivity-modal'
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center'
+      modal.innerHTML = `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:28px 32px;max-width:360px;width:90%;text-align:center;box-shadow:var(--shadow-xl)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <h3 style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text)">Still there?</h3>
+          <p style="font-size:13px;color:var(--text-2);margin-bottom:4px;line-height:1.6">
+            You'll be signed out in <strong id="fs-inactivity-countdown" style="color:var(--text)"></strong> due to inactivity.
+          </p>
+          <button id="fs-inactivity-stay" class="btn btn-primary" style="margin-top:18px;width:100%">Stay signed in</button>
+        </div>`
+      document.body.appendChild(modal)
+      document.getElementById('fs-inactivity-stay').addEventListener('click', keepAlive)
+    } else {
+      modal.style.display = 'flex'
+    }
+
+    function tick() {
+      const el = document.getElementById('fs-inactivity-countdown')
+      if (el) el.textContent = secsLeft >= 60 ? `${Math.ceil(secsLeft / 60)} min` : `${secsLeft}s`
+    }
+    tick()
+    clearInterval(countdownIv)
+    countdownIv = setInterval(() => { if (--secsLeft <= 0) clearInterval(countdownIv); else tick() }, 1000)
+  }
+
+  function keepAlive() {
+    warningShown = false
+    clearInterval(countdownIv)
+    clearTimeout(logoutTimer)
+    const modal = document.getElementById('fs-inactivity-modal')
+    if (modal) modal.style.display = 'none'
+    lastActivity = Date.now()
+    scheduleTimers()
+    // Ping server to refresh last_used_at
+    fetch('/api/auth/me').catch(() => {})
+  }
+
+  async function performLogout() {
+    clearInterval(countdownIv)
+    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
+    window.location.href = '/login.html?reason=inactivity'
+  }
+
+  const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click']
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    events.forEach(e => document.addEventListener(e, onActivity, { passive: true }))
+    try {
+      const r = await fetch('/api/config')
+      if (!r.ok) return
+      const data = await r.json()
+      if (!data.user) return  // not authenticated
+      const mins = data.inactivityTimeout
+      if (mins && mins > 0) {
+        timeoutMs = mins * 60 * 1000
+        scheduleTimers()
+      }
+    } catch {}
+  })
+})()
+
 // ── API helpers ────────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   const r = await fetch(path, {

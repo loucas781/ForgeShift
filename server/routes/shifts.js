@@ -32,8 +32,8 @@ router.get('/', requireAuth, (req, res) => {
     if (end)     { sql += ' AND s.date <= ?'; params.push(end) }
     if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
 
-    if (req.user.role === 'admin') {
-      // no extra filter — admins see all shifts, including individual user views
+    if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // no extra filter — admins and managers see all shifts
     } else if (req.user.role === 'shift_lead') {
       // Always constrain to team scope whether or not a specific user_id was requested.
       // This prevents a shift lead querying an out-of-scope user directly via the API.
@@ -65,7 +65,7 @@ router.get('/export/csv', requireAuth, (req, res) => {
   try {
     const { start, end } = req.query
     let user_id = req.user.id
-    if (req.user.role === 'admin' && req.query.user_id) {
+    if ((req.user.role === 'admin' || req.user.role === 'manager') && req.query.user_id) {
       user_id = req.query.user_id === 'all' ? null : req.query.user_id
     } else if (req.user.role === 'shift_lead' && req.query.user_id) {
       const scope = getShiftLeadScope(req.user.id)
@@ -83,7 +83,7 @@ router.get('/export/csv', requireAuth, (req, res) => {
     if (start)   { sql += ' AND s.date >= ?'; params.push(start) }
     if (end)     { sql += ' AND s.date <= ?'; params.push(end) }
     if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
-    else if (req.user.role !== 'admin') { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
+    else if (req.user.role !== 'admin' && req.user.role !== 'manager') { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
     sql += ' ORDER BY s.date, u.name'
 
     const rows = db.prepare(sql).all(...params)
@@ -116,7 +116,7 @@ router.get('/:id', requireAuth, (req, res) => {
     WHERE s.id = ?
   `).get(req.params.id)
   if (!shift) return res.status(404).json({ error: 'Shift not found' })
-  if (req.user.role === 'admin') { return res.json(shift) }
+  if (req.user.role === 'admin' || req.user.role === 'manager') { return res.json(shift) }
   if (req.user.role === 'shift_lead') {
     const scope = getShiftLeadScope(req.user.id)
     if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
@@ -129,7 +129,7 @@ router.get('/:id', requireAuth, (req, res) => {
 // ── POST /api/shifts ──────────────────────────────────────────────────────────
 router.post('/', requireAuth, (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin'
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'manager'
     const isShiftLead = req.user.role === 'shift_lead'
     const { user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
 
@@ -191,7 +191,7 @@ router.put('/:id', requireAuth, (req, res) => {
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     if (!shift) return res.status(404).json({ error: 'Shift not found' })
 
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'manager') {
       // full access
     } else if (req.user.role === 'shift_lead') {
       const scope = getShiftLeadScope(req.user.id)
@@ -224,7 +224,7 @@ router.delete('/:id', requireAuth, (req, res) => {
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     if (!shift) return res.status(404).json({ error: 'Shift not found' })
 
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'manager') {
       // full access
     } else if (req.user.role === 'shift_lead') {
       const scope = getShiftLeadScope(req.user.id)

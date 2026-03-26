@@ -269,8 +269,8 @@
 'use strict'
 
 let cfg = null
-// Helper: true for admin and shift_lead (both can manage shifts/assignments)
-function canManage() { return cfg && (cfg.user.role === 'admin' || cfg.user.role === 'shift_lead') }
+// Helper: true for admin, manager, and shift_lead (all can manage shifts/assignments)
+function canManage() { return cfg && (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') }
 let prefs = null
 let view = 'month'
 let currentDate = new Date()
@@ -306,7 +306,7 @@ async function init() {
 
   view = prefs.defaultView || 'month'
 
-  if (cfg.user.role === 'admin' || cfg.user.role === 'shift_lead') {
+  if (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') {
     document.getElementById('userFilterWrap').style.display = 'block'
     document.getElementById('adminUserField').style.display = 'block'
   }
@@ -351,7 +351,7 @@ async function loadUsers() {
   const allUsers = await api('/api/users')
   if (cfg.user.role === 'shift_lead') {
     // Get team members from the shift_lead's own teams (loaded in loadTeams)
-    // We'll populate after teams load; for now load all active members + self
+    // We'll populate after teams load; for now load all active members + leads
     users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.role === 'shift_lead'))
   } else {
     users = allUsers
@@ -619,7 +619,7 @@ async function loadShifts() {
 
   if (role === 'member') {
     params.set('user_id', cfg.user.id)
-  } else if (role === 'admin' || role === 'shift_lead') {
+  } else if (role === 'admin' || role === 'manager' || role === 'shift_lead') {
     if (filterVal === '') {
       // No filter selected — show own shifts only
       params.set('user_id', cfg.user.id)

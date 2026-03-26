@@ -66,6 +66,12 @@
           </div>
         </div>
 
+        <!-- Email Address -->
+        <div class="card" id="emailCard">
+          <div class="card-header"><h3 class="card-title">Email Address</h3></div>
+          <div class="card-body" id="emailCardBody">Loading…</div>
+        </div>
+
         <!-- Change Password -->
         <div class="card">
           <div class="card-header"><h3 class="card-title">Change Password</h3></div>
@@ -196,14 +202,27 @@ async function init() {
   renderAvatar(u)
   document.getElementById('profileName').textContent = u.name
   document.getElementById('profileEmail').textContent = u.email
-  document.getElementById('profileRole').textContent = u.role
+  const roleLabels = { admin: 'Admin', manager: 'Manager', shift_lead: 'Shift Lead', member: 'Member' }
+  document.getElementById('profileRole').textContent = roleLabels[u.role] || u.role
   document.getElementById('editName').value = u.name
 
   profileColour = u.color || '#4f46e5'
   const picker = document.getElementById('profileColourPicker')
   renderColourPicker(picker, profileColour, v => { profileColour = v })
 
+  renderEmailCard(u, cfg.smtpEnabled)
   loadIcal()
+
+  // Show feedback toasts for email change flow
+  const params = new URLSearchParams(window.location.search)
+  if (params.has('emailChanged')) {
+    toast('Email address updated successfully. Please sign in again.', 'success')
+    history.replaceState(null, '', '/profile.html')
+  } else if (params.has('emailChangeFailed')) {
+    const reason = params.get('reason')
+    toast(reason === 'taken' ? 'That email address is already in use.' : 'Email verification link is invalid or expired.', 'error')
+    history.replaceState(null, '', '/profile.html')
+  }
 }
 
 async function uploadAvatar(input) {
@@ -233,6 +252,42 @@ async function removeAvatar() {
     renderAvatar(cfg.user)
     _config = null
     toast('Photo removed', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function renderEmailCard(u, smtpEnabled) {
+  const body = document.getElementById('emailCardBody')
+  if (!smtpEnabled) {
+    body.innerHTML = `
+      <p style="font-size:13px;color:var(--text-2);margin:0 0 8px">
+        <strong>Current email:</strong> ${u.email}
+      </p>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0;color:var(--text-3)"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+        <span style="font-size:13px;color:var(--text-2)">To update your email address, please contact your administrator.</span>
+      </div>`
+    return
+  }
+  body.innerHTML = `
+    <p style="font-size:13px;color:var(--text-2);margin:0 0 16px">
+      <strong>Current email:</strong> ${u.email}
+    </p>
+    <div class="form-group">
+      <label class="form-label">New email address</label>
+      <input type="email" class="form-input" id="newEmailInput" placeholder="name@example.com" autocomplete="email">
+      <p class="form-hint">A verification link will be sent to the new address. Your email won't change until you click it.</p>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="requestEmailChange()">Send verification email</button>`
+}
+
+async function requestEmailChange() {
+  const input = document.getElementById('newEmailInput')
+  const newEmail = input?.value.trim()
+  if (!newEmail) { toast('Please enter a new email address', 'error'); return }
+  try {
+    await api('/api/auth/email-change/request', { method: 'POST', body: { newEmail } })
+    toast('Verification email sent — check your inbox', 'success')
+    if (input) input.value = ''
   } catch (err) { toast(err.message, 'error') }
 }
 

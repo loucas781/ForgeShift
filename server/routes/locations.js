@@ -5,6 +5,7 @@ const db     = require('../db/connection')
 const { requireAuth, requireAdmin } = require('../middleware/auth')
 const audit  = require('../audit')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
+const logger = require('../utils/logger')
 
 // ── GET /api/locations ────────────────────────────────────────────────────────
 // Admin: all locations with member_count + members array.
@@ -30,7 +31,7 @@ router.get('/', requireAuth, (req, res) => {
     `).all(req.user.id)
     res.json(locs)
   } catch (err) {
-    console.error('locations get:', err.message)
+    logger.error('locations get:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -99,7 +100,7 @@ router.put('/:id/members', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'location.members_updated', 'location', req.params.id, loc.name)
     res.json({ ok: true })
   } catch (err) {
-    console.error('location members put:', err.message)
+    logger.error('location members put:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

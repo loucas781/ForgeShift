@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const crypto = require('crypto')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
+const logger = require('../utils/logger')
 
 // ── GET /api/ical/token — get or create feed token for current user ───────────
 router.get('/token', requireAuth, (req, res) => {
@@ -157,7 +158,7 @@ router.get('/feed/:token', (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store')
     res.send(cal.join('\r\n'))
   } catch (err) {
-    console.error('ical feed:', err.message)
+    logger.error('ical feed:', err.message)
     res.status(500).end()
   }
 })

@@ -18,6 +18,7 @@ const { v4: uuid }  = require('uuid')
 const db            = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const jwt           = require('jsonwebtoken')
+const logger        = require('../utils/logger')
 
 const router = express.Router()
 
@@ -59,10 +60,11 @@ function issueSession(res, user) {
     { expiresIn: `${process.env.COOKIE_MAX_AGE_HOURS || 72}h` }
   )
   const maxAge = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72', 10) * 3600 * 1000
+  const secure = process.env.COOKIE_SECURE === 'true'
   res.cookie('token', token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: secure ? 'strict' : 'lax',
+    secure,
     maxAge
   })
 }
@@ -102,7 +104,7 @@ router.post('/register-options', requireAuth, async (req, res) => {
     storeChallenge(`reg:${req.user.id}`, options.challenge)
     res.json(options)
   } catch (err) {
-    console.error('passkey register-options error:', err)
+    logger.error('passkey register-options error:', err.message)
     res.status(500).json({ error: 'Failed to generate registration options' })
   }
 })
@@ -146,8 +148,8 @@ router.post('/register-verify', requireAuth, async (req, res) => {
 
     res.json({ ok: true })
   } catch (err) {
-    console.error('passkey register-verify error:', err)
-    res.status(500).json({ error: err.message || 'Verification failed' })
+    logger.error('passkey register-verify error:', err.message)
+    res.status(500).json({ error: 'Verification failed' })
   }
 })
 
@@ -179,7 +181,7 @@ router.post('/auth-options', async (req, res) => {
     storeChallenge(`auth:${nonce}`, options.challenge)
     res.json({ ...options, _nonce: nonce })
   } catch (err) {
-    console.error('passkey auth-options error:', err)
+    logger.error('passkey auth-options error:', err.message)
     res.status(500).json({ error: 'Failed to generate authentication options' })
   }
 })
@@ -241,8 +243,8 @@ router.post('/auth-verify', async (req, res) => {
     issueSession(res, user)
     res.json({ ok: true, redirectTo: '/' })
   } catch (err) {
-    console.error('passkey auth-verify error:', err)
-    res.status(500).json({ error: err.message || 'Authentication failed' })
+    logger.error('passkey auth-verify error:', err.message)
+    res.status(500).json({ error: 'Authentication failed' })
   }
 })
 

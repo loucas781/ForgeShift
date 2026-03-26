@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth, requireAdmin } = require('../middleware/auth')
 const audit  = require('../audit')
+const logger = require('../utils/logger')
 
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
@@ -59,7 +60,7 @@ router.get('/', requireAuth, (req, res) => {
 
     res.json(orgs)
   } catch (err) {
-    console.error('organisations get:', err.message)
+    logger.error('organisations get:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -84,7 +85,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     org.team_count = 0
     res.status(201).json(org)
   } catch (err) {
-    console.error('organisation create:', err.message)
+    logger.error('organisation create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -104,7 +105,7 @@ router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'org.update', 'organisation', req.params.id, name || org.name, { by: req.user.name })
     res.json(db.prepare('SELECT * FROM organisations WHERE id = ?').get(req.params.id))
   } catch (err) {
-    console.error('organisation patch:', err.message)
+    logger.error('organisation patch:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -126,7 +127,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'org.delete', 'organisation', req.params.id, org.name, { by: req.user.name })
     res.json({ ok: true })
   } catch (err) {
-    console.error('organisation delete:', err.message)
+    logger.error('organisation delete:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -147,7 +148,7 @@ router.put('/:id/members', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'org.members_update', 'organisation', req.params.id, org.name, { count: user_ids.length, by: req.user.name })
     res.json({ ok: true })
   } catch (err) {
-    console.error('organisation members put:', err.message)
+    logger.error('organisation members put:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

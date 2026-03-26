@@ -2,7 +2,7 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db = require('../db/connection')
-const { requireAuth, requireAdmin } = require('../middleware/auth')
+const { requireAuth, requireAdmin, requireAdminOrManager } = require('../middleware/auth')
 const audit = require('../audit')
 const {
   MAX_PATTERN_CYCLE_LENGTH,
@@ -14,6 +14,7 @@ const {
   normalizeTemplateType,
   sanitizeTemplateDays,
 } = require('../utils/template-utils')
+const logger = require('../utils/logger')
 
 function serializeTemplate(template) {
   const templateType = normalizeTemplateType(template.template_type)
@@ -110,7 +111,7 @@ function validateTemplatePayload(body) {
 router.get('/', requireAuth, (req, res) => {
   let templates
 
-  if (req.user.role === 'admin') {
+  if (req.user.role === 'admin' || req.user.role === 'manager') {
     templates = db.prepare(`
       SELECT t.*, u.name as created_by_name,
              o.name as org_name, o.id as org_id
@@ -149,7 +150,7 @@ router.get('/:id', requireAuth, (req, res) => {
 })
 
 // ── POST /api/templates ───────────────────────────────────────────────────────
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requireAdminOrManager, (req, res) => {
   try {
     const payload = validateTemplatePayload(req.body)
     if (payload.error) return res.status(400).json({ error: payload.error })
@@ -179,13 +180,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'template.create', 'template', id, payload.name)
     res.status(201).json({ ...template, days })
   } catch (err) {
-    console.error('template create:', err.message)
+    logger.error('template create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
 
 // ── PUT /api/templates/:id ────────────────────────────────────────────────────
-router.put('/:id', requireAuth, requireAdmin, (req, res) => {
+router.put('/:id', requireAuth, requireAdminOrManager, (req, res) => {
   try {
     const existing = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(req.params.id)
     if (!existing) return res.status(404).json({ error: 'Template not found' })
@@ -230,13 +231,13 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'template.update', 'template', req.params.id, updated.name)
     res.json({ ...updated, days })
   } catch (err) {
-    console.error('template update:', err.message)
+    logger.error('template update:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
 
 // ── DELETE /api/templates/:id ─────────────────────────────────────────────────
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requireAdminOrManager, (req, res) => {
   try {
     const template = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(req.params.id)
     if (!template) return res.status(404).json({ error: 'Template not found' })
