@@ -2,13 +2,8 @@
 // ForgeShift email module — SMTP config stored in .runtime-overrides.json, never committed.
 // All functions return { ok, error } and never throw, so callers degrade gracefully.
 
-const fs   = require('fs')
-const path = require('path')
-
-const overridesFile = path.join(__dirname, '../.runtime-overrides.json')
-function loadOverrides() {
-  try { return JSON.parse(fs.readFileSync(overridesFile, 'utf8')) } catch { return {} }
-}
+const { loadOverrides } = require('./utils/overrides')
+const logger = require('./utils/logger')
 
 function getSmtpConfig() {
   const o = loadOverrides()
@@ -43,7 +38,7 @@ async function sendMail({ to, subject, html, text }) {
     await transport.sendMail({ from: `"${cfg.fromName}" <${cfg.fromAddr}>`, to, subject, html, text })
     return { ok: true }
   } catch (err) {
-    console.error('[email] send error:', err.message)
+    logger.error('[email] send error:', err.message)
     return { ok: false, error: err.message }
   }
 }
@@ -136,4 +131,22 @@ async function sendAdminInvite({ to, name, tempPassword, loginUrl }) {
     text: `You've been invited to ${appName}.\n\nEmail: ${to}\nPassword: ${tempPassword}\n\nSign in: ${loginUrl}\n\nPlease change your password after signing in.\n\n— ${appName}` })
 }
 
-module.exports = { getSmtpConfig, testConnection, sendMail, sendPasswordReset, sendWelcome, sendAdminInvite }
+async function sendEmailChangeVerification({ to, name, verifyUrl }) {
+  const appName = getSmtpConfig().fromName
+  const html = baseTemplate('Verify your new email address', `
+    <h2 style="margin:0 0 8px;font-size:22px;color:#111827">Verify your new email</h2>
+    <p style="color:#6b7280;font-size:14px;margin:0 0 24px">Hi ${name}, click the button below to confirm this as your new ${appName} email address.</p>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:24px">
+      <tr><td style="background:#4f46e5;border-radius:6px;padding:12px 28px">
+        <a href="${verifyUrl}" style="color:#fff;font-size:14px;font-weight:600;text-decoration:none">Confirm new email</a>
+      </td></tr>
+    </table>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 8px">Or copy this link into your browser:</p>
+    <p style="color:#4f46e5;font-size:12px;word-break:break-all;margin:0 0 24px">${verifyUrl}</p>
+    <p style="color:#6b7280;font-size:12px;margin:0;border-top:1px solid #e5e7eb;padding-top:16px">This link expires in <strong>1 hour</strong>. If you didn't request this, you can safely ignore it.</p>
+  `, appName)
+  return sendMail({ to, subject: `Verify your new ${appName} email address`, html,
+    text: `Hi ${name},\n\nConfirm your new email address here:\n${verifyUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, you can safely ignore it.\n\n— ${appName}` })
+}
+
+module.exports = { getSmtpConfig, testConnection, sendMail, sendPasswordReset, sendWelcome, sendAdminInvite, sendEmailChangeVerification }

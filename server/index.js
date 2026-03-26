@@ -129,11 +129,12 @@ app.get('/api/config', optionalAuth, (req, res) => {
     nodeVersion:    process.version,
     platform:       process.platform,
     user,
-    allowSignup:    (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
-    cookieSecure:   process.env.COOKIE_SECURE === 'true',
-    trustProxy:     process.env.TRUST_PROXY   === 'true',
-    passwordPolicy: getPasswordPolicy(overrides),
-    smtpEnabled:    emailSvc.getSmtpConfig().enabled,
+    allowSignup:        (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
+    cookieSecure:       process.env.COOKIE_SECURE === 'true',
+    trustProxy:         process.env.TRUST_PROXY   === 'true',
+    passwordPolicy:     getPasswordPolicy(overrides),
+    smtpEnabled:        emailSvc.getSmtpConfig().enabled,
+    inactivityTimeout:  overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
     featureTasks,
     featureDragDrop,
   })
@@ -187,12 +188,23 @@ app.patch('/api/config', requireAuth, (req, res) => {
     // Apply immediately to Express — no restart needed
     req.app.set('trust proxy', req.body.trustProxy ? 1 : 0)
   }
+  if (req.body.inactivityTimeout !== undefined) {
+    const v = req.body.inactivityTimeout
+    if (v === null || v === 0) {
+      overrides.INACTIVITY_TIMEOUT_MINUTES = 0
+    } else {
+      const n = parseInt(v)
+      if (isNaN(n) || n < 1 || n > 10080) return res.status(400).json({ error: 'Timeout must be 1–10080 minutes, or 0 to disable' })
+      overrides.INACTIVITY_TIMEOUT_MINUTES = n
+    }
+  }
   saveOverrides(overrides)
   res.json({
     ok: true,
-    allowSignup:  overrides.ALLOW_SIGNUP   !== 'false',
-    cookieSecure: process.env.COOKIE_SECURE === 'true',
-    trustProxy:   process.env.TRUST_PROXY   === 'true',
+    allowSignup:       overrides.ALLOW_SIGNUP   !== 'false',
+    cookieSecure:      process.env.COOKIE_SECURE === 'true',
+    trustProxy:        process.env.TRUST_PROXY   === 'true',
+    inactivityTimeout: overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
   })
 })
 
@@ -285,7 +297,7 @@ app.delete('/api/audit', requireAuth, (req, res) => {
     audit(req.user.id, 'settings_change', 'audit_log', 'all', 'Audit Log', { detail: 'Cleared all audit log entries' })
     res.json({ ok: true })
   } catch (err) {
-    console.error('[audit clear]', err)
+    logger.error('[audit clear]', err.message)
     res.status(500).json({ error: err.message })
   }
 })

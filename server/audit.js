@@ -1,6 +1,7 @@
 'use strict'
-const db    = require('./db/connection')
+const db     = require('./db/connection')
 const { v4: uuidv4 } = require('uuid')
+const logger = require('./utils/logger')
 
 function audit(actorId, action, entityType, entityId, entityName, meta) {
   try {
@@ -17,7 +18,7 @@ function audit(actorId, action, entityType, entityId, entityName, meta) {
       meta ? JSON.stringify(meta) : null
     )
   } catch (err) {
-    console.error('[audit] write failed:', err.message)
+    logger.error('[audit] write failed:', err.message)
   }
 }
 

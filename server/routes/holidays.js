@@ -3,6 +3,7 @@ const router = require('express').Router()
 const db     = require('../db/connection')
 const { requireAuth, requireAdmin } = require('../middleware/auth')
 const audit  = require('../audit')
+const logger = require('../utils/logger')
 
 // ── Supported live data sources ───────────────────────────────────────────────
 // Each source defines how to fetch and map to { 'YYYY-MM-DD': [{name, setId, emoji}] }
@@ -61,7 +62,7 @@ router.get('/status', requireAuth, requireAdmin, (req, res) => {
       sources: SOURCES.map(s => ({ id: s.id, label: s.label, emoji: s.emoji })),
     })
   } catch (err) {
-    console.error('holiday status:', err.message)
+    logger.error('holiday status:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -95,7 +96,7 @@ router.post('/fetch', requireAuth, requireAdmin, async (req, res) => {
           }
         }
       } catch (err) {
-        console.error(`holiday fetch [${source.id}]:`, err.message)
+        logger.error(`holiday fetch [${source.id}]:`, err.message)
         errors.push({ source: source.id, error: err.message })
       }
     }
@@ -127,7 +128,7 @@ router.post('/fetch', requireAuth, requireAdmin, async (req, res) => {
       errors:      errors.length ? errors : undefined,
     })
   } catch (err) {
-    console.error('holiday fetch:', err.message)
+    logger.error('holiday fetch:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

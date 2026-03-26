@@ -1783,10 +1783,30 @@ async function doInviteInline() {
           <div style="font-weight:600;color:var(--text);margin-bottom:6px">⚠️ Temporary Password — share securely, shown once only</div>
           <div style="display:flex;align-items:center;gap:8px">
             <code style="flex:1;font-size:14px;font-family:var(--mono);padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);word-break:break-all;color:var(--text);letter-spacing:.04em">${escHtml(r.tempPassword)}</code>
-            <button class="btn btn-secondary btn-sm" onclick="(function(b){navigator.clipboard.writeText(${escHtml(JSON.stringify(r.tempPassword))}).then(()=>{b.textContent='✓ Copied';setTimeout(()=>b.textContent='Copy',2000)})})(this)" style="flex-shrink:0">Copy</button>
+            <button id="copyTempPwBtn" class="btn btn-secondary btn-sm" style="flex-shrink:0">Copy</button>
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:6px">The user should change this password after first login.</div>
         </div>`
+      // Attach copy handler via closure — password never stored in DOM attributes
+      const copyBtn = document.getElementById('copyTempPwBtn')
+      if (copyBtn) {
+        const pw = r.tempPassword
+        copyBtn.addEventListener('click', () => {
+          const reset = () => { copyBtn.textContent = 'Copy' }
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(pw)
+              .then(() => { copyBtn.textContent = '✓ Copied'; setTimeout(reset, 2000) })
+              .catch(() => { copyBtn.textContent = 'Failed'; setTimeout(reset, 2000) })
+          } else {
+            const t = document.createElement('textarea')
+            t.value = pw; t.style.position = 'fixed'; t.style.opacity = '0'
+            document.body.appendChild(t); t.focus(); t.select()
+            document.execCommand('copy')
+            document.body.removeChild(t)
+            copyBtn.textContent = '✓ Copied'; setTimeout(reset, 2000)
+          }
+        })
+      }
     }
     if (submitBtn) submitBtn.style.display = 'none'
     // Add "Invite another" reset
@@ -2804,6 +2824,30 @@ async function renderSecurityPanel() {
         </div>
       </div>
     </div>
+
+    <div class="card section-card">
+      <div class="card-header">
+        <h3 class="card-title">Session Timeout</h3>
+        <button class="btn btn-primary btn-sm" onclick="saveInactivityTimeout()">Save</button>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+          Automatically sign users out after a period of inactivity. A warning prompt will appear 1 minute before the session expires. Set to <strong>0</strong> to disable entirely.
+        </p>
+        <div class="policy-row">
+          <div class="pref-info">
+            <strong>Inactivity timeout</strong>
+            <span>Minutes of inactivity before sign-out (0 = disabled)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="form-input" id="inactivityTimeoutInput"
+              value="${c.inactivityTimeout ?? 15}" min="0" max="10080" step="1"
+              style="width:80px;text-align:center">
+            <span style="font-size:12px;color:var(--text-3)">min</span>
+          </div>
+        </div>
+      </div>
+    </div>
     ` : ''}
 
     <div class="card section-card">
@@ -3094,6 +3138,17 @@ async function toggleTrustProxy(val) {
     toast(err.message, 'error')
     if (btn) { btn.disabled = false }
   }
+}
+
+async function saveInactivityTimeout() {
+  const input = document.getElementById('inactivityTimeoutInput')
+  if (!input) return
+  const val = parseInt(input.value)
+  if (isNaN(val) || val < 0 || val > 10080) { toast('Enter a value between 0 and 10080 minutes', 'error'); return }
+  try {
+    await api('/api/config', { method: 'PATCH', body: { inactivityTimeout: val } })
+    toast(val === 0 ? 'Session timeout disabled' : `Session timeout set to ${val} minute${val === 1 ? '' : 's'}`, 'success')
+  } catch (err) { toast(err.message, 'error') }
 }
 
 // ── Email / SMTP panel ─────────────────────────────────────────────────────────

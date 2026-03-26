@@ -6,6 +6,7 @@ const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/a
 const audit  = require('../audit')
 const { getShiftLeadScope } = require('../utils/scope')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
+const logger = require('../utils/logger')
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
 // Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
@@ -39,7 +40,7 @@ router.get('/lists', requireAuth, (req, res) => {
     }
     res.json(lists)
   } catch (err) {
-    console.error('tasks/lists get:', err.message)
+    logger.error('tasks/lists get:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -71,7 +72,7 @@ router.post('/lists', requireAuth, requireAdmin, (req, res) => {
     audit(req.user.id, 'task_list.create', 'task_list', id, name.trim())
     res.status(201).json(list)
   } catch (err) {
-    console.error('task list create:', err.message)
+    logger.error('task list create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -162,7 +163,7 @@ router.get('/assignments', requireAuth, (req, res) => {
     const assignments = db.prepare(sql).all(...params)
     res.json(assignments)
   } catch (err) {
-    console.error('assignments get:', err.message)
+    logger.error('assignments get:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -201,7 +202,7 @@ router.post('/assignments', requireAuth, requireShiftLead, (req, res) => {
     audit(req.user.id, 'task_assignment.create', 'task_assignment', id, date, { user_id, task_list_id })
     res.status(201).json(assignment)
   } catch (err) {
-    console.error('assignment create:', err.message)
+    logger.error('assignment create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -234,7 +235,7 @@ router.post('/assignments/bulk', requireAuth, requireShiftLead, (req, res) => {
     }
     res.status(201).json({ created: created.length, skipped: dates.length - created.length })
   } catch (err) {
-    console.error('assignment bulk create:', err.message)
+    logger.error('assignment bulk create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

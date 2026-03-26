@@ -111,7 +111,7 @@ router.get('/export', (req, res) => {
     res.send(json)
   } catch (err) {
     logger.error('backup export:', err.message)
-    res.status(500).json({ error: 'Export failed: ' + err.message })
+    res.status(500).json({ error: 'Export failed' })
   }
 })
 
@@ -660,7 +660,7 @@ router.post('/restore', (req, res) => {
     res.json({ ok: true, exported_at: manifest.exported_at, instance: manifest.instance, stats })
   } catch (err) {
     logger.error('backup restore error:', err.message)
-    res.status(500).json({ error: 'Restore failed: ' + err.message })
+    res.status(500).json({ error: 'Restore failed' })
   } finally {
     // Always re-enable FK enforcement after the restore attempt — must be done
     // outside the transaction so it actually takes effect at connection level.

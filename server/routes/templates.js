@@ -14,6 +14,7 @@ const {
   normalizeTemplateType,
   sanitizeTemplateDays,
 } = require('../utils/template-utils')
+const logger = require('../utils/logger')
 
 function serializeTemplate(template) {
   const templateType = normalizeTemplateType(template.template_type)
@@ -179,7 +180,7 @@ router.post('/', requireAuth, requireAdminOrManager, (req, res) => {
     audit(req.user.id, 'template.create', 'template', id, payload.name)
     res.status(201).json({ ...template, days })
   } catch (err) {
-    console.error('template create:', err.message)
+    logger.error('template create:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
@@ -230,7 +231,7 @@ router.put('/:id', requireAuth, requireAdminOrManager, (req, res) => {
     audit(req.user.id, 'template.update', 'template', req.params.id, updated.name)
     res.json({ ...updated, days })
   } catch (err) {
-    console.error('template update:', err.message)
+    logger.error('template update:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

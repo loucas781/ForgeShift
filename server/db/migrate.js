@@ -498,6 +498,21 @@ function migrateAdditive() {
     CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
   `)
   console.log('✓ User sessions schema ready')
+
+  // Email change verification tokens
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS email_change_tokens (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      new_email   TEXT NOT NULL,
+      token       TEXT NOT NULL UNIQUE,
+      expires_at  TEXT NOT NULL,
+      used        INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_change_token ON email_change_tokens(token);
+  `)
+  console.log('✓ Email change tokens schema ready')
 }
 
 try {
