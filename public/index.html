@@ -352,7 +352,7 @@ async function loadUsers() {
   if (cfg.user.role === 'shift_lead') {
     // Get team members from the shift_lead's own teams (loaded in loadTeams)
     // We'll populate after teams load; for now load all active members + self
-    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.id === cfg.user.id))
+    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.role === 'shift_lead'))
   } else {
     users = allUsers
   }
