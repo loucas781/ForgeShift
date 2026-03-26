@@ -142,6 +142,7 @@ let templates = []
 let groups = []
 let locations = []
 let users = []
+let teams = []
 let editingTmplId = null
 let applyingTmplId = null
 let applyingTmplType = 'weekly'
@@ -234,7 +235,9 @@ async function init() {
   cfg = await loadConfig()
   if (!cfg) return
   renderShell(cfg, 'templates')
-  await Promise.all([loadLocations(), loadUsers(), loadGroups(), loadTemplates()])
+  // loadUsers must complete before loadTeams — loadTeams filters users to team scope for shift_leads
+  await loadUsers()
+  await Promise.all([loadLocations(), loadTeams(), loadGroups(), loadTemplates()])
 
   if (cfg.user.role === 'admin') {
     document.getElementById('adminActions').innerHTML = `
@@ -263,6 +266,14 @@ async function loadUsers() {
   } else {
     users = allUsers.filter(u => u.is_active)
   }
+}
+
+async function loadTeams() {
+  if (cfg.user.role !== 'shift_lead') return
+  try { teams = await api('/api/teams') } catch { teams = [] }
+  const teamMemberIds = new Set([cfg.user.id])
+  teams.forEach(t => (t.members || []).forEach(m => { if (m.is_active) teamMemberIds.add(m.id) }))
+  users = users.filter(u => teamMemberIds.has(u.id))
 }
 
 async function loadTemplates() {
