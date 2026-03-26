@@ -49,7 +49,10 @@ router.get('/', requireAuth, (req, res) => {
     return res.json({ users, total, limit, offset })
   }
   const users = db.prepare(
-    'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users ORDER BY name'
+    `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.is_active, u.created_at,
+            tm.team_id
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     ORDER BY u.name`
   ).all()
   res.json(users)
 })

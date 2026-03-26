@@ -1023,8 +1023,7 @@ async function deleteMyTeam(id, name) {
 function openAddMember(teamId) {
   const t = myTeams.find(x => x.id === teamId); if (!t) return
   const currentIds = new Set((t.members || []).map(m => m.id))
-  const allTeamMemberIds = isShiftLead ? new Set(myTeams.flatMap(t2 => (t2.members || []).map(m => m.id))) : null
-  const available = users.filter(u => u.is_active && u.role === 'member' && !currentIds.has(u.id) && (!isShiftLead || !allTeamMemberIds.has(u.id)))
+  const available = users.filter(u => u.is_active && u.role === 'member' && !currentIds.has(u.id) && (!isShiftLead || !u.team_id))
   if (!available.length) { toast('No eligible members to add', 'error'); return }
   const existing = document.getElementById('addMemberModal')
   if (existing) existing.remove()
