@@ -980,7 +980,7 @@ function renderMyTeamsList() {
             `<div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 4px">
               ${_avatarHTML(m, 'sm')}
               <span style="font-size:12px;font-weight:500">${m.name}</span>
-              <button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>
+              ${!isShiftLead || m.id !== cfg.user.id ? `<button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>` : ''}
             </div>`
           ).join('')}
           <button class="btn btn-ghost btn-sm" onclick="openAddMember('${t.id}')" style="border-style:dashed">+ Add member</button>
