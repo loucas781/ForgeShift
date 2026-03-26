@@ -1020,22 +1020,63 @@ async function deleteMyTeam(id, name) {
   } catch (err) { toast(err.message, 'error') }
 }
 
-async function openAddMember(teamId) {
-  // Show a simple select of available members not already in the team
+function openAddMember(teamId) {
   const t = myTeams.find(x => x.id === teamId); if (!t) return
   const currentIds = new Set((t.members || []).map(m => m.id))
-  const available = users.filter(u => u.is_active && u.role === 'member' && !currentIds.has(u.id))
+  const allTeamMemberIds = isShiftLead ? new Set(myTeams.flatMap(t2 => (t2.members || []).map(m => m.id))) : null
+  const available = users.filter(u => u.is_active && u.role === 'member' && !currentIds.has(u.id) && (!isShiftLead || !allTeamMemberIds.has(u.id)))
   if (!available.length) { toast('No eligible members to add', 'error'); return }
-  const names = available.map((u, i) => `${i + 1}. ${u.name}`).join('\n')
-  const input = prompt(`Add member to "${t.name}".\nEnter a number:\n${names}`)
-  if (!input) return
-  const idx = parseInt(input) - 1
-  if (isNaN(idx) || idx < 0 || idx >= available.length) { toast('Invalid selection', 'error'); return }
+  const existing = document.getElementById('addMemberModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'addMemberModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Member to "${t.name}"</h3>
+        <button class="modal-close" onclick="document.getElementById('addMemberModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Member</label>
+          <select class="form-input" id="addMemberSelect">
+            <option value="">Select a member…</option>
+            ${available.map(u => `<option value="${u.id}">${u.name}</option>`).join('')}
+          </select>
+        </div>
+        <div id="addMemberError" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('addMemberModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="doAddMember('${teamId}')">Add member</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  setTimeout(() => document.getElementById('addMemberSelect').focus(), 50)
+}
+
+async function doAddMember(teamId) {
+  const select = document.getElementById('addMemberSelect')
+  const userId = select.value
+  if (!userId) {
+    const err = document.getElementById('addMemberError')
+    err.textContent = 'Please select a member.'
+    err.style.display = 'block'
+    return
+  }
+  const userName = select.options[select.selectedIndex].text
   try {
-    await api(`/api/teams/${teamId}/members/${available[idx].id}`, { method: 'POST' })
+    await api(`/api/teams/${teamId}/members/${userId}`, { method: 'POST' })
+    document.getElementById('addMemberModal').remove()
     await loadMyTeams()
-    toast(`${available[idx].name} added`, 'success')
-  } catch (err) { toast(err.message, 'error') }
+    toast(`${userName} added`, 'success')
+  } catch (err) {
+    const errEl = document.getElementById('addMemberError')
+    errEl.textContent = err.message
+    errEl.style.display = 'block'
+  }
 }
 
 async function removeMyTeamMember(teamId, userId) {
