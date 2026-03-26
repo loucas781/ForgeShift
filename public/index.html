@@ -311,7 +311,9 @@ async function init() {
     document.getElementById('adminUserField').style.display = 'block'
   }
 
-  const _initResults = await Promise.allSettled([loadLocations(), loadUsers(), loadTeams(), loadTaskLists(), loadTemplates()])
+  // loadUsers must complete before loadTeams — loadTeams filters the users array for shift_leads
+  await loadUsers()
+  const _initResults = await Promise.allSettled([loadLocations(), loadTeams(), loadTaskLists(), loadTemplates()])
   const _initFailed = _initResults.filter(r => r.status === 'rejected')
   if (_initFailed.length) console.warn('Init: some data failed to load', _initFailed.map(r => r.reason?.message))
   renderView()
