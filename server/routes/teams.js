@@ -167,6 +167,10 @@ router.post('/:id/members/:userId', requireAuth, requireShiftLead, (req, res) =>
   if (!user) return res.status(404).json({ error: 'User not found' })
   if (req.user.role === 'shift_lead' && user.role !== 'member' && user.id !== req.user.id)
     return res.status(403).json({ error: 'Shift leads can only add members to teams' })
+  if (req.user.role === 'shift_lead') {
+    const alreadyInTeam = db.prepare('SELECT 1 FROM team_members WHERE user_id = ? AND team_id != ?').get(req.params.userId, req.params.id)
+    if (alreadyInTeam) return res.status(400).json({ error: 'That member is already assigned to another team. Only an admin can move members between teams.' })
+  }
   db.prepare('INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?,?)').run(req.params.id, req.params.userId)
   res.json({ ok: true })
 })
