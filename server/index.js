@@ -108,7 +108,8 @@ app.get('/api/health', (req, res) => {
 })
 
 // ── Config endpoint ────────────────────────────────────────────────────────────
-app.get('/api/config', optionalAuth, cacheShort, (req, res) => {
+app.get('/api/config', optionalAuth, (req, res) => {
+  res.set('Cache-Control', req.user ? 'no-store' : 'private, max-age=10, stale-while-revalidate=30')
   const overrides = loadOverrides()
   let user = null
   if (req.user) {
