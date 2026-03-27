@@ -1680,6 +1680,10 @@ function openTaskAssignModal(dateStr, userId) {
   _renderCurrentAssignments(sel ? sel.value : null)
   if (sel) sel.onchange = () => _renderCurrentAssignments(sel.value)
 
+  // Reset save button in case modal is reopened after a save
+  const saveBtn = document.querySelector('#taskAssignModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Add assignment' }
+
   document.getElementById('taskAssignModal').classList.add('open')
 }
 
