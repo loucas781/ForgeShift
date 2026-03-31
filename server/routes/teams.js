@@ -2,7 +2,7 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db = require('../db/connection')
-const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
+const { requireAuth, requireAdmin, requireShiftLead, requireAdminOrManager } = require('../middleware/auth')
 const audit = require('../audit')
 
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
@@ -81,18 +81,11 @@ router.get('/', requireAuth, (req, res) => {
   res.json(teams)
 })
 
-// ── POST /api/teams — create (admin or shift_lead) ────────────────────────────
-router.post('/', requireAuth, requireShiftLead, (req, res) => {
+// ── POST /api/teams — create (admin or manager only) ─────────────────────────
+router.post('/', requireAuth, requireAdminOrManager, (req, res) => {
   const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
 
-  // Shift leads can only create a team if they don't already own one
-  if (req.user.role === 'shift_lead') {
-    const existing = db.prepare(`
-      SELECT 1 FROM teams WHERE owned_by = ? OR created_by = ? LIMIT 1
-    `).get(req.user.id, req.user.id)
-    if (existing) return res.status(400).json({ error: 'You already own a team.' })
-  }
   const count = db.prepare('SELECT COUNT(*) AS c FROM teams').get().c
   const teamColor = color || COLORS[count % COLORS.length]
   const id = uuidv4()
