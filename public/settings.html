@@ -468,10 +468,10 @@ async function init() {
     { id: 'preferences', label: 'Preferences', roles: ['admin','manager','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
-    { id: 'my-teams', label: 'My Teams', roles: ['manager','shift_lead'],
+    { id: 'my-teams', label: 'My Teams', roles: ['shift_lead'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
-    { id: 'team', label: 'Team', roles: ['admin'],
+    { id: 'team', label: 'Team', roles: ['admin','manager'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
     { id: 'organisations', label: 'Organisations', roles: ['admin'],
       icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
@@ -515,8 +515,8 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  if (isAdmin) await Promise.all([loadUsers(), loadLocations(), loadOrgs()])
-  if (isManager || isShiftLead) await Promise.all([loadUsers()])
+  if (isAdmin || isManager) await Promise.all([loadUsers(), loadLocations(), loadOrgs()])
+  if (isShiftLead) await Promise.all([loadUsers()])
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
   // Wire password indicator for Edit User modal
@@ -524,8 +524,8 @@ async function init() {
   await Promise.all([
     renderAppearancePanel(),
     renderPreferencesPanel(),
-    (isShiftLead || isManager) ? renderMyTeamsPanel() : Promise.resolve(),
-    isAdmin ? renderTeamPanel() : Promise.resolve(),
+    isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
+    (isAdmin || isManager) ? renderTeamPanel() : Promise.resolve(),
     isAdmin ? renderOrganisationsPanel() : Promise.resolve(),
     isAdmin ? renderLocationsPanel() : Promise.resolve(),
     isAdmin ? renderFeaturesPanel() : Promise.resolve(),
@@ -939,7 +939,11 @@ async function renderMyTeamsPanel() {
   const el = document.getElementById('panel-my-teams')
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:4px">My Teams</h2>
-    <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create and manage teams. You can assign shifts to members of your teams from the Calendar.</p>
+    <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">View the teams you have been assigned to. You can assign shifts to members of your teams from the Calendar.</p>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:20px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="flex-shrink:0;margin-top:1px;color:var(--blue)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p style="margin:0;font-size:12px;color:var(--text-2);line-height:1.5">Teams are created and assigned to you by a <strong>Manager</strong> or <strong>Admin</strong>. Contact your manager if you need to be added to a team.</p>
+    </div>
     <div id="myTeamsContainer"></div>`
   await loadMyTeams()
 }
@@ -954,8 +958,7 @@ function renderMyTeamsList() {
   if (!el) return
   if (!myTeams.length) {
     el.innerHTML = `
-      <div style="margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="openCreateMyTeam()">+ New team</button></div>
-      <div class="card" style="padding:24px;text-align:center;color:var(--text-3)">No teams yet — create one to start assigning shifts.</div>`
+      <div class="card" style="padding:24px;text-align:center;color:var(--text-3)">No teams assigned yet — ask your manager to add you to a team.</div>`
     return
   }
   el.innerHTML = myTeams.map(t => {
@@ -1108,8 +1111,8 @@ async function renderTeamPanel() {
       <!-- Left column: all team content -->
       <div>
 
-        <!-- Invite Member card -->
-        <div class="card" style="margin-bottom:24px">
+        <!-- Invite Member card (admin only) -->
+        ${isAdmin ? `<div class="card" style="margin-bottom:24px">
           <div class="card-body">
             <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
             <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
@@ -1135,7 +1138,7 @@ async function renderTeamPanel() {
             <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
             <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
           </div>
-        </div>
+        </div>` : ''}
 
         <!-- Team Members card -->
         <div class="card">
@@ -1242,6 +1245,24 @@ async function renderTeamPanel() {
 
             <div style="border-top:1px solid var(--border);margin-bottom:14px"></div>
 
+            <!-- Manager -->
+            <div style="margin-bottom:14px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="color:#f59e0b;flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.04em">Manager</span>
+              </div>
+              <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px">
+                <li style="font-size:11px;color:var(--text-3);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--text-3);flex-shrink:0;margin-top:1px">+</span>All Shift Lead permissions</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#f59e0b;flex-shrink:0;margin-top:1px">✓</span>Create &amp; manage all teams</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#f59e0b;flex-shrink:0;margin-top:1px">✓</span>Assign teams to Shift Leads</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#f59e0b;flex-shrink:0;margin-top:1px">✓</span>Manage all members &amp; shifts</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#f59e0b;flex-shrink:0;margin-top:1px">✓</span>Create &amp; manage templates</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:#f59e0b;flex-shrink:0;margin-top:1px">✓</span>Export shift data</li>
+              </ul>
+            </div>
+
+            <div style="border-top:1px solid var(--border);margin-bottom:14px"></div>
+
             <!-- Admin -->
             <div>
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
@@ -1249,9 +1270,9 @@ async function renderTeamPanel() {
                 <span style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.04em">Admin</span>
               </div>
               <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px">
-                <li style="font-size:11px;color:var(--text-3);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--text-3);flex-shrink:0;margin-top:1px">+</span>All Shift Lead permissions</li>
+                <li style="font-size:11px;color:var(--text-3);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--text-3);flex-shrink:0;margin-top:1px">+</span>All Manager permissions</li>
                 <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Invite &amp; manage all users</li>
-                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Manage locations</li>
+                <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Manage locations &amp; organisations</li>
                 <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Features &amp; security config</li>
                 <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Audit log &amp; backups</li>
                 <li style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px"><span style="color:var(--brand);flex-shrink:0;margin-top:1px">✓</span>Email configuration</li>
@@ -3829,6 +3850,18 @@ async function renderBuildInfoPanel() {
         </table>
       </div>
     </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Clear Cache</h3></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+          If the application appears out of date after an update — such as missing features or stale styles — clearing the cache will force a fresh download of all assets. Your account and preferences are not affected.
+        </p>
+        <button class="btn btn-secondary btn-sm" onclick="clearAppCache()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="flex-shrink:0"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Clear App Cache
+        </button>
+      </div>
+    </div>
     ${isAdmin ? `
     <div class="card section-card">
       <div class="card-header"><h3 class="card-title">Instance Statistics</h3></div>
@@ -3855,6 +3888,25 @@ async function renderBuildInfoPanel() {
             </div>`).join('')}
         </div>`
     } catch {}
+  }
+}
+
+// ── Clear App Cache ───────────────────────────────────────────────────────────
+async function clearAppCache() {
+  if (!confirm('Clear application cache and reload? Fresh assets will be downloaded. Your account and preferences will not be affected.')) return
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map(k => caches.delete(k)))
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map(r => r.unregister()))
+    }
+    toast('Cache cleared — reloading…', 'success')
+    setTimeout(() => window.location.reload(true), 800)
+  } catch (err) {
+    toast('Failed to clear cache', 'error')
   }
 }
 
