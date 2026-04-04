@@ -1092,12 +1092,13 @@ async function removeMyTeamMember(teamId, userId) {
 
 async function renderTeamPanel() {
   const el = document.getElementById('panel-team')
-  // Check SMTP and signup status
+  // Check SMTP and signup status — /api/config is available to all authenticated users
+  // and already contains smtpEnabled, so use that directly instead of the non-existent /api/email/status
   let smtpEnabled = false
   let signupEnabled = false
   try {
-    const [smtp, appCfg] = await Promise.all([api('/api/email/status'), api('/api/config')])
-    smtpEnabled = !!smtp.enabled
+    const appCfg = await api('/api/config')
+    smtpEnabled = !!appCfg.smtpEnabled
     signupEnabled = appCfg.allowSignup !== false
   } catch {}
 
@@ -1390,9 +1391,11 @@ function renderTeamListFiltered() {
         <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
       </div>
       <div class="member-actions">
+        ${isAdmin ? `
         <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
         <button class="btn btn-ghost btn-sm" onclick="getResetLink('${u.id}','${u.name}')">Reset link</button>
         ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}','${u.name}')">Delete</button>` : ''}
+        ` : ''}
       </div>
     </div>`).join('')
 }

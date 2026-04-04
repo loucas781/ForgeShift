@@ -10,9 +10,19 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 
 // ── GET /api/organisations ────────────────────────────────────────────────────
 // Admin: all orgs with member list + item counts.
+// Manager: all orgs (basic info only — needed for template filtering across all orgs).
 // Others: orgs they belong to (name + id only).
 router.get('/', requireAuth, (req, res) => {
   try {
+    if (req.user.role === 'manager') {
+      const orgs = db.prepare(`
+        SELECT o.id, o.name, o.color
+        FROM organisations o
+        ORDER BY o.name
+      `).all()
+      return res.json(orgs)
+    }
+
     if (req.user.role !== 'admin') {
       const orgs = db.prepare(`
         SELECT o.id, o.name, o.color
