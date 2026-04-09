@@ -522,6 +522,7 @@ try {
   migrateHolidays()
   migrateLocationMembers()
   migrateOrganisations()
+  migrateDeviceTokens()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)
@@ -613,4 +614,29 @@ function migrateLocationMembers() {
     CREATE INDEX IF NOT EXISTS idx_lm_user     ON location_members(user_id);
   `)
   console.log('✓ Location members schema ready')
+}
+
+// Additive: iOS push notification device tokens
+function migrateDeviceTokens() {
+  const db = require('./connection')
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_tokens (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token        TEXT NOT NULL UNIQUE,
+      device_name  TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+  `)
+
+  // Feature flag: auto push notifications on shift changes (default off)
+  const db2 = require('./connection')
+  db2.prepare(`
+    INSERT OR IGNORE INTO app_preferences (key, value, updated_at)
+    VALUES ('feature_push_notifications', 'false', datetime('now'))
+  `).run()
+
+  console.log('✓ Device tokens schema ready')
 }
