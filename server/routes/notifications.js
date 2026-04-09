@@ -95,6 +95,36 @@ router.patch('/settings', requireAdmin, (req, res) => {
   }
 })
 
+// ── GET /api/notifications/devices ───────────────────────────────────────────
+// List all registered device tokens with user info (admin only).
+router.get('/devices', requireAdmin, (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT dt.id, dt.token, dt.device_name, dt.created_at, dt.last_used_at,
+             u.id AS user_id, u.name AS user_name, u.email AS user_email
+      FROM device_tokens dt
+      LEFT JOIN users u ON u.id = dt.user_id
+      ORDER BY dt.last_used_at DESC
+    `).all()
+    res.json({ devices: rows })
+  } catch {
+    res.status(500).json({ error: 'Failed to load devices.' })
+  }
+})
+
+// ── DELETE /api/notifications/devices/:id ─────────────────────────────────────
+// Remove a specific device token by its row id (admin only).
+router.delete('/devices/:id', requireAdmin, (req, res) => {
+  try {
+    const { changes } = db.prepare('DELETE FROM device_tokens WHERE id = ?').run(req.params.id)
+    if (!changes) return res.status(404).json({ error: 'Device not found.' })
+    audit(req.user.id, 'notifications.device.remove', 'device_tokens', req.params.id, 'admin removed device')
+    res.json({ ok: true })
+  } catch {
+    res.status(500).json({ error: 'Failed to remove device.' })
+  }
+})
+
 // ── POST /api/notifications/send ─────────────────────────────────────────────
 // Send a manual broadcast notification (admin only).
 router.post('/send', requireAdmin, async (req, res) => {

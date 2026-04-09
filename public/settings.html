@@ -2858,11 +2858,17 @@ async function renderNotificationsPanel() {
           <select id="notifRecipientId" class="input-field w-full mt-1"></select>
         </div>
         <div>
-          <label class="field-label">Title</label>
+          <div class="flex items-center justify-between">
+            <label class="field-label">Title</label>
+            <span id="notifTitleCount" class="text-xs text-[var(--text-muted)]">0 / 100</span>
+          </div>
           <input type="text" id="notifTitle" class="input-field w-full mt-1" placeholder="Rota updated" maxlength="100">
         </div>
         <div>
-          <label class="field-label">Message</label>
+          <div class="flex items-center justify-between">
+            <label class="field-label">Message</label>
+            <span id="notifBodyCount" class="text-xs text-[var(--text-muted)]">0 / 300</span>
+          </div>
           <textarea id="notifBody" class="input-field w-full mt-1" rows="3" placeholder="Your rota has been updated. Please check your schedule." maxlength="300"></textarea>
         </div>
         <div id="notifFeedback" class="hidden text-sm rounded-lg p-3"></div>
@@ -2870,6 +2876,12 @@ async function renderNotificationsPanel() {
           Send Notification
         </button>
       </div>
+    </div>
+
+    <!-- Registered Devices -->
+    <div class="settings-section">
+      <div class="settings-section-title">Registered Devices</div>
+      <div id="devicesList"><div class="spinner-sm mx-auto my-4"></div></div>
     </div>
   `
 
@@ -2888,6 +2900,18 @@ async function renderNotificationsPanel() {
       e.target.checked = !e.target.checked
     }
   })
+
+  // Character counters
+  document.getElementById('notifTitle')?.addEventListener('input', (e) => {
+    const el = document.getElementById('notifTitleCount')
+    if (el) el.textContent = `${e.target.value.length} / 100`
+  })
+  document.getElementById('notifBody')?.addEventListener('input', (e) => {
+    const el = document.getElementById('notifBodyCount')
+    if (el) el.textContent = `${e.target.value.length} / 300`
+  })
+
+  loadDevicesList()
 }
 
 function updateRecipientPicker() {
@@ -2936,6 +2960,55 @@ async function sendBroadcast() {
   } finally {
     btn.disabled = false
     btn.textContent = 'Send Notification'
+  }
+}
+
+async function loadDevicesList() {
+  const wrap = document.getElementById('devicesList')
+  if (!wrap) return
+  try {
+    const { devices } = await api('/api/notifications/devices')
+    if (!devices.length) {
+      wrap.innerHTML = `<p class="text-sm text-[var(--text-muted)] px-0 py-2">No devices registered yet. Install the ForgeShift iOS app and sign in to register a device.</p>`
+      return
+    }
+    const fmtDate = d => {
+      if (!d) return '—'
+      const date = new Date(d + (d.endsWith('Z') ? '' : 'Z'))
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    }
+    wrap.innerHTML = `
+      <div class="settings-card divide-y divide-[var(--border)]">
+        ${devices.map(d => `
+          <div class="flex items-center gap-3 p-4" data-device-id="${escHtml(d.id)}">
+            <svg class="w-8 h-8 shrink-0 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+              <line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">${escHtml(d.device_name || 'Unknown device')}</div>
+              <div class="text-xs text-[var(--text-muted)] truncate">${escHtml(d.user_name || d.user_email || 'Unknown user')}</div>
+              <div class="text-xs text-[var(--text-muted)] mt-0.5">Registered ${fmtDate(d.created_at)} · Last used ${fmtDate(d.last_used_at)}</div>
+            </div>
+            <button class="btn-ghost text-xs text-red-400 hover:text-red-300 shrink-0" onclick="removeDevice('${escHtml(d.id)}')">Remove</button>
+          </div>
+        `).join('')}
+      </div>
+    `
+  } catch {
+    wrap.innerHTML = `<p class="text-sm text-[var(--text-muted)] py-2">Could not load registered devices.</p>`
+  }
+}
+
+async function removeDevice(id) {
+  if (!confirm('Remove this device? The user will stop receiving push notifications on it.')) return
+  try {
+    await api(`/api/notifications/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    toast('Device removed', 'success')
+    // Re-render panel to update device count in status section and refresh list
+    renderNotificationsPanel()
+  } catch (err) {
+    toast(err.message || 'Failed to remove device', 'error')
   }
 }
 
