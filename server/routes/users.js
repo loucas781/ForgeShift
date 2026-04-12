@@ -55,6 +55,22 @@ router.get('/', requireAuth, (req, res) => {
   res.json(users)
 })
 
+// ── GET /api/users/me ─────────────────────────────────────────────────────────
+router.get('/me', requireAuth, (req, res) => {
+  const user = db.prepare(
+    'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users WHERE id = ?'
+  ).get(req.user.id)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  res.json(user)
+})
+
+// ── GET /api/users/:id/avatar — serve avatar image ───────────────────────────
+router.get('/:id/avatar', requireAuth, (req, res) => {
+  const filePath = path.join(AVATARS_DIR, `${req.params.id}.jpg`)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No avatar' })
+  res.sendFile(filePath)
+})
+
 // ── GET /api/users/:id ────────────────────────────────────────────────────────
 router.get('/:id', requireAuth, (req, res) => {
   const user = db.prepare(

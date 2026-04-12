@@ -12,6 +12,9 @@ uploads/
 .env.*
 !.env.example
 
+# APNs private key — NEVER commit this
+config/AuthKey_*.p8
+
 # Runtime overrides (toggled via Settings UI)
 .runtime-overrides.json
 
