@@ -6,9 +6,12 @@ const { requireAuth, requireAdmin } = require('../middleware/auth')
 const { sendPushToUser, sendPushToMany, sendPushToAll, isConfigured } = require('../push/apns')
 const audit   = require('../audit')
 
+// All notification routes require authentication
+router.use(requireAuth)
+
 // ── POST /api/notifications/register ─────────────────────────────────────────
 // Save (or refresh) a device token for the authenticated user.
-router.post('/register', requireAuth, (req, res) => {
+router.post('/register', (req, res) => {
   try {
     const { token, device_name: deviceName } = req.body
     if (!token || typeof token !== 'string' || token.length < 32) {
@@ -33,7 +36,7 @@ router.post('/register', requireAuth, (req, res) => {
 
 // ── DELETE /api/notifications/register ───────────────────────────────────────
 // Remove all device tokens for the authenticated user (called on logout).
-router.delete('/register', requireAuth, (req, res) => {
+router.delete('/register', (req, res) => {
   try {
     // If a specific token is provided, remove only that one; otherwise remove all.
     const { token } = req.body || {}
