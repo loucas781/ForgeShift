@@ -92,7 +92,6 @@ app.use('/api/users',          writeLimiter)
 app.use('/api/locations',      writeLimiter)
 app.use('/api/tasks',          writeLimiter)
 app.use('/api/organisations',  writeLimiter)
-app.use('/api/notifications',  writeLimiter)
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '../public'), { index: false }))
@@ -368,7 +367,6 @@ app.use('/api/tasks',            require('./routes/tasks'))
 app.use('/api/task-list-groups', require('./routes/task-list-groups'))
 app.use('/api/holidays',         require('./routes/holidays'))
 app.use('/api/passkeys',         require('./routes/passkeys'))
-app.use('/api/notifications',    require('./routes/notifications'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {

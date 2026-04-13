@@ -4,24 +4,6 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
 const audit  = require('../audit')
-const apns   = require('../push/apns')
-
-/** Fire-and-forget push notification for shift events (only if feature flag enabled). */
-function maybePushShiftEvent(eventType, shift) {
-  try {
-    const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_push_notifications'").get()
-    if (row?.value !== 'true') return
-    const dateStr = shift.date || ''
-    const timeStr = (shift.start_time && shift.end_time) ? ` ${shift.start_time}–${shift.end_time}` : ''
-    const msgs = {
-      create: { title: 'New shift added',  body: `You have a new shift on ${dateStr}${timeStr}.` },
-      update: { title: 'Shift updated',    body: `Your shift on ${dateStr} has been updated${timeStr ? ` (${timeStr.trim()})` : ''}.` },
-      delete: { title: 'Shift removed',    body: `Your shift on ${dateStr} has been removed.` },
-    }
-    const msg = msgs[eventType]
-    if (msg) apns.sendPushToUser(shift.user_id, msg.title, msg.body, { type: `shift.${eventType}`, date: dateStr }).catch(() => {})
-  } catch { /* never block the response */ }
-}
 const { buildHolidayMapServer } = require('../holidays')
 const { getShiftLeadScope } = require('../utils/scope')
 const logger = require('../utils/logger')
@@ -196,7 +178,6 @@ router.post('/', requireAuth, (req, res) => {
     if (result.conflict === 'time') return res.status(409).json({ error: 'This shift overlaps with an existing shift.', conflict: true })
     audit(req.user.id, 'shift.create', 'shift', id, date)
     req.app.locals.broadcastShiftEvent?.('shift.create', shift, req.user.id)
-    maybePushShiftEvent('create', shift)
     res.status(201).json(shift)
   } catch (err) {
     logger.error('shift create:', err.message)
@@ -231,7 +212,6 @@ router.put('/:id', requireAuth, (req, res) => {
     const updated = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     audit(req.user.id, 'shift.update', 'shift', req.params.id, targetDate)
     req.app.locals.broadcastShiftEvent?.('shift.update', updated, req.user.id)
-    maybePushShiftEvent('update', updated)
     res.json(updated)
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -257,7 +237,6 @@ router.delete('/:id', requireAuth, (req, res) => {
     db.prepare('DELETE FROM shifts WHERE id = ?').run(req.params.id)
     audit(req.user.id, 'shift.delete', 'shift', req.params.id, shift.date)
     req.app.locals.broadcastShiftEvent?.('shift.delete', { id: req.params.id, date: shift.date }, req.user.id)
-    maybePushShiftEvent('delete', shift)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
