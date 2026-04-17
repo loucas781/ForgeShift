@@ -193,7 +193,7 @@ router.post('/auth-verify', async (req, res) => {
     const { verifyAuthenticationResponse } = await import('@simplewebauthn/server')
     const { rpID, origin } = rpConfig(req)
 
-    const { credential, nonce } = req.body
+    const { credential, _nonce: nonce } = req.body
     if (!credential || !nonce) return res.status(400).json({ error: 'Missing credential or nonce' })
 
     const expectedChallenge = popChallenge(`auth:${nonce}`)

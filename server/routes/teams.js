@@ -34,7 +34,7 @@ router.get('/', requireAuth, (req, res) => {
 
   if (role === 'admin' || role === 'manager') {
     teams = db.prepare(`
-      SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
+      SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
       FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
       GROUP BY t.id ORDER BY t.name
@@ -42,7 +42,7 @@ router.get('/', requireAuth, (req, res) => {
   } else if (role === 'shift_lead') {
     // Shift lead sees teams in their orgs, teams they own/created, or teams they're a member of
     teams = db.prepare(`
-      SELECT t.id, t.name, t.color, t.created_at, t.owned_by, t.created_by,
+      SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by, t.created_by,
              COUNT(tm.user_id) AS member_count
       FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
       WHERE t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
@@ -52,7 +52,7 @@ router.get('/', requireAuth, (req, res) => {
     `).all(userId, userId, userId, userId)
   } else {
     teams = db.prepare(`
-      SELECT t.id, t.name, t.color, t.created_at, t.owned_by,
+      SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
              COUNT(tm2.user_id) AS member_count
       FROM teams t
       JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = ?
