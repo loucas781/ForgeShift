@@ -124,7 +124,7 @@ router.delete('/lists/:id', requireAuth, requireAdmin, (req, res) => {
 // ── GET /api/tasks/assignments ────────────────────────────────────────────────
 router.get('/assignments', requireAuth, (req, res) => {
   try {
-    const { start, end, user_id } = req.query
+    const { start, end, user_id, org_id } = req.query
     let sql = `
       SELECT a.*, u.name as user_name, u.initials as user_initials, u.color as user_color,
              tl.name as task_list_name, tl.color as task_list_color,
@@ -140,6 +140,7 @@ router.get('/assignments', requireAuth, (req, res) => {
     if (start)   { sql += ' AND a.date >= ?'; params.push(start) }
     if (end)     { sql += ' AND a.date <= ?'; params.push(end) }
     if (user_id) { sql += ' AND a.user_id = ?'; params.push(user_id) }
+    if (org_id)  { sql += ' AND (tl.org_id IS NULL OR tl.org_id = ?)'; params.push(org_id) }
 
     if (req.user.role === 'admin' || req.user.role === 'manager') {
       // no extra filter — admins and managers see all assignments

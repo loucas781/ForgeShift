@@ -663,6 +663,11 @@ async function loadTaskAssignments() {
       params.set('user_id', filterVal.slice(5))
     }
     // 'all' or 'team:xxx' — no user_id filter, backend scopes for shift_lead
+    if (filterVal.startsWith('team:')) {
+      const teamId = filterVal.slice(5)
+      const team = teams.find(t => t.id === teamId)
+      if (team?.org_id) params.set('org_id', team.org_id)
+    }
   }
   try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
 }
