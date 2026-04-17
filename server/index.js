@@ -93,6 +93,11 @@ app.use('/api/locations',      writeLimiter)
 app.use('/api/tasks',          writeLimiter)
 app.use('/api/organisations',  writeLimiter)
 
+// Apple App Site Association — must be served as application/json (no file extension)
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+  res.type('application/json').sendFile(path.join(__dirname, '../public/.well-known/apple-app-site-association'))
+})
+
 // Serve static files
 app.use(express.static(path.join(__dirname, '../public'), { index: false }))
 
