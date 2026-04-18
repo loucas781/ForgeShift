@@ -401,23 +401,6 @@ async function loadTeams() {
 
   const sel = document.getElementById('teamFilter')
   while (sel.options.length > 1) sel.remove(1)
-  const allOpt = document.createElement('option')
-  allOpt.value = 'all'; allOpt.textContent = cfg.user.role === 'admin' ? 'All shifts' : 'All my teams'
-  sel.appendChild(allOpt)
-
-  // Teams group
-  if (teams.length) {
-    const tGrp = document.createElement('optgroup')
-    tGrp.label = 'Teams'
-    teams.forEach(t => {
-      const o = document.createElement('option')
-      o.value = 'team:' + t.id
-      o.textContent = t.name + (t.member_count > 0 ? ' (' + t.member_count + ')' : '')
-      tGrp.appendChild(o)
-    })
-    sel.appendChild(tGrp)
-  }
-
   // Individual users group.
   // Admins: all active users.
   // Shift leads: only members of their own teams (the `users` array has already
@@ -623,20 +606,6 @@ async function loadShifts() {
     if (filterVal === '') {
       // No filter selected — show own shifts only
       params.set('user_id', cfg.user.id)
-    } else if (filterVal === 'all') {
-      // Show all shifts in scope (backend enforces scope for shift_lead)
-    } else if (filterVal.startsWith('team:')) {
-      const teamId = filterVal.slice(5)
-      const team = teams.find(t => t.id === teamId)
-      if (team && team.members.length) {
-        const fetches = team.members.filter(m => m.is_active).map(m => {
-          const p = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end), user_id: m.id })
-          return api('/api/shifts?' + p)
-        })
-        const results = await Promise.allSettled(fetches)
-        shifts = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value)
-        return
-      }
     } else if (filterVal.startsWith('user:')) {
       // Individual rota view — single user, admin/shift_lead can edit
       params.set('user_id', filterVal.slice(5))
@@ -661,10 +630,6 @@ async function loadTaskAssignments() {
     } else if (filterVal.startsWith('user:')) {
       // Individual user's rota — only their tasks
       params.set('user_id', filterVal.slice(5))
-    }
-    // 'all' or 'team:xxx' — no user_id filter, backend scopes for shift_lead
-    if (filterVal.startsWith('team:')) {
-      params.set('team_id', filterVal.slice(5))
     }
   }
   try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
@@ -1831,7 +1796,6 @@ function exportCSV() {
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
   if (filterVal.startsWith('user:')) params.set('user_id', filterVal.slice(5))
-  else if (filterVal === 'all' && cfg.user.role === 'admin') params.set('user_id', 'all')
   // Remember last-used export scope in localStorage
   try { localStorage.setItem('fs-last-export-filter', filterVal) } catch {}
   window.location.href = '/api/shifts/export/csv?' + params
@@ -2370,9 +2334,6 @@ async function copyWeekToNext() {
     targetUserIds = [cfg.user.id]
   } else if (filterVal.startsWith('user:')) {
     targetUserIds = [filterVal.slice(5)]
-  } else if (filterVal === 'all' || filterVal.startsWith('team:')) {
-    const uniqueIds = [...new Set(shifts.map(s => s.user_id))]
-    targetUserIds = uniqueIds
   }
 
   const btn = document.getElementById('copyWeekBtn')
