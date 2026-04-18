@@ -99,6 +99,11 @@
         <label class="form-label">Date</label>
         <input type="date" class="form-input" id="modalDate">
       </div>
+      <div id="repeatDaysWrap" class="form-group" style="display:none">
+        <label class="form-label">Repeat on days</label>
+        <div id="repeatDayBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px"></div>
+        <p style="font-size:11px;color:var(--text-3);margin:6px 0 0">Creates the same shift on each selected day within this week.</p>
+      </div>
       <div id="modalTemplateQuickWrap" class="form-group" style="display:none">
         <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
@@ -1450,6 +1455,46 @@ async function applyTemplateFromModal() {
   }
 }
 
+// ── Repeat-on-days helpers ─────────────────────────────────────────────────────
+function _getRepeatWeekDates(baseDate) {
+  const d = new Date(baseDate + 'T00:00:00')
+  const jsDay = d.getDay() // 0=Sun, 1=Mon ... 6=Sat
+  const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + mondayOffset)
+  return Array.from({ length: 7 }, (_, i) => {
+    const dt = new Date(monday)
+    dt.setDate(monday.getDate() + i)
+    return dt.toISOString().slice(0, 10)
+  })
+}
+
+function _initRepeatDayBtns(baseDate) {
+  const wrap = document.getElementById('repeatDaysWrap')
+  const container = document.getElementById('repeatDayBtns')
+  if (!wrap || !container) return
+  wrap.style.display = ''
+  container.innerHTML = ''
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const d = new Date(baseDate + 'T00:00:00')
+  const jsDay = d.getDay()
+  const activeDayIndex = jsDay === 0 ? 6 : jsDay - 1 // convert to 0=Mon, 6=Sun
+  labels.forEach((label, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.textContent = label
+    btn.dataset.dayIndex = i
+    const isActive = i === activeDayIndex
+    btn.className = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-secondary') + ' repeat-day-btn' + (isActive ? ' selected' : '')
+    btn.addEventListener('click', () => {
+      const nowSelected = btn.classList.toggle('selected')
+      btn.classList.toggle('btn-primary', nowSelected)
+      btn.classList.toggle('btn-secondary', !nowSelected)
+    })
+    container.appendChild(btn)
+  })
+}
+
 // ── Modal ──────────────────────────────────────────────────────────────────────
 function openCreateModal(date) {
   editingShiftId = null
@@ -1468,6 +1513,7 @@ function openCreateModal(date) {
   document.getElementById('modalTemplateSelect').value = ''
   document.getElementById('modalTemplateSkipHolidays').checked = true
   setupColourPicker()
+  _initRepeatDayBtns(date)
   setTemplateQuickApplyVisibility(true, date)
   document.getElementById('shiftModal').classList.add('open')
 }
@@ -1488,6 +1534,8 @@ function openEditModal(id) {
   document.getElementById('deleteShiftBtn').style.display = 'flex'
   if (canManage()) document.getElementById('modalUser').value = s.user_id
   setupColourPicker()
+  const rdw = document.getElementById('repeatDaysWrap')
+  if (rdw) rdw.style.display = 'none'
   setTemplateQuickApplyVisibility(false)
   document.getElementById('shiftModal').classList.add('open')
 }
@@ -1507,6 +1555,8 @@ function closeModal() {
   const modal = document.getElementById('shiftModal')
   modal.classList.remove('open')
   modal.querySelector('.modal').classList.remove('modal--readonly')
+  const rdw = document.getElementById('repeatDaysWrap')
+  if (rdw) rdw.style.display = 'none'
   setTemplateQuickApplyVisibility(false)
 }
 
@@ -2049,9 +2099,9 @@ async function saveShiftForce() {
   } catch (err) { toast(err.message, 'error') }
 }
 
-// Override saveShift (defined above) with conflict-aware version
+// Override saveShift (defined above) with conflict-aware and multi-day version
 async function saveShift() {
-  const body = {
+  const baseBody = {
     date:        document.getElementById('modalDate').value,
     location_id: document.getElementById('modalLocation').value || null,
     start_time:  document.getElementById('modalStart').value || null,
@@ -2061,43 +2111,82 @@ async function saveShift() {
     is_off:      document.getElementById('modalIsOff').checked,
     is_oncall:   document.getElementById('modalIsOncall').checked,
   }
-  if (canManage()) body.user_id = getSelectedModalUserId()
+  if (canManage()) baseBody.user_id = getSelectedModalUserId()
 
-  // Remove any existing conflict warning
   document.getElementById('conflictWarning')?.remove()
 
-  const url    = editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts'
-  const method = editingShiftId ? 'PUT' : 'POST'
+  // Collect selected repeat days (create mode only)
+  const repeatWrap = document.getElementById('repeatDaysWrap')
+  let datesToSave = [baseBody.date]
+  if (!editingShiftId && repeatWrap && repeatWrap.style.display !== 'none') {
+    const selectedBtns = [...document.querySelectorAll('#repeatDayBtns .repeat-day-btn.selected')]
+    if (selectedBtns.length > 0) {
+      const weekDates = _getRepeatWeekDates(baseBody.date)
+      datesToSave = selectedBtns.map(btn => weekDates[parseInt(btn.dataset.dayIndex)])
+    }
+  }
+
   const saveBtn = document.querySelector('#shiftModal .btn-primary')
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…' }
+
   try {
-    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const d = await r.json()
-    if (!r.ok) {
-      if (r.status === 409 && d.conflict) {
-        // Show inline conflict warning with "Save anyway" option
-        _conflictBody = body
-        const footer = document.querySelector('#shiftModal .modal-footer')
-        const warn = document.createElement('div')
-        warn.id = 'conflictWarning'
-        warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
-        const msgSpan = document.createElement('span')
-        msgSpan.appendChild(document.createTextNode('⚠️ ' + (d.error || 'Conflict detected')))
-        const forceBtn = document.createElement('button')
-        forceBtn.className = 'btn btn-sm'
-        forceBtn.style.cssText = 'background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px'
-        forceBtn.textContent = 'Save anyway'
-        forceBtn.addEventListener('click', saveShiftForce)
-        warn.appendChild(msgSpan)
-        warn.appendChild(forceBtn)
-        footer.insertAdjacentElement('beforebegin', warn)
-        return
+    if (!editingShiftId && datesToSave.length > 1) {
+      // Multi-day create: post each date, skip conflicts silently
+      let added = 0, skipped = 0, errors = []
+      for (const date of datesToSave) {
+        const r = await fetch('/api/shifts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...baseBody, date })
+        })
+        if (r.ok) {
+          added++
+        } else {
+          const d = await r.json()
+          if (r.status === 409) skipped++
+          else errors.push(d.error || `Error for ${date}`)
+        }
       }
-      throw new Error(d.error || `HTTP ${r.status}`)
+      if (errors.length) {
+        toast(errors[0], 'error')
+      } else {
+        const addedStr = `${added} shift${added !== 1 ? 's' : ''} added`
+        toast(skipped > 0 ? `${addedStr}, ${skipped} skipped (already exist)` : addedStr, 'success')
+      }
+      closeModal()
+      renderView()
+    } else {
+      // Single shift create or edit — original conflict-aware behaviour
+      const body = { ...baseBody }
+      const url    = editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts'
+      const method = editingShiftId ? 'PUT' : 'POST'
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const d = await r.json()
+      if (!r.ok) {
+        if (r.status === 409 && d.conflict) {
+          _conflictBody = body
+          const footer = document.querySelector('#shiftModal .modal-footer')
+          const warn = document.createElement('div')
+          warn.id = 'conflictWarning'
+          warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
+          const msgSpan = document.createElement('span')
+          msgSpan.appendChild(document.createTextNode('⚠️ ' + (d.error || 'Conflict detected')))
+          const forceBtn = document.createElement('button')
+          forceBtn.className = 'btn btn-sm'
+          forceBtn.style.cssText = 'background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px'
+          forceBtn.textContent = 'Save anyway'
+          forceBtn.addEventListener('click', saveShiftForce)
+          warn.appendChild(msgSpan)
+          warn.appendChild(forceBtn)
+          footer.insertAdjacentElement('beforebegin', warn)
+          return
+        }
+        throw new Error(d.error || `HTTP ${r.status}`)
+      }
+      toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+      closeModal()
+      renderView()
     }
-    toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
-    closeModal()
-    renderView()
   } catch (err) {
     toast(err.message, 'error')
   } finally {
