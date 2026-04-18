@@ -794,11 +794,11 @@ function renderMonth() {
     const overflow    = dayShifts.length - MAX_CHIPS
     chipsToShow.forEach(s => {
       const color = getShiftDisplayColour(s)
-      const label = s.is_off ? '🏖️ Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
+      const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       // Duration badge
       let durBadge = ''
-      if (!s.is_off && !s.is_oncall && s.start_time && s.end_time) {
+      if (!s.is_off && s.start_time && s.end_time) {
         const mins = _timeToMins(s.end_time) - _timeToMins(s.start_time)
         if (mins > 0) {
           const h = Math.floor(mins / 60); const m = mins % 60
@@ -988,7 +988,7 @@ function renderWeek() {
     // Shift blocks — positioned by time, or all-day chip if no time
     dayShifts.forEach(s => {
       const color = getShiftDisplayColour(s)
-      const label = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
+      const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       const clickFn = `openShiftPanel('${s.id}')`
       const ctxAttr = canManage()
@@ -1917,7 +1917,7 @@ function openShiftPanel(shiftId) {
   _shiftPanelId = shiftId
 
   // Title
-  const title = s.is_off ? '🏖️ Day Off' : s.is_oncall ? '📟 On-call' : (s.location_name || 'Shift')
+  const title = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
   document.getElementById('shiftPanelTitle').textContent = title
 
   // Edit button (managers only)
@@ -1935,7 +1935,10 @@ function openShiftPanel(shiftId) {
   const dateStr = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Date</div><div class="shift-panel-value">${escHtml(dateStr)}</div></div>`)
 
-  if (!s.is_off && !s.is_oncall) {
+  if (s.is_oncall) {
+    rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">On-call</div><div class="shift-panel-value">📟 Yes</div></div>`)
+  }
+  if (!s.is_off) {
     if (s.location_name) rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Location</div><div class="shift-panel-value">${escHtml(s.location_name)}</div></div>`)
     if (s.start_time && s.end_time) {
       const mins = _timeToMins(s.end_time) - _timeToMins(s.start_time)
