@@ -601,7 +601,11 @@ function getViewDateRange() {
 
 async function loadShifts() {
   const { start, end } = getViewDateRange()
-  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
+  const queryStart = new Date(start)
+  // Week view needs one extra day so overnight shifts from the previous day
+  // can render their after-midnight segment in the visible week.
+  if (view === 'week') queryStart.setDate(queryStart.getDate() - 1)
+  const params = new URLSearchParams({ start: toDateStr(queryStart), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
   const role = cfg.user.role
 
@@ -799,7 +803,7 @@ function renderMonth() {
       // Duration badge
       let durBadge = ''
       if (!s.is_off && s.start_time && s.end_time) {
-        const mins = _timeToMins(s.end_time) - _timeToMins(s.start_time)
+        const mins = _shiftDurationMins(s.start_time, s.end_time)
         if (mins > 0) {
           const h = Math.floor(mins / 60); const m = mins % 60
           durBadge = `<span style="opacity:.75;font-size:9px;margin-left:3px">${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''}</span>`
@@ -859,6 +863,19 @@ function _timeToMins(t) {
   const [h, m] = t.split(':').map(Number)
   return h * 60 + (m || 0)
 }
+function _shiftDurationMins(startTime, endTime) {
+  const start = _timeToMins(startTime)
+  const end = _timeToMins(endTime)
+  if (start === null || end === null) return null
+  if (end < start) return (1440 - start) + end
+  return end - start
+}
+function _addDaysToDateStr(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + days)
+  return toDateStr(dt)
+}
 function _pct(mins) {
   // minutes → pixel offset (60px per hour)
   return Math.round((mins / 60) * 60)
@@ -877,9 +894,29 @@ function renderWeek() {
   const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
 
   const visibleShiftsWeek = shifts
-
   const shiftMap = {}
-  visibleShiftsWeek.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
+  visibleShiftsWeek.forEach(s => {
+    if (!shiftMap[s.date]) shiftMap[s.date] = []
+    const startMins = _timeToMins(s.start_time)
+    const endMins = _timeToMins(s.end_time)
+
+    if (startMins !== null && endMins !== null) {
+      // Overnight shifts are split across two day columns.
+      if (endMins < startMins) {
+        shiftMap[s.date].push({ shift: s, timed: true, segStart: startMins, segEnd: 1440, overnight: true, continuation: false })
+        const nextDate = _addDaysToDateStr(s.date, 1)
+        if (!shiftMap[nextDate]) shiftMap[nextDate] = []
+        shiftMap[nextDate].push({ shift: s, timed: true, segStart: 0, segEnd: endMins, overnight: true, continuation: true })
+      } else if (endMins > startMins) {
+        shiftMap[s.date].push({ shift: s, timed: true, segStart: startMins, segEnd: endMins, overnight: false, continuation: false })
+      } else {
+        shiftMap[s.date].push({ shift: s, timed: false, overnight: false, continuation: false })
+      }
+      return
+    }
+
+    shiftMap[s.date].push({ shift: s, timed: false, overnight: false, continuation: false })
+  })
 
   // Task assignment map for this week: date -> [assignments]
   const taskMap = {}
@@ -986,7 +1023,8 @@ function renderWeek() {
     }
 
     // Shift blocks — positioned by time, or all-day chip if no time
-    dayShifts.forEach(s => {
+    dayShifts.forEach(entry => {
+      const s = entry.shift
       const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
@@ -995,14 +1033,13 @@ function renderWeek() {
         ? `oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')"`
         : ''
 
-      const startMins = _timeToMins(s.start_time)
-      const endMins   = _timeToMins(s.end_time)
-
-      if (startMins !== null && endMins !== null && endMins > startMins) {
+      if (entry.timed) {
         // Time-positioned block
-        const top    = _pct(startMins)
-        const height = Math.max(20, _pct(endMins - startMins))
-        const timeStr = `${s.start_time}–${s.end_time}`
+        const top    = _pct(entry.segStart)
+        const height = Math.max(20, _pct(entry.segEnd - entry.segStart))
+        const timeStr = entry.overnight
+          ? (entry.continuation ? `00:00–${s.end_time}` : `${s.start_time}–24:00`)
+          : `${s.start_time}–${s.end_time}`
         const showTime = height >= 32
         const showNotes = s.notes && height >= 52
         html += `<div class="cal-week-shift-card${s.is_oncall ? ' is-oncall' : ''}"
@@ -1828,7 +1865,7 @@ async function saveTaskAssignment() {
 function calcHours(shiftsArr) {
   return shiftsArr.reduce((total, s) => {
     if (!s.start_time || !s.end_time || s.is_off) return total
-    return total + (_timeToMins(s.end_time) - _timeToMins(s.start_time)) / 60
+    return total + (_shiftDurationMins(s.start_time, s.end_time) / 60)
   }, 0)
 }
 
@@ -1941,7 +1978,7 @@ function openShiftPanel(shiftId) {
   if (!s.is_off) {
     if (s.location_name) rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Location</div><div class="shift-panel-value">${escHtml(s.location_name)}</div></div>`)
     if (s.start_time && s.end_time) {
-      const mins = _timeToMins(s.end_time) - _timeToMins(s.start_time)
+      const mins = _shiftDurationMins(s.start_time, s.end_time)
       const dur = mins > 0 ? ` (${Math.floor(mins/60)}h${mins%60>0?' '+mins%60+'m':''})` : ''
       rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Time</div><div class="shift-panel-value">${escHtml(s.start_time)} – ${escHtml(s.end_time)}${escHtml(dur)}</div></div>`)
     }
@@ -2224,13 +2261,16 @@ function _initDragDrop() {
     const shiftId = idMatch[1]
     const shift = shifts.find(s => s.id === shiftId)
     if (!shift || !shift.start_time) return
+    const start = _timeToMins(shift.start_time)
+    const end = _timeToMins(shift.end_time || shift.start_time)
+    if (start !== null && end !== null && end < start) return
 
     e.preventDefault()
     e.stopPropagation()
     card.setPointerCapture(e.pointerId)
 
-    const startMins = _timeToMins(shift.start_time)
-    const endMins   = _timeToMins(shift.end_time || shift.start_time)
+    const startMins = start
+    const endMins   = end
     const mode = handle ? 'resize' : 'move'
 
     // Ghost element

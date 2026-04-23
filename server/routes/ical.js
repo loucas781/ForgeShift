@@ -47,6 +47,20 @@ function fmtLocalDT(dateStr, timeStr) {
   const timePart = timeStr.replace(':', '') + '00'
   return `${datePart}T${timePart}`
 }
+function timeToMins(timeStr) {
+  if (!timeStr) return null
+  const [h, m] = timeStr.split(':').map(Number)
+  return h * 60 + (m || 0)
+}
+function addDaysToDateStr(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + days)
+  const yy = dt.getFullYear()
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
 
 // Build a correct VTIMEZONE block for Europe/London.
 // A single DAYLIGHT + STANDARD pair with RRULE covers all years.
@@ -122,13 +136,20 @@ router.get('/feed/:token', (req, res) => {
 
       if (isAllDay) {
         const datePart = shift.date.replace(/-/g, '')
+        const endDatePart = addDaysToDateStr(shift.date, 1).replace(/-/g, '')
         dtStart = datePart
-        dtEnd   = datePart
+        dtEnd   = endDatePart
         startProp = `DTSTART;VALUE=DATE:${dtStart}`
         endProp   = `DTEND;VALUE=DATE:${dtEnd}`
       } else {
+        let endDate = shift.date
+        const startMins = timeToMins(shift.start_time)
+        const endMins = timeToMins(shift.end_time || shift.start_time)
+        if (startMins !== null && endMins !== null && endMins < startMins) {
+          endDate = addDaysToDateStr(shift.date, 1)
+        }
         dtStart   = fmtLocalDT(shift.date, shift.start_time)
-        dtEnd     = fmtLocalDT(shift.date, shift.end_time || shift.start_time)
+        dtEnd     = fmtLocalDT(endDate, shift.end_time || shift.start_time)
         startProp = `DTSTART;TZID=Europe/London:${dtStart}`
         endProp   = `DTEND;TZID=Europe/London:${dtEnd}`
       }
