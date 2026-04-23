@@ -195,7 +195,7 @@
 
       const verRes = await fetch('/api/passkeys/auth-verify', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ credential, nonce: opts._nonce })
+        body: JSON.stringify({ credential, nonce: opts.nonce || opts._nonce })
       })
       const verData = await verRes.json()
       if (!verRes.ok) { err.textContent = verData.error || 'Passkey verification failed'; err.classList.add('show'); return }

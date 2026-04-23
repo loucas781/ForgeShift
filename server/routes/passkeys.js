@@ -179,7 +179,8 @@ router.post('/auth-options', async (req, res) => {
     // Use a nonce so we can look up the challenge even without a session
     const nonce = uuid()
     storeChallenge(`auth:${nonce}`, options.challenge)
-    res.json({ ...options, _nonce: nonce })
+    // Keep both keys temporarily for compatibility with older/newer clients.
+    res.json({ ...options, nonce, _nonce: nonce })
   } catch (err) {
     logger.error('passkey auth-options error:', err.message)
     res.status(500).json({ error: 'Failed to generate authentication options' })
@@ -193,10 +194,11 @@ router.post('/auth-verify', async (req, res) => {
     const { verifyAuthenticationResponse } = await import('@simplewebauthn/server')
     const { rpID, origin } = rpConfig(req)
 
-    const { credential, _nonce: nonce } = req.body
-    if (!credential || !nonce) return res.status(400).json({ error: 'Missing credential or nonce' })
+    const { credential, nonce, _nonce } = req.body
+    const challengeNonce = nonce || _nonce
+    if (!credential || !challengeNonce) return res.status(400).json({ error: 'Missing credential or nonce' })
 
-    const expectedChallenge = popChallenge(`auth:${nonce}`)
+    const expectedChallenge = popChallenge(`auth:${challengeNonce}`)
     if (!expectedChallenge) return res.status(400).json({ error: 'Challenge expired or not found' })
 
     // Look up the stored credential

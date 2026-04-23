@@ -2893,7 +2893,7 @@ async function renderSecurityPanel() {
       <div class="card-header"><h3 class="card-title">Passkeys</h3></div>
       <div class="card-body">
         <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
-          Passkeys let you sign in with Face ID, Touch ID or a device PIN — no password needed.
+          Passkeys let you sign in with Touch ID, Windows Hello, or your device PIN — no password needed.
         </p>
         <div id="passkeys-area">
           <div style="display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:13px">
@@ -3022,7 +3022,7 @@ function _ab2b64url(buf) {
 }
 async function _promptDeviceName() {
   return new Promise(resolve => {
-    const name = prompt('Give this passkey a name (e.g. "MacBook Touch ID"):')
+    const name = prompt('Give this passkey a name (e.g. "Work Laptop"):')
     resolve(name && name.trim() ? name.trim() : 'My passkey')
   })
 }
