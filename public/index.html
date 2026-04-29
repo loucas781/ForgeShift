@@ -85,7 +85,7 @@
               <div style="display:flex;gap:6px;align-items:center">
                 <button id="shiftPanelDayAddBtn" class="btn btn-secondary btn-sm" style="display:none" onclick="shiftPanelAddForDay()">+ Shift</button>
                 <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
-                <button class="btn btn-ghost btn-icon" onclick="closeShiftPanel()" aria-label="Close panel" style="font-size:16px;width:32px;height:32px">✕</button>
+                <button class="btn btn-ghost btn-icon shift-panel-close" onclick="closeShiftPanel()" aria-label="Close panel">✕</button>
               </div>
             </div>
           </div>
@@ -2700,7 +2700,7 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
-  display: none;
+  display: flex;
   width: 380px;
   max-width: 380px;
   height: 100%;
@@ -2710,12 +2710,31 @@ init()
   box-shadow: -8px 0 32px rgba(0,0,0,.12);
   flex-direction: column;
   overflow: hidden;
+  opacity: 0;
+  transform: translateX(16px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .25s cubic-bezier(.32,1,.23,1);
 }
-.shift-panel.open { display: flex; }
+.shift-panel.open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.shift-panel-close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 15px;
+  padding: 0;
+}
 @media (min-width: 641px) {
   body.shift-panel-open .cal-wrapper {
     grid-template-columns: minmax(0, 1fr) 380px;
     gap: 12px;
+    transition: grid-template-columns .25s cubic-bezier(.32,1,.23,1), gap .25s cubic-bezier(.32,1,.23,1);
   }
 }
 .shift-panel-backdrop {
@@ -2778,6 +2797,9 @@ init()
     transition: bottom .25s cubic-bezier(.32,1,.23,1);
     z-index: 500;
     box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
   }
   .shift-panel.open { display: flex; bottom: 0; right: 6px; }
 }
