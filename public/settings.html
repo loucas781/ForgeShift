@@ -615,17 +615,21 @@ async function renderAppearancePanel() {
 }
 
 function pickTheme(theme) {
-  // Apply immediately
-  if (theme === 'system') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
-    if (!prefersDark) document.documentElement.removeAttribute('data-theme')
-  } else if (theme === 'light') {
-    document.documentElement.removeAttribute('data-theme')
-  } else {
-    document.documentElement.setAttribute('data-theme', theme)
+  // Keep settings page in sync with shared topbar/icon theme handling.
+  if (typeof applyTheme === 'function') applyTheme(theme)
+  else {
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
+      if (!prefersDark) document.documentElement.removeAttribute('data-theme')
+    } else if (theme === 'light') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+    localStorage.setItem('fs-theme', theme)
   }
-  localStorage.setItem('fs-theme', theme)
+  syncAboutIcon()
   // Update UI
   document.querySelectorAll('.theme-option').forEach(el => el.classList.remove('active'))
   document.getElementById('themeOpt-' + theme)?.classList.add('active')
@@ -4038,7 +4042,8 @@ async function doDeleteAccount() {
 // ── About panel ───────────────────────────────────────────────────────────────
 async function renderAboutPanel() {
   const el = document.getElementById('panel-about')
-  const aboutIcon = document.documentElement.getAttribute('data-theme') === 'dark'
+  const currentTheme = document.documentElement.getAttribute('data-theme')
+  const aboutIcon = (currentTheme === 'dark' || currentTheme === 'oled')
     ? '/icons/app-icon-dark-1024.png?v=20260429'
     : '/icons/app-icon-light-1024.png?v=20260429'
   el.innerHTML = `
@@ -4047,7 +4052,7 @@ async function renderAboutPanel() {
       <div class="card-body">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
           <div style="width:52px;height:52px;flex-shrink:0">
-            <img src="${aboutIcon}" alt="ForgeShift icon" style="width:52px;height:52px;border-radius:12px;display:block;object-fit:cover">
+            <img id="aboutAppIcon" src="${aboutIcon}" alt="ForgeShift icon" style="width:52px;height:52px;border-radius:12px;display:block;object-fit:cover">
           </div>
           <div>
             <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
@@ -4094,6 +4099,22 @@ async function renderAboutPanel() {
       </div>
     </div>`
 }
+
+function syncAboutIcon() {
+  const icon = document.getElementById('aboutAppIcon')
+  if (!icon) return
+  const currentTheme = document.documentElement.getAttribute('data-theme')
+  const isDark = currentTheme === 'dark' || currentTheme === 'oled'
+  icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429')
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  const liveTheme = localStorage.getItem('fs-theme') || 'system'
+  if (liveTheme === 'system') {
+    if (typeof applyTheme === 'function') applyTheme('system')
+    syncAboutIcon()
+  }
+})
 
 // Close modals on overlay click
 ['editUserModal','locModal'].forEach(id => {
