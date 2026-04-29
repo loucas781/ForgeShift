@@ -2708,11 +2708,13 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
+  --shift-panel-width: 380px;
+  --shift-panel-gap: 14px;
   position: absolute;
   top: 0;
   right: 0;
-  width: 380px;
-  max-width: 380px;
+  width: var(--shift-panel-width);
+  max-width: var(--shift-panel-width);
   height: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2750,12 +2752,12 @@ body.shift-panel-left .shift-panel {
 }
 @media (min-width: 641px) {
   body.shift-panel-open .cal-wrapper {
-    padding-right: 394px;
+    padding-right: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
     transition: padding-right .25s cubic-bezier(.32,1,.23,1);
   }
   body.shift-panel-left.shift-panel-open .cal-wrapper {
     padding-right: 0;
-    padding-left: 394px;
+    padding-left: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
     transition: padding-left .25s cubic-bezier(.32,1,.23,1);
   }
 }
