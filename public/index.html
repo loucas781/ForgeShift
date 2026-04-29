@@ -259,6 +259,7 @@
     <div class="shift-panel-title-row">
       <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
       <div style="display:flex;gap:6px;align-items:center">
+        <button id="shiftPanelDayAddBtn" class="btn btn-secondary btn-sm" style="display:none" onclick="shiftPanelAddForDay()">+ Shift</button>
         <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
         <button class="btn btn-ghost btn-icon" onclick="closeShiftPanel()" aria-label="Close panel" style="font-size:16px;width:32px;height:32px">✕</button>
       </div>
@@ -266,7 +267,6 @@
   </div>
   <div class="shift-panel-body" id="shiftPanelBody"></div>
 </div>
-<div id="shiftPanelBackdrop" class="shift-panel-backdrop" onclick="closeShiftPanel()"></div>
 
 <script src="/js/shell.js"></script>
 <script src="/js/prefs.js"></script>
@@ -749,15 +749,21 @@ function renderMonth() {
       html += '<div class="cal-wknum">' + _isoWeekNumber(d) + '</div>'
     }
 
+    const dayAssignments = taskMap[ds] || []
+    const dayTaskCount = dayAssignments.length
+    const dayShiftCount = dayShifts.length
+
     // Task banner — shown on every day that has assignments (or + Task prompt for managers)
     let taskBannerHtml = ''
     if (cfg.featureTasks && taskLists.length) {
-      const dayAssignments = taskMap[ds] || []
       const clickAttr = canManage()
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       if (dayAssignments.length) {
-        taskBannerHtml = dayAssignments.map(a => {
+        const MAX_TASK_BANNERS = 1
+        const visibleAssignments = dayAssignments.slice(0, MAX_TASK_BANNERS)
+        const hiddenAssignments = dayAssignments.length - visibleAssignments.length
+        taskBannerHtml = visibleAssignments.map(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
           const accent = getTaskBannerPresentation(a, '22')
           return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}" ` +
@@ -765,6 +771,9 @@ function renderMonth() {
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         }).join('')
+        if (hiddenAssignments > 0) {
+          taskBannerHtml += `<div class="cal-more-badge cal-task-more-badge${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">+${hiddenAssignments} task${hiddenAssignments > 1 ? 's' : ''}</div>`
+        }
       } else if (canManage() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
@@ -782,6 +791,9 @@ function renderMonth() {
       '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
       (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
+    if ((dayShiftCount + dayTaskCount) >= 4) {
+      html += '<div class="cal-day-summary">' + dayShiftCount + ' shift' + (dayShiftCount !== 1 ? 's' : '') + ' · ' + dayTaskCount + ' task' + (dayTaskCount !== 1 ? 's' : '') + '</div>'
+    }
 
     // Holiday label(s) — pinned, non-interactive, behind shifts
     if (dayHols.length) {
@@ -793,7 +805,7 @@ function renderMonth() {
     if (taskBannerHtml) html += taskBannerHtml
 
     // Shift chips — show up to 3, then "+N more"
-    const MAX_CHIPS = 3
+    const MAX_CHIPS = dayTaskCount > 0 ? 2 : 3
     const chipsToShow = dayShifts.slice(0, MAX_CHIPS)
     const overflow    = dayShifts.length - MAX_CHIPS
     chipsToShow.forEach(s => {
@@ -967,7 +979,10 @@ function renderWeek() {
         : ''
       html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
       if (dayAssignments.length) {
-        dayAssignments.forEach(a => {
+        const MAX_WEEK_TASK_BANNERS = 1
+        const visibleAssignments = dayAssignments.slice(0, MAX_WEEK_TASK_BANNERS)
+        const hiddenAssignments = dayAssignments.length - visibleAssignments.length
+        visibleAssignments.forEach(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
           const accent = getTaskBannerPresentation(a, '22')
           html += `<div class="cal-task-banner week-task-banner${canManage() ? ' clickable' : ''}"
@@ -977,6 +992,9 @@ function renderWeek() {
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         })
+        if (hiddenAssignments > 0) {
+          html += `<div class="cal-more-badge cal-task-more-badge${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">+${hiddenAssignments} task${hiddenAssignments > 1 ? 's' : ''}</div>`
+        }
       } else if (canManage() && taskLists.length && isSingleUserView) {
         html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
@@ -1134,7 +1152,7 @@ function handleCellClick(date) {
     const dayHasShift = shifts.some(s => s.date === date)
     if (!dayHasShift) { pasteShift(date); return }
   }
-  openCreateModal(date)
+  openDayPanel(date)
 }
 
 // ── Copy / Paste ───────────────────────────────────────────────────────────────
@@ -1933,6 +1951,8 @@ document.addEventListener('keydown', e => {
       } else if (modalOpen) {
         if (modalOpen.id === 'shiftModal') closeModal()
         else if (modalOpen.id === 'taskAssignModal') closeTaskAssignModal()
+      } else if (document.getElementById('shiftPanel')?.classList.contains('open')) {
+        closeShiftPanel()
       }
       break
     case '?':
@@ -1947,11 +1967,13 @@ document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
 
 // ── Shift details side panel ───────────────────────────────────────────────────
 let _shiftPanelId = null
+let _shiftPanelDay = null
 
 function openShiftPanel(shiftId) {
   const s = shifts.find(x => x.id == shiftId)
   if (!s) return
   _shiftPanelId = shiftId
+  _shiftPanelDay = s.date
 
   // Title
   const title = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
@@ -1960,6 +1982,7 @@ function openShiftPanel(shiftId) {
   // Edit button (managers only)
   const editBtn = document.getElementById('shiftPanelEditBtn')
   editBtn.style.display = canManage() ? '' : 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = 'none'
 
   // Body
   const rows = []
@@ -2009,19 +2032,73 @@ function openShiftPanel(shiftId) {
 
   // Open panel
   document.getElementById('shiftPanel').classList.add('open')
-  document.getElementById('shiftPanelBackdrop').classList.add('open')
+}
+
+function openDayPanel(dateStr) {
+  _shiftPanelId = null
+  _shiftPanelDay = dateStr
+
+  const dateObj = new Date(dateStr + 'T00:00:00')
+  const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  document.getElementById('shiftPanelTitle').textContent = dateLabel
+
+  document.getElementById('shiftPanelEditBtn').style.display = 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() ? '' : 'none'
+
+  const dayShifts = shifts
+    .filter(s => s.date === dateStr)
+    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+
+  const dayTasks = taskAssignments.filter(a => a.date === dateStr)
+
+  const shiftCards = dayShifts.length
+    ? dayShifts.map(s => {
+      const label = s.is_off ? 'Day Off' : (s.location_name || 'Shift')
+      const meta = [
+        s.user_name || '',
+        s.is_oncall ? 'On call' : '',
+        (s.start_time && s.end_time) ? `${s.start_time} - ${s.end_time}` : ''
+      ].filter(Boolean).join(' • ')
+      return `<div class="shift-panel-task-card" style="cursor:pointer" onclick="openShiftPanel('${s.id}')">` +
+        `<div class="shift-panel-task-name">${escHtml(label)}</div>` +
+        (meta ? `<div class="shift-panel-task-notes">${escHtml(meta)}</div>` : '') +
+        (s.notes ? `<div class="shift-panel-task-notes">${escHtml(s.notes)}</div>` : '') +
+        `</div>`
+    }).join('')
+    : `<div class="shift-panel-task-notes" style="padding:2px 0 0">No shifts for this day.</div>`
+
+  const taskCards = dayTasks.length
+    ? dayTasks.map(a => {
+      const who = a.user_name ? ` • ${a.user_name}` : ''
+      return `<div class="shift-panel-task-card">` +
+        `<div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}${escHtml(who)}</div>` +
+        (a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : '') +
+        `</div>`
+    }).join('')
+    : ''
+
+  document.getElementById('shiftPanelBody').innerHTML =
+    `<div class="shift-panel-section"><div class="shift-panel-section-title">Shifts</div>${shiftCards}</div>` +
+    (taskCards ? `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks</div>${taskCards}</div>` : '')
+
+  document.getElementById('shiftPanel').classList.add('open')
 }
 
 function closeShiftPanel() {
   document.getElementById('shiftPanel').classList.remove('open')
-  document.getElementById('shiftPanelBackdrop').classList.remove('open')
   _shiftPanelId = null
+  _shiftPanelDay = null
 }
 
 function shiftPanelEdit() {
   const id = _shiftPanelId
   closeShiftPanel()
   if (id) openEditModal(id)
+}
+
+function shiftPanelAddForDay() {
+  if (!canManage() || !_shiftPanelDay) return
+  openCreateModal(_shiftPanelDay)
 }
 
 // ── Real-time SSE ──────────────────────────────────────────────────────────────

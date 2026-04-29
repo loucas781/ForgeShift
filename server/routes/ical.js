@@ -154,8 +154,12 @@ router.get('/feed/:token', (req, res) => {
         endProp   = `DTEND;TZID=Europe/London:${dtEnd}`
       }
 
-      let summary = shift.is_off ? 'Annual Leave' : `Work - ${shift.location_name || 'No location'}`
+      const onCallOnly = !!shift.is_oncall && !shift.is_off && !shift.location_name
+      let summary = shift.is_off
+        ? 'Annual Leave'
+        : (onCallOnly ? 'ON CALL' : `Work - ${shift.location_name || 'Shift'}`)
       let desc = []
+      if (shift.is_oncall) desc.push('On call')
       if (shift.location_name)  desc.push(`Location: ${shift.location_name}`)
       if (shift.location_address) desc.push(`Address: ${shift.location_address}`)
       if (shift.start_time && shift.end_time) desc.push(`Time: ${shift.start_time} - ${shift.end_time}`)
