@@ -28,6 +28,7 @@
   <header class="topbar" id="topbar"></header>
   <main class="page-content" style="padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
       <div class="cal-wrapper">
+        <div class="cal-main">
         <!-- Toolbar -->
         <div class="cal-toolbar">
           <div class="cal-nav">
@@ -75,6 +76,7 @@
           <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
         </div>
         <div class="cal-grid" id="calGrid"></div>
+        </div>
         <!-- Shift Details Side Panel -->
         <div id="shiftPanel" class="shift-panel" aria-label="Shift details">
           <div class="shift-panel-header">
@@ -2698,29 +2700,22 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
-  position: absolute;
-  top: 8px;
-  right: -420px;
+  display: none;
   width: 380px;
-  max-width: calc(100% - 16px);
-  height: calc(100% - 16px);
+  max-width: 380px;
+  height: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px 0 0 14px;
+  border-radius: 16px;
   box-shadow: -8px 0 32px rgba(0,0,0,.12);
-  z-index: 500;
-  display: flex;
   flex-direction: column;
-  transition: right .25s cubic-bezier(.32,1,.23,1);
   overflow: hidden;
 }
-.shift-panel.open { right: 8px; }
-.cal-wrapper {
-  transition: padding-right .25s cubic-bezier(.32,1,.23,1);
-}
+.shift-panel.open { display: flex; }
 @media (min-width: 641px) {
   body.shift-panel-open .cal-wrapper {
-    padding-right: 394px;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 12px;
   }
 }
 .shift-panel-backdrop {
@@ -2767,8 +2762,24 @@ init()
 .shift-panel-task-desc-body p { margin: 0 0 4px; }
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
-  .shift-panel { width: calc(100% - 12px); max-width: 100%; border-left: none; border-radius: 14px 14px 0 0; top: auto; bottom: -100%; right: 6px; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
-  .shift-panel.open { bottom: 0; right: 6px; }
+  body.shift-panel-open .cal-wrapper {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .shift-panel {
+    position: fixed;
+    width: calc(100% - 12px);
+    max-width: 100%;
+    border-left: none;
+    border-radius: 14px 14px 0 0;
+    right: 6px;
+    bottom: -100%;
+    height: 85dvh;
+    transition: bottom .25s cubic-bezier(.32,1,.23,1);
+    z-index: 500;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+  }
+  .shift-panel.open { display: flex; bottom: 0; right: 6px; }
 }
 </style>
 </body>
