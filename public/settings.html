@@ -4109,6 +4109,12 @@ function syncAboutIcon() {
   icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429')
 }
 
+// Keep About icon in sync regardless of where theme was changed
+;(function watchThemeChangesForAboutIcon() {
+  const observer = new MutationObserver(() => syncAboutIcon())
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+})()
+
 // Close modals on overlay click
 ['editUserModal','locModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) document.getElementById(id).classList.remove('open') })
