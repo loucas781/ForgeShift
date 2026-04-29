@@ -606,7 +606,7 @@ router.patch('/prefs', requireAuth, (req, res) => {
     let existing = {}
     try { existing = JSON.parse(row?.prefs || '{}') } catch {}
     // Merge incoming keys — only allow known preference keys
-    const ALLOWED = ['weekStartDay', 'defaultView', 'showWeekNumbers', 'holidays', 'defaultShiftStart', 'defaultShiftEnd', 'compactChips']
+    const ALLOWED = ['weekStartDay', 'defaultView', 'showWeekNumbers', 'holidays', 'defaultShiftStart', 'defaultShiftEnd', 'compactChips', 'shiftPanelSide']
     const incoming = req.body || {}
     for (const k of ALLOWED) {
       if (k in incoming) existing[k] = incoming[k]

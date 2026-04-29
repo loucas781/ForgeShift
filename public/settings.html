@@ -704,6 +704,17 @@ async function renderPreferencesPanel() {
           </label>
         </div>
 
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Shift details side</strong>
+            <span>Choose which side the shift details panel opens from on desktop</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="pref-choice-btn${(p.shiftPanelSide || 'right')==='left'?' active':''}" id="sps-left" onclick="pickShiftPanelSide('left')">Left</button>
+            <button class="pref-choice-btn${(p.shiftPanelSide || 'right')==='right'?' active':''}" id="sps-right" onclick="pickShiftPanelSide('right')">Right</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -847,6 +858,13 @@ function pickDefaultView(v) {
   window._pendingDefaultView = v
 }
 
+function pickShiftPanelSide(side) {
+  const v = side === 'left' ? 'left' : 'right'
+  document.getElementById('sps-left')?.classList.toggle('active', v === 'left')
+  document.getElementById('sps-right')?.classList.toggle('active', v === 'right')
+  window._pendingShiftPanelSide = v
+}
+
 async function savePrefsPanel() {
   // Read all controls
   const wsd = window._pendingWeekStart !== undefined
@@ -865,6 +883,7 @@ async function savePrefsPanel() {
     defaultView:       dv,
     showWeekNumbers:   document.getElementById('prefShowWkNums')?.checked ?? false,
     compactChips:      document.getElementById('prefCompact')?.checked ?? false,
+    shiftPanelSide:    window._pendingShiftPanelSide || (document.getElementById('sps-left')?.classList.contains('active') ? 'left' : 'right'),
     defaultShiftStart: document.getElementById('prefDefaultStart')?.value || '',
     defaultShiftEnd:   document.getElementById('prefDefaultEnd')?.value || '',
     holidays,
@@ -873,6 +892,7 @@ async function savePrefsPanel() {
   // Clear pending
   delete window._pendingWeekStart
   delete window._pendingDefaultView
+  delete window._pendingShiftPanelSide
 
   await savePrefs(updates)
   toast('Preferences saved', 'success')
