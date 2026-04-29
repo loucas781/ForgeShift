@@ -295,6 +295,7 @@ let taskLists = []
 let taskAssignments = []
 let editingShiftId = null
 let selectedColour = '#4f46e5'
+let selectedCalendarDate = null
 const NEUTRAL_CALENDAR_COLOUR = '#6b7280'
 
 function getShiftDisplayColour(shift) {
@@ -303,6 +304,23 @@ function getShiftDisplayColour(shift) {
 
 function getTaskBannerPresentation(taskAssignment, alpha = '22') {
   return getAccentPresentation(taskAssignment.task_list_color, { alpha })
+}
+
+function renderTaskDots(dayAssignments, dateStr, className = '') {
+  if (!cfg.featureTasks || !dayAssignments.length) return ''
+  const clickAttr = canManage()
+    ? `onclick="event.stopPropagation();openTaskAssignModal('${dateStr}')"`
+    : ''
+  const count = dayAssignments.length
+  const sample = dayAssignments[0]
+  const accent = getTaskBannerPresentation(sample, '22')
+  const title = dayAssignments.map(a =>
+    `${a.task_list_name || 'Task'}${a.user_name ? ' • ' + a.user_name : ''}`
+  ).join('\n')
+  return `<div class="cal-task-dots${canManage() ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canManage() ? clickAttr : ''} title="${escHtml(title)}">` +
+    `<span class="cal-task-dot" style="background:${accent.border}"></span>` +
+    `<span class="cal-task-dot-label">${count} task list${count === 1 ? '' : 's'}</span>` +
+  `</div>`
 }
 
 // Copy/paste state
@@ -762,28 +780,14 @@ function renderMonth() {
     const dayTaskCount = dayAssignments.length
     const dayShiftCount = dayShifts.length
 
-    // Task banner — shown on every day that has assignments (or + Task prompt for managers)
+    // Task indicator — compact dots keeps month view clean.
     let taskBannerHtml = ''
     if (cfg.featureTasks && taskLists.length) {
       const clickAttr = canManage()
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       if (dayAssignments.length) {
-        const MAX_TASK_BANNERS = 2
-        const visibleAssignments = dayAssignments.slice(0, MAX_TASK_BANNERS)
-        const hiddenAssignments = dayAssignments.length - visibleAssignments.length
-        taskBannerHtml = '<div class="cal-task-stack">' + visibleAssignments.map(a => {
-          const safeData = encodeURIComponent(JSON.stringify(a))
-          const accent = getTaskBannerPresentation(a, '22')
-          return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}" ` +
-            `onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()" ${canManage() ? clickAttr : ''}>` +
-            (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
-            `<span>${a.task_list_name}</span></div>`
-        }).join('') + '</div>'
-        if (hiddenAssignments > 0) {
-          const totalTaskLists = dayAssignments.length
-          taskBannerHtml += `<div class="cal-task-summary${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">${totalTaskLists} task list${totalTaskLists > 1 ? 's' : ''}</div>`
-        }
+        taskBannerHtml = renderTaskDots(dayAssignments, ds)
       } else if (canManage() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
@@ -795,6 +799,7 @@ function renderMonth() {
     html += '<div class="cal-cell' +
       (isCurrentMonth ? '' : ' other-month') +
       (isToday ? ' today' : '') +
+      (selectedCalendarDate === ds ? ' selected-day' : '') +
       (dayHols.length ? ' is-holiday' : '') +
       (hasPaste ? ' can-paste' : '') +
       (isEmpty && canManage() ? ' can-add' : '') +
@@ -989,22 +994,7 @@ function renderWeek() {
         : ''
       html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
       if (dayAssignments.length) {
-        const MAX_WEEK_TASK_BANNERS = 1
-        const visibleAssignments = dayAssignments.slice(0, MAX_WEEK_TASK_BANNERS)
-        const hiddenAssignments = dayAssignments.length - visibleAssignments.length
-        visibleAssignments.forEach(a => {
-          const safeData = encodeURIComponent(JSON.stringify(a))
-          const accent = getTaskBannerPresentation(a, '22')
-          html += `<div class="cal-task-banner week-task-banner${canManage() ? ' clickable' : ''}"
-            style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}"
-            onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()"
-            ${canManage() ? clickAttr : ''}>` +
-            (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
-            `<span>${a.task_list_name}</span></div>`
-        })
-        if (hiddenAssignments > 0) {
-          html += `<div class="cal-more-badge cal-task-more-badge${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">+${hiddenAssignments} task${hiddenAssignments > 1 ? 's' : ''}</div>`
-        }
+        html += renderTaskDots(dayAssignments, ds, 'week-task-dots')
       } else if (canManage() && taskLists.length && isSingleUserView) {
         html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
@@ -1031,7 +1021,7 @@ function renderWeek() {
     const dayHols   = holidays[ds] || []
     const hasPaste  = copiedShift && dayShifts.length === 0
 
-    html += `<div class="cal-week-day-col${dayHols.length ? ' is-holiday' : ''}" onclick="handleCellClick('${ds}')">`
+    html += `<div class="cal-week-day-col${selectedCalendarDate === ds ? ' selected-day' : ''}${dayHols.length ? ' is-holiday' : ''}" onclick="handleCellClick('${ds}')">`
     html += `<div class="cal-week-col-inner">`
 
     // Hour grid lines
@@ -1154,13 +1144,34 @@ function next() {
 function goToday() { currentDate = new Date(); renderView() }
 function setView(v) { view = v; renderView() }
 
+function syncSelectedDayHighlight() {
+  document.querySelectorAll('.cal-cell.selected-day').forEach(el => el.classList.remove('selected-day'))
+  document.querySelectorAll('.cal-week-day-col.selected-day').forEach(el => el.classList.remove('selected-day'))
+  if (!selectedCalendarDate) return
+  document.querySelectorAll(`.cal-cell[data-date="${selectedCalendarDate}"]`).forEach(el => el.classList.add('selected-day'))
+  const weekCols = document.querySelectorAll('.cal-week-day-col')
+  weekCols.forEach(col => {
+    const onclickAttr = col.getAttribute('onclick') || ''
+    if (onclickAttr.includes(`'${selectedCalendarDate}'`)) col.classList.add('selected-day')
+  })
+}
+
 // ── Cell click — aware of paste mode ──────────────────────────────────────────
 function handleCellClick(date) {
   dismissContextMenu()
+  selectedCalendarDate = date
+  syncSelectedDayHighlight()
   if (copiedShift) {
     // Paste if the day is empty; otherwise open create modal pre-filled
     const dayHasShift = shifts.some(s => s.date === date)
     if (!dayHasShift) { pasteShift(date); return }
+  }
+  const dayShifts = shifts
+    .filter(s => s.date === date)
+    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+  if (dayShifts.length) {
+    openShiftPanel(dayShifts[0].id)
+    return
   }
   openDayPanel(date)
 }
@@ -1982,6 +1993,8 @@ let _shiftPanelDay = null
 function openShiftPanel(shiftId) {
   const s = shifts.find(x => x.id == shiftId)
   if (!s) return
+  selectedCalendarDate = s.date
+  syncSelectedDayHighlight()
   _shiftPanelId = shiftId
   _shiftPanelDay = s.date
 
@@ -2046,19 +2059,20 @@ function openShiftPanel(shiftId) {
 }
 
 function openDayPanel(dateStr) {
+  selectedCalendarDate = dateStr
+  syncSelectedDayHighlight()
   _shiftPanelId = null
   _shiftPanelDay = dateStr
+  const dayShifts = shifts
+    .filter(s => s.date === dateStr)
+    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
 
   const dateObj = new Date(dateStr + 'T00:00:00')
   const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   document.getElementById('shiftPanelTitle').textContent = dateLabel
 
   document.getElementById('shiftPanelEditBtn').style.display = 'none'
-  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() ? '' : 'none'
-
-  const dayShifts = shifts
-    .filter(s => s.date === dateStr)
-    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() && dayShifts.length === 0 ? '' : 'none'
 
   const dayTasks = taskAssignments.filter(a => a.date === dateStr)
 
@@ -2101,6 +2115,8 @@ function closeShiftPanel() {
   document.body.classList.remove('shift-panel-open')
   _shiftPanelId = null
   _shiftPanelDay = null
+  selectedCalendarDate = null
+  syncSelectedDayHighlight()
 }
 
 function shiftPanelEdit() {
@@ -2721,7 +2737,7 @@ init()
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: -8px 0 32px rgba(0,0,0,.12);
-  z-index: 500;
+  z-index: 150;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2842,16 +2858,22 @@ body.shift-panel-left:not(.shift-panel-open) .shift-panel {
     border-left: none;
     border-radius: 14px 14px 0 0;
     right: 6px;
-    bottom: -100%;
+    bottom: 0;
     height: 85dvh;
-    transition: bottom .25s cubic-bezier(.32,1,.23,1);
-    z-index: 500;
+    transition: transform .25s cubic-bezier(.32,1,.23,1), opacity .2s ease;
+    z-index: 150;
     box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+    opacity: 0;
+    transform: translateY(105%);
+    pointer-events: none;
+  }
+  .shift-panel.open {
+    display: flex;
+    right: 6px;
     opacity: 1;
-    transform: none;
+    transform: translateY(0);
     pointer-events: auto;
   }
-  .shift-panel.open { display: flex; bottom: 0; right: 6px; }
   body.shift-panel-left .shift-panel {
     left: auto;
     right: 6px;
