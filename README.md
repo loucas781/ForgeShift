@@ -80,12 +80,12 @@ Enable in repo **Settings → Actions → General → Read and write permissions
 | Branch | Behaviour |
 |---|---|
 | `develop` | Increments build counter on every push — e.g. `0.0.1-dev.42` |
-| `staging` | Bumps patch + `-rc` suffix on PR merge, creates the Git tag, and publishes a GitHub prerelease — e.g. `0.0.2-rc` |
-| `main` | Bumps minor, clean version, creates the Git tag, and publishes a GitHub release — e.g. `0.1.0` |
+| `staging` | Bumps patch + `-rc` suffix on PR merge and creates the Git tag — e.g. `0.0.2-rc` |
+| `main` | Bumps minor, clean version, and creates the Git tag — e.g. `0.1.0` |
 
 The version is displayed in the topbar env badge (`development v0.0.1-dev.42`), on the login page footer, and in Settings → Build Info.
 
-The Settings → Updates page checks published GitHub Releases for this repository. Production builds only compare against full releases, staging builds only compare against GitHub prereleases, and development builds are shown as unreleased builds rather than updateable releases.
+The Settings → Updates page checks published GitHub Releases for this repository. Production builds only compare against full releases, staging builds only compare against GitHub prereleases, and development builds are shown as unreleased builds rather than updateable releases. Publish releases/prereleases manually from GitHub when you want users to see them as available updates.
 
 ---
 
