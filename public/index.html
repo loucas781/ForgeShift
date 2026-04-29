@@ -2700,14 +2700,18 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
-  display: flex;
+  position: absolute;
+  top: 8px;
+  right: 8px;
   width: 380px;
   max-width: 380px;
-  height: 100%;
+  height: calc(100% - 16px);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: -8px 0 32px rgba(0,0,0,.12);
+  z-index: 500;
+  display: flex;
   flex-direction: column;
   overflow: hidden;
   opacity: 0;
@@ -2732,9 +2736,8 @@ init()
 }
 @media (min-width: 641px) {
   body.shift-panel-open .cal-wrapper {
-    grid-template-columns: minmax(0, 1fr) 380px;
-    gap: 12px;
-    transition: grid-template-columns .25s cubic-bezier(.32,1,.23,1), gap .25s cubic-bezier(.32,1,.23,1);
+    padding-right: 394px;
+    transition: padding-right .25s cubic-bezier(.32,1,.23,1);
   }
 }
 .shift-panel-backdrop {
@@ -2782,8 +2785,7 @@ init()
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
   body.shift-panel-open .cal-wrapper {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    padding-right: 0;
   }
   .shift-panel {
     position: fixed;
