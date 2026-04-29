@@ -80,8 +80,8 @@ function _resolvedTheme(theme) {
 
 function _applyAppIconTheme(theme) {
   const mode = _resolvedTheme(theme)
-  const iconHref = mode === 'dark' ? '/icons/app-icon-dark-1024.png' : '/icons/app-icon-light-1024.png'
-  const manifestHref = mode === 'dark' ? '/manifest-dark.json' : '/manifest-light.json'
+  const iconHref = mode === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429'
+  const manifestHref = mode === 'dark' ? '/manifest-dark.json?v=20260429' : '/manifest-light.json?v=20260429'
 
   const manifest = document.getElementById('appManifest')
   if (manifest) manifest.setAttribute('href', manifestHref)
@@ -98,6 +98,9 @@ function _applyAppIconTheme(theme) {
     document.head.appendChild(runtimeIcon)
   }
   runtimeIcon.setAttribute('href', iconHref)
+
+  const topbarLogo = document.getElementById('topbarLogoImg')
+  if (topbarLogo) topbarLogo.setAttribute('src', iconHref)
 }
 
 async function loadConfig() {
@@ -237,12 +240,7 @@ function renderShell(cfg, activePage) {
       <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M3 5h14a1 1 0 110 2H3a1 1 0 110-2zm0 4h14a1 1 0 110 2H3a1 1 0 110-2zm0 4h14a1 1 0 110 2H3a1 1 0 110-2z" clip-rule="evenodd"/></svg>
     </button>
     <a href="/" class="topbar-logo">
-      <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
-        <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
-        <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
-        <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
-        <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
-        <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/></svg>
+      <img id="topbarLogoImg" class="topbar-logo-img" src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429'}" alt="ForgeShift">
       <span class="topbar-logo-text">ForgeShift</span>
     </a>
     <span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>

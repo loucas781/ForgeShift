@@ -165,6 +165,7 @@ h4 { font-size: 13px; font-weight: 600; }
   text-decoration: none; flex-shrink: 0;
 }
 .topbar-logo svg { width: 28px; height: 28px; }
+.topbar-logo-img { width: 28px; height: 28px; border-radius: 8px; object-fit: cover; display: block; }
 .topbar-logo-text { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: -.03em; }
 .topbar-logo:hover { text-decoration: none; }
 
