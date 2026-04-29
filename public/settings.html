@@ -4109,10 +4109,14 @@ function syncAboutIcon() {
   icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429')
 }
 
-// Keep About icon in sync regardless of where theme was changed
+// Keep About icon in sync regardless of where theme was changed.
+// Guarded to avoid breaking settings on older embedded webviews.
 ;(function watchThemeChangesForAboutIcon() {
-  const observer = new MutationObserver(() => syncAboutIcon())
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  try {
+    if (typeof MutationObserver !== 'function') return
+    const observer = new MutationObserver(() => syncAboutIcon())
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  } catch {}
 })()
 
 // Close modals on overlay click
