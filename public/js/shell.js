@@ -638,7 +638,20 @@ function renderInlineColourSwatch(value, options = {}) {
 
 // ── PWA — Service Worker registration ──────────────────────────────────────────
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {})
+  ;(async () => {
+    try {
+      const cfg = await loadConfig()
+      const env = (cfg?.appEnv || '').toLowerCase()
+      if (env === 'development') {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map(r => r.unregister()))
+        return
+      }
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    } catch {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
+  })()
 }
 
 function renderColourPicker(container, value, onChange, options = {}) {

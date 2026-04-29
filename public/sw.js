@@ -1,5 +1,5 @@
 'use strict'
-const CACHE = 'forgeshift-v1'
+const CACHE = 'forgeshift-v2'
 const STATIC = ['/css/main.css', '/js/shell.js', '/js/prefs.js', '/favicon.svg']
 
 self.addEventListener('install', e =>
