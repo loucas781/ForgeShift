@@ -2755,37 +2755,32 @@ body.shift-panel-left .shift-panel {
   padding: 0;
 }
 @media (min-width: 641px) {
-  .cal-wrapper {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-areas: "main";
+  body.shift-panel-open .cal-wrapper {
+    display: flex;
+    flex-direction: row;
+    gap: var(--shift-panel-gap, 14px);
     align-items: stretch;
   }
-  .cal-main {
-    grid-area: main;
-    margin-left: 0;
-    margin-right: 0;
+  body.shift-panel-open .cal-main {
+    order: 1;
+    flex: 1 1 auto;
     min-width: 0;
   }
-  .shift-panel {
+  body.shift-panel-open .shift-panel {
     position: relative;
+    order: 2;
     top: auto;
     right: auto;
     left: auto;
     height: auto;
     max-height: none;
-    justify-self: end;
+    flex: 0 0 var(--shift-panel-width, 380px);
   }
-  body.shift-panel-left .shift-panel { justify-self: start; }
-  body.shift-panel-open .cal-wrapper {
-    column-gap: var(--shift-panel-gap, 14px);
-    grid-template-columns: 1fr var(--shift-panel-width, 380px);
-    grid-template-areas: "main panel";
-  }
-  body.shift-panel-open .shift-panel { grid-area: panel; }
-  body.shift-panel-left.shift-panel-open .cal-wrapper {
-    grid-template-columns: var(--shift-panel-width, 380px) 1fr;
-    grid-template-areas: "panel main";
+  body.shift-panel-left.shift-panel-open .shift-panel { order: 1; }
+  body.shift-panel-left.shift-panel-open .cal-main { order: 2; }
+  body.shift-panel-left.shift-panel-open .shift-panel,
+  body.shift-panel-left.shift-panel-open .cal-main {
+    min-width: 0;
   }
 }
 .shift-panel-backdrop {
