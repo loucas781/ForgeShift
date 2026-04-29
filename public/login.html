@@ -77,7 +77,7 @@
     <div class="auth-link" id="signupLink">
       Don't have an account? <a href="/signup.html">Sign up</a>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter"></div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3);white-space:normal;word-break:break-word;overflow:visible;text-overflow:clip" id="versionFooter"></div>
   </div>
 </div>
 
@@ -146,14 +146,28 @@
     })()
 
   async function init() {
+    const footer = document.getElementById('versionFooter')
+    const footerEnvColor = (env) => env === 'production' ? '#dc2626' : env === 'staging' ? '#d97706' : '#059669'
+    const inferEnvFromHost = () => {
+      const host = (window.location.hostname || '').toLowerCase()
+      return host.includes('staging') ? 'staging' : (host.includes('dev') || host.includes('develop') || host.includes('localhost')) ? 'development' : 'production'
+    }
+    const setFooter = (env, version) => {
+      if (!footer) return
+      const envLabel = String(env || inferEnvFromHost()).toUpperCase()
+      const versionLabel = String(version || 'unknown')
+      footer.innerHTML = `ForgeShift <span style="color:${footerEnvColor(envLabel.toLowerCase())};font-weight:700">${envLabel}</span> v${versionLabel}`
+    }
+
+    // Always render immediately so footer is visible even if network/config fails.
+    setFooter(inferEnvFromHost(), '...')
+
     try {
       const r = await fetch('/api/config')
       const d = await r.json()
       if (d.user) window.location.href = '/'
       if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
-      const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
-      document.getElementById('versionFooter').innerHTML =
-        `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
+      setFooter(d.appEnv, d.version)
       // Disable "remember login details" on non-production builds
       if (d.appEnv === 'development') {
         document.getElementById('rememberRow').style.display = 'none'
@@ -167,12 +181,7 @@
         fpLink.title = 'No email server configured — ask your admin to generate a reset link from Settings → Team'
       }
     } catch {
-      try {
-        const host = (window.location.hostname || '').toLowerCase()
-        const env = host.includes('staging') ? 'staging' : (host.includes('dev') || host.includes('develop') || host.includes('localhost')) ? 'development' : 'production'
-        document.getElementById('versionFooter').innerHTML =
-          `ForgeShift &nbsp;·&nbsp; <span style="color:${env==='production'?'#dc2626':env==='staging'?'#d97706':'#059669'};font-weight:600">${env}</span> &nbsp;·&nbsp; vunknown`
-      } catch {}
+      setFooter(inferEnvFromHost(), 'unknown')
     }
     // Show passkey option if browser supports WebAuthn
     if (window.PublicKeyCredential) {
