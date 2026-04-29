@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="/css/main.css">
   <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429" media="(prefers-color-scheme: light)">
   <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429">
   <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429">
   <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429">
   <meta name="theme-color" content="#4f46e5">
@@ -4036,19 +4038,16 @@ async function doDeleteAccount() {
 // ── About panel ───────────────────────────────────────────────────────────────
 async function renderAboutPanel() {
   const el = document.getElementById('panel-about')
+  const aboutIcon = document.documentElement.getAttribute('data-theme') === 'dark'
+    ? '/icons/app-icon-dark-1024.png?v=20260429'
+    : '/icons/app-icon-light-1024.png?v=20260429'
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About ForgeShift</h2>
     <div class="card section-card">
       <div class="card-body">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
           <div style="width:52px;height:52px;flex-shrink:0">
-            <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
-              <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
-              <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
-              <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
-              <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
-              <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/>
-            </svg>
+            <img src="${aboutIcon}" alt="ForgeShift icon" style="width:52px;height:52px;border-radius:12px;display:block;object-fit:cover">
           </div>
           <div>
             <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>

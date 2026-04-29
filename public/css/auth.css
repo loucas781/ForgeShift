@@ -29,6 +29,13 @@
 }
 
 .auth-logo svg { width: 36px; height: 36px; }
+.auth-logo-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  object-fit: cover;
+  display: block;
+}
 
 .auth-logo-text {
   font-size: 22px;

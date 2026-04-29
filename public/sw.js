@@ -1,5 +1,5 @@
 'use strict'
-const CACHE = 'forgeshift-v2'
+const CACHE = 'forgeshift-v3'
 const STATIC = [
   '/css/main.css',
   '/js/shell.js',
