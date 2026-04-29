@@ -65,7 +65,8 @@ function issueSession(res, user) {
     httpOnly: true,
     sameSite: secure ? 'strict' : 'lax',
     secure,
-    maxAge
+    maxAge,
+    path: '/'
   })
 }
 
