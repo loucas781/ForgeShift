@@ -2740,6 +2740,10 @@ body.shift-panel-left .shift-panel {
   transform: translateX(0);
   pointer-events: auto;
 }
+.cal-main {
+  margin-left: 0;
+  margin-right: 0;
+}
 .shift-panel-close {
   width: 32px;
   height: 32px;
@@ -2751,14 +2755,14 @@ body.shift-panel-left .shift-panel {
   padding: 0;
 }
 @media (min-width: 641px) {
-  body.shift-panel-open .cal-wrapper {
-    padding-right: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
-    transition: padding-right .25s cubic-bezier(.32,1,.23,1);
+  body.shift-panel-open .cal-main {
+    margin-right: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
+    transition: margin-right .25s cubic-bezier(.32,1,.23,1);
   }
-  body.shift-panel-left.shift-panel-open .cal-wrapper {
-    padding-right: 0;
-    padding-left: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
-    transition: padding-left .25s cubic-bezier(.32,1,.23,1);
+  body.shift-panel-left.shift-panel-open .cal-main {
+    margin-right: 0;
+    margin-left: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
+    transition: margin-left .25s cubic-bezier(.32,1,.23,1);
   }
 }
 .shift-panel-backdrop {
@@ -2805,9 +2809,9 @@ body.shift-panel-left .shift-panel {
 .shift-panel-task-desc-body p { margin: 0 0 4px; }
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
-  body.shift-panel-open .cal-wrapper {
-    padding-right: 0;
-    padding-left: 0;
+  body.shift-panel-open .cal-main {
+    margin-right: 0;
+    margin-left: 0;
   }
   .shift-panel {
     position: fixed;
