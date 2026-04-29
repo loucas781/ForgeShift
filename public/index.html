@@ -2032,6 +2032,7 @@ function openShiftPanel(shiftId) {
 
   // Open panel
   document.getElementById('shiftPanel').classList.add('open')
+  document.body.classList.add('shift-panel-open')
 }
 
 function openDayPanel(dateStr) {
@@ -2082,10 +2083,12 @@ function openDayPanel(dateStr) {
     (taskCards ? `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks</div>${taskCards}</div>` : '')
 
   document.getElementById('shiftPanel').classList.add('open')
+  document.body.classList.add('shift-panel-open')
 }
 
 function closeShiftPanel() {
   document.getElementById('shiftPanel').classList.remove('open')
+  document.body.classList.remove('shift-panel-open')
   _shiftPanelId = null
   _shiftPanelDay = null
 }
@@ -2711,6 +2714,14 @@ init()
   overflow: hidden;
 }
 .shift-panel.open { right: 0; }
+.cal-wrapper {
+  transition: margin-right .25s cubic-bezier(.32,1,.23,1);
+}
+@media (min-width: 641px) {
+  body.shift-panel-open .cal-wrapper {
+    margin-right: 394px;
+  }
+}
 .shift-panel-backdrop {
   display: none;
   position: fixed;
