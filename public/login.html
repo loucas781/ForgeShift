@@ -97,15 +97,17 @@
 
   // Restore saved credentials
   ;(function restoreSaved() {
-    const savedEmail = localStorage.getItem('fs-saved-email')
-    const savedPassword = localStorage.getItem('fs-saved-password')
-    if (savedEmail && savedPassword) {
-      document.getElementById('email').value = savedEmail
-      document.getElementById('password').value = savedPassword
-      const cb = document.getElementById('rememberToggle')
-      cb.checked = true
-      onRememberChange(cb)
-    }
+    try {
+      const savedEmail = localStorage.getItem('fs-saved-email')
+      const savedPassword = localStorage.getItem('fs-saved-password')
+      if (savedEmail && savedPassword) {
+        document.getElementById('email').value = savedEmail
+        document.getElementById('password').value = savedPassword
+        const cb = document.getElementById('rememberToggle')
+        cb.checked = true
+        onRememberChange(cb)
+      }
+    } catch {}
   })()
 
   function applyAuthThemeAndIcons(theme) {
@@ -129,12 +131,14 @@
     runtimeIcon.setAttribute('href', href)
   }
 
-  const t = localStorage.getItem('fs-theme') || 'system'
+  let t = 'system'
+  try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
   applyAuthThemeAndIcons(t)
   (function() {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const onThemeChange = () => {
-        const liveTheme = localStorage.getItem('fs-theme') || 'system'
+        let liveTheme = 'system'
+        try { liveTheme = localStorage.getItem('fs-theme') || 'system' } catch {}
         if (liveTheme === 'system') applyAuthThemeAndIcons('system')
       }
       if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
@@ -162,7 +166,14 @@
       if (fpLink && !d.smtpEnabled) {
         fpLink.title = 'No email server configured — ask your admin to generate a reset link from Settings → Team'
       }
-    } catch {}
+    } catch {
+      try {
+        const host = (window.location.hostname || '').toLowerCase()
+        const env = host.includes('staging') ? 'staging' : (host.includes('dev') || host.includes('develop') || host.includes('localhost')) ? 'development' : 'production'
+        document.getElementById('versionFooter').innerHTML =
+          `ForgeShift &nbsp;·&nbsp; <span style="color:${env==='production'?'#dc2626':env==='staging'?'#d97706':'#059669'};font-weight:600">${env}</span> &nbsp;·&nbsp; vunknown`
+      } catch {}
+    }
     // Show passkey option if browser supports WebAuthn
     if (window.PublicKeyCredential) {
       document.getElementById('passkeyDivider').style.display = 'flex'
