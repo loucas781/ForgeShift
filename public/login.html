@@ -82,22 +82,15 @@
 </div>
 
 <script>
-  function guessEnvFromHost() {
-    const h = (window.location.hostname || '').toLowerCase()
-    if (h.includes('staging')) return 'STAGING'
-    if (h.includes('develop') || h.includes('dev') || h.includes('localhost') || h === '127.0.0.1') return 'DEVELOPMENT'
-    return 'PRODUCTION'
-  }
-
   function renderVersionFooter(envRaw, versionRaw) {
-    const env = String(envRaw || 'DEVELOPMENT').toUpperCase()
-    const version = String(versionRaw || 'unknown')
+    const env = String(envRaw || '').toUpperCase()
+    const version = String(versionRaw || '').trim()
+    if (!env || !version) return
     const envColour = env === 'PRODUCTION' ? '#dc2626' : env === 'STAGING' ? '#d97706' : '#059669'
     const el = document.getElementById('versionFooter')
     if (!el) return
     el.innerHTML = `ForgeShift <span style="color:${envColour};font-weight:600">${env}</span> v${version}`
   }
-  renderVersionFooter(guessEnvFromHost(), '...')
   ;(async function nudgeFreshLoginPage() {
     try {
       if (!('serviceWorker' in navigator)) return
@@ -173,9 +166,8 @@
     })()
 
   async function init() {
-    renderVersionFooter(guessEnvFromHost(), '...')
     try {
-      const r = await fetch('/api/config')
+      const r = await fetch('/api/config', { cache: 'no-store' })
       let d = {}
       const ct = r.headers.get('content-type') || ''
       if (ct.includes('application/json')) {
@@ -188,8 +180,8 @@
       }
       if (d.user) window.location.href = '/'
       if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
-      const appEnv = (d.appEnv || guessEnvFromHost()).toString()
-      const version = d.version || 'unknown'
+      const appEnv = String(d.appEnv || d.env || d.environment || '').toUpperCase()
+      const version = String(d.version || d.appVersion || d.buildVersion || '').trim()
       renderVersionFooter(appEnv, version)
       // Disable "remember login details" on non-production builds
       if (String(appEnv).toLowerCase() === 'development') {
