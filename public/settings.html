@@ -577,6 +577,7 @@ function showTab(id) {
   const sel = document.getElementById('settingsMobileSelect')
   if (sel) sel.value = id
   window.location.hash = id
+  if (id === 'about') syncAboutIcon()
 }
 
 async function loadUsers() { users = await api('/api/users') }
@@ -629,6 +630,7 @@ function pickTheme(theme) {
     }
     localStorage.setItem('fs-theme', theme)
   }
+  syncAboutIcon()
   // Update UI
   document.querySelectorAll('.theme-option').forEach(el => el.classList.remove('active'))
   document.getElementById('themeOpt-' + theme)?.classList.add('active')
