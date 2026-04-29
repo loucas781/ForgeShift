@@ -250,8 +250,16 @@
     btn.disabled = true; btn.textContent = 'Signing in…'
     try {
       const r = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
-      const d = await r.json()
-      if (!r.ok) { err.textContent = d.error || 'Login failed'; err.classList.add('show'); return }
+      let d = {}
+      if (r.status !== 204) {
+        const ct = r.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          try { d = await r.json() } catch {}
+        } else {
+          try { d = { error: (await r.text()) || '' } } catch {}
+        }
+      }
+      if (!r.ok) { err.textContent = d.error || `Login failed (${r.status})`; err.classList.add('show'); return }
       if (document.getElementById('rememberToggle').checked) {
         localStorage.setItem('fs-saved-email', email)
         localStorage.setItem('fs-saved-password', password)
@@ -284,8 +292,16 @@
     btn.disabled = true; btn.textContent = 'Verifying…'
     try {
       const r = await fetch('/api/auth/2fa/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pendingToken: _pendingToken, code }) })
-      const d = await r.json()
-      if (!r.ok) { err.textContent = d.error || 'Verification failed'; err.classList.add('show'); return }
+      let d = {}
+      if (r.status !== 204) {
+        const ct = r.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          try { d = await r.json() } catch {}
+        } else {
+          try { d = { error: (await r.text()) || '' } } catch {}
+        }
+      }
+      if (!r.ok) { err.textContent = d.error || `Verification failed (${r.status})`; err.classList.add('show'); return }
       window.location.href = '/'
     } catch {
       err.textContent = 'Connection error — please try again'
