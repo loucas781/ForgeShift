@@ -3,11 +3,13 @@
 ============================================================ */
 .auth-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: var(--bg);
   padding: 24px 16px;
+  overflow-y: auto;
 }
 
 .auth-card {
@@ -18,6 +20,11 @@
   width: 100%;
   max-width: 400px;
   box-shadow: var(--shadow-lg);
+  margin: auto 0;
+}
+
+@media (min-height: 840px) {
+  .auth-page { align-items: center; }
 }
 
 .auth-logo {
