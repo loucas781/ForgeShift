@@ -129,10 +129,15 @@
 
   const t = localStorage.getItem('fs-theme') || 'system'
   applyAuthThemeAndIcons(t)
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    const liveTheme = localStorage.getItem('fs-theme') || 'system'
-    if (liveTheme === 'system') applyAuthThemeAndIcons('system')
-  })
+  (function() {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const onThemeChange = () => {
+        const liveTheme = localStorage.getItem('fs-theme') || 'system'
+        if (liveTheme === 'system') applyAuthThemeAndIcons('system')
+      }
+      if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
+      else if (typeof mq.addListener === 'function') mq.addListener(onThemeChange)
+    })()
 
   async function init() {
     try {

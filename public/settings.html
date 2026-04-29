@@ -4108,13 +4108,18 @@ function syncAboutIcon() {
   icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429')
 }
 
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  const liveTheme = localStorage.getItem('fs-theme') || 'system'
-  if (liveTheme === 'system') {
-    if (typeof applyTheme === 'function') applyTheme('system')
-    syncAboutIcon()
+;(function attachSettingsThemeListener() {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)')
+  const onThemeChange = () => {
+    const liveTheme = localStorage.getItem('fs-theme') || 'system'
+    if (liveTheme === 'system') {
+      if (typeof applyTheme === 'function') applyTheme('system')
+      syncAboutIcon()
+    }
   }
-})
+  if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
+  else if (typeof mq.addListener === 'function') mq.addListener(onThemeChange)
+})()
 
 // Close modals on overlay click
 ['editUserModal','locModal'].forEach(id => {
