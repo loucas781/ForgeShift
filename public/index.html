@@ -2755,14 +2755,37 @@ body.shift-panel-left .shift-panel {
   padding: 0;
 }
 @media (min-width: 641px) {
-  body.shift-panel-open .cal-main {
-    margin-right: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
-    transition: margin-right .25s cubic-bezier(.32,1,.23,1);
+  .cal-wrapper {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: "main";
+    align-items: stretch;
   }
-  body.shift-panel-left.shift-panel-open .cal-main {
+  .cal-main {
+    grid-area: main;
+    margin-left: 0;
     margin-right: 0;
-    margin-left: calc(var(--shift-panel-width, 380px) + var(--shift-panel-gap, 14px));
-    transition: margin-left .25s cubic-bezier(.32,1,.23,1);
+    min-width: 0;
+  }
+  .shift-panel {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    height: auto;
+    max-height: none;
+    justify-self: end;
+  }
+  body.shift-panel-left .shift-panel { justify-self: start; }
+  body.shift-panel-open .cal-wrapper {
+    column-gap: var(--shift-panel-gap, 14px);
+    grid-template-columns: 1fr var(--shift-panel-width, 380px);
+    grid-template-areas: "main panel";
+  }
+  body.shift-panel-open .shift-panel { grid-area: panel; }
+  body.shift-panel-left.shift-panel-open .cal-wrapper {
+    grid-template-columns: var(--shift-panel-width, 380px) 1fr;
+    grid-template-areas: "panel main";
   }
 }
 .shift-panel-backdrop {
