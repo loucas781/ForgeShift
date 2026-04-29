@@ -144,14 +144,25 @@
   async function init() {
     try {
       const r = await fetch('/api/config')
-      const d = await r.json()
+      let d = {}
+      const ct = r.headers.get('content-type') || ''
+      if (ct.includes('application/json')) {
+        try { d = await r.json() } catch {}
+      } else {
+        try {
+          const txt = await r.text()
+          d = txt ? JSON.parse(txt) : {}
+        } catch {}
+      }
       if (d.user) window.location.href = '/'
       if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
-      const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
+      const appEnv = d.appEnv || 'unknown'
+      const version = d.version || 'unknown'
+      const envColour = appEnv === 'production' ? '#dc2626' : appEnv === 'staging' ? '#d97706' : '#059669'
       document.getElementById('versionFooter').innerHTML =
-        `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
+        `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${appEnv}</span> &nbsp;·&nbsp; v${version}`
       // Disable "remember login details" on non-production builds
-      if (d.appEnv === 'development') {
+      if (appEnv === 'development') {
         document.getElementById('rememberRow').style.display = 'none'
         document.getElementById('rememberWarning').style.display = 'none'
         localStorage.removeItem('fs-saved-email')
@@ -162,7 +173,9 @@
       if (fpLink && !d.smtpEnabled) {
         fpLink.title = 'No email server configured — ask your admin to generate a reset link from Settings → Team'
       }
-    } catch {}
+    } catch {
+      document.getElementById('versionFooter').textContent = 'ForgeShift'
+    }
     // Show passkey option if browser supports WebAuthn
     if (window.PublicKeyCredential) {
       document.getElementById('passkeyDivider').style.display = 'flex'
@@ -267,8 +280,8 @@
         localStorage.removeItem('fs-saved-email')
         localStorage.removeItem('fs-saved-password')
       }
-      if (d.requiresTOTP) {
-        _pendingToken = d.pendingToken
+      if (d.requiresTOTP || d.requires2fa) {
+        _pendingToken = d.pendingToken || d.token
         document.getElementById('credentialsForm').style.display = 'none'
         document.getElementById('totpForm').style.display = ''
         document.getElementById('totpCode').focus()
