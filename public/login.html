@@ -77,31 +77,11 @@
     <div class="auth-link" id="signupLink">
       Don't have an account? <a href="/signup.html">Sign up</a>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter">ForgeShift</div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter"></div>
   </div>
 </div>
 
 <script>
-  function renderVersionFooter(envRaw, versionRaw) {
-    const env = String(envRaw || '').toUpperCase()
-    const version = String(versionRaw || '').trim()
-    if (!env || !version) return
-    const envColour = env === 'PRODUCTION' ? '#dc2626' : env === 'STAGING' ? '#d97706' : '#059669'
-    const el = document.getElementById('versionFooter')
-    if (!el) return
-    el.innerHTML = `ForgeShift <span style="color:${envColour};font-weight:600">${env}</span> v${version}`
-  }
-  ;(async function nudgeFreshLoginPage() {
-    try {
-      if (!('serviceWorker' in navigator)) return
-      const regs = await navigator.serviceWorker.getRegistrations()
-      for (const reg of regs) {
-        const scope = String(reg.scope || '')
-        if (scope.includes(window.location.origin)) await reg.update()
-      }
-    } catch {}
-  })()
-
   // Remember login details toggle
   function onRememberChange(cb) {
     const knob = document.getElementById('rememberKnob')
@@ -117,17 +97,15 @@
 
   // Restore saved credentials
   ;(function restoreSaved() {
-    try {
-      const savedEmail = localStorage.getItem('fs-saved-email')
-      const savedPassword = localStorage.getItem('fs-saved-password')
-      if (savedEmail && savedPassword) {
-        document.getElementById('email').value = savedEmail
-        document.getElementById('password').value = savedPassword
-        const cb = document.getElementById('rememberToggle')
-        cb.checked = true
-        onRememberChange(cb)
-      }
-    } catch {}
+    const savedEmail = localStorage.getItem('fs-saved-email')
+    const savedPassword = localStorage.getItem('fs-saved-password')
+    if (savedEmail && savedPassword) {
+      document.getElementById('email').value = savedEmail
+      document.getElementById('password').value = savedPassword
+      const cb = document.getElementById('rememberToggle')
+      cb.checked = true
+      onRememberChange(cb)
+    }
   })()
 
   function applyAuthThemeAndIcons(theme) {
@@ -151,14 +129,12 @@
     runtimeIcon.setAttribute('href', href)
   }
 
-  let t = 'system'
-  try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
+  const t = localStorage.getItem('fs-theme') || 'system'
   applyAuthThemeAndIcons(t)
   (function() {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const onThemeChange = () => {
-        let liveTheme = 'system'
-        try { liveTheme = localStorage.getItem('fs-theme') || 'system' } catch {}
+        const liveTheme = localStorage.getItem('fs-theme') || 'system'
         if (liveTheme === 'system') applyAuthThemeAndIcons('system')
       }
       if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
@@ -167,24 +143,15 @@
 
   async function init() {
     try {
-      const r = await fetch('/api/config', { cache: 'no-store' })
-      let d = {}
-      const ct = r.headers.get('content-type') || ''
-      if (ct.includes('application/json')) {
-        try { d = await r.json() } catch {}
-      } else {
-        try {
-          const txt = await r.text()
-          d = txt ? JSON.parse(txt) : {}
-        } catch {}
-      }
+      const r = await fetch('/api/config')
+      const d = await r.json()
       if (d.user) window.location.href = '/'
       if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
-      const appEnv = String(d.appEnv || d.env || d.environment || '').toUpperCase()
-      const version = String(d.version || d.appVersion || d.buildVersion || '').trim()
-      renderVersionFooter(appEnv, version)
+      const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
+      document.getElementById('versionFooter').innerHTML =
+        `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
       // Disable "remember login details" on non-production builds
-      if (String(appEnv).toLowerCase() === 'development') {
+      if (d.appEnv === 'development') {
         document.getElementById('rememberRow').style.display = 'none'
         document.getElementById('rememberWarning').style.display = 'none'
         localStorage.removeItem('fs-saved-email')
@@ -300,8 +267,8 @@
         localStorage.removeItem('fs-saved-email')
         localStorage.removeItem('fs-saved-password')
       }
-      if (d.requiresTOTP || d.requires2fa) {
-        _pendingToken = d.pendingToken || d.token
+      if (d.requiresTOTP) {
+        _pendingToken = d.pendingToken
         document.getElementById('credentialsForm').style.display = 'none'
         document.getElementById('totpForm').style.display = ''
         document.getElementById('totpCode').focus()
