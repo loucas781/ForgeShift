@@ -7,8 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
   <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -573,6 +579,7 @@ function showTab(id) {
   const sel = document.getElementById('settingsMobileSelect')
   if (sel) sel.value = id
   window.location.hash = id
+  if (id === 'about') syncAboutIcon()
 }
 
 async function loadUsers() { users = await api('/api/users') }
@@ -611,17 +618,21 @@ async function renderAppearancePanel() {
 }
 
 function pickTheme(theme) {
-  // Apply immediately
-  if (theme === 'system') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
-    if (!prefersDark) document.documentElement.removeAttribute('data-theme')
-  } else if (theme === 'light') {
-    document.documentElement.removeAttribute('data-theme')
-  } else {
-    document.documentElement.setAttribute('data-theme', theme)
+  // Keep settings page in sync with shared topbar/icon theme handling.
+  if (typeof applyTheme === 'function') applyTheme(theme)
+  else {
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
+      if (!prefersDark) document.documentElement.removeAttribute('data-theme')
+    } else if (theme === 'light') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+    localStorage.setItem('fs-theme', theme)
   }
-  localStorage.setItem('fs-theme', theme)
+  syncAboutIcon()
   // Update UI
   document.querySelectorAll('.theme-option').forEach(el => el.classList.remove('active'))
   document.getElementById('themeOpt-' + theme)?.classList.add('active')
@@ -4034,19 +4045,17 @@ async function doDeleteAccount() {
 // ── About panel ───────────────────────────────────────────────────────────────
 async function renderAboutPanel() {
   const el = document.getElementById('panel-about')
+  const currentTheme = document.documentElement.getAttribute('data-theme')
+  const aboutIcon = (currentTheme === 'dark' || currentTheme === 'oled')
+    ? '/icons/app-icon-dark-1024.png?v=20260429c'
+    : '/icons/app-icon-light-1024.png?v=20260429c'
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About ForgeShift</h2>
     <div class="card section-card">
       <div class="card-body">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
           <div style="width:52px;height:52px;flex-shrink:0">
-            <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
-              <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
-              <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
-              <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
-              <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
-              <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/>
-            </svg>
+            <img id="aboutAppIcon" src="${aboutIcon}" alt="ForgeShift icon" style="width:52px;height:52px;border-radius:12px;display:block;object-fit:cover">
           </div>
           <div>
             <div style="font-size:20px;font-weight:800;letter-spacing:-.03em">ForgeShift</div>
@@ -4092,6 +4101,14 @@ async function renderAboutPanel() {
         </p>
       </div>
     </div>`
+}
+
+function syncAboutIcon() {
+  const icon = document.getElementById('aboutAppIcon')
+  if (!icon) return
+  const currentTheme = document.documentElement.getAttribute('data-theme')
+  const isDark = currentTheme === 'dark' || currentTheme === 'oled'
+  icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c')
 }
 
 // Close modals on overlay click

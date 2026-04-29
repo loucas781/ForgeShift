@@ -8,7 +8,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/auth.css">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
   <script>
     (function(){
       var t = localStorage.getItem('fs-theme') || 'system'
@@ -22,12 +28,7 @@
 <div class="auth-page">
   <div class="auth-card">
     <div class="auth-logo">
-      <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#4f46e5"/>
-        <path d="M10 26V10h10l6 6v10H10z" fill="rgba(255,255,255,.25)"/>
-        <path d="M20 10l6 6h-6V10z" fill="rgba(255,255,255,.5)"/>
-        <rect x="13" y="16" width="10" height="1.5" rx=".75" fill="white"/>
-        <rect x="13" y="19" width="7" height="1.5" rx=".75" fill="white"/>
-        <rect x="13" y="22" width="8" height="1.5" rx=".75" fill="white"/></svg>
+      <img id="authLogoImg" class="auth-logo-img" src="/icons/app-icon-light-1024.png?v=20260429c" alt="ForgeShift">
       <span class="auth-logo-text">ForgeShift</span>
     </div>
 
@@ -97,6 +98,42 @@
     el.textContent = msg
     el.style.display = msg ? 'block' : 'none'
   }
+
+  function applyAuthThemeAndIcons(theme) {
+    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    if (theme === 'light') document.documentElement.removeAttribute('data-theme')
+    else if (isDark) document.documentElement.setAttribute('data-theme', 'dark')
+    else document.documentElement.removeAttribute('data-theme')
+    const href = isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
+    const appleTouch = document.querySelector('link[rel="apple-touch-icon"]')
+    if (appleTouch) appleTouch.setAttribute('href', href)
+    const logo = document.getElementById('authLogoImg')
+    if (logo) logo.setAttribute('src', href)
+    let runtimeIcon = document.getElementById('runtimeAppIcon')
+    if (!runtimeIcon) {
+      runtimeIcon = document.createElement('link')
+      runtimeIcon.id = 'runtimeAppIcon'
+      runtimeIcon.rel = 'icon'
+      runtimeIcon.type = 'image/png'
+      document.head.appendChild(runtimeIcon)
+    }
+    runtimeIcon.setAttribute('href', href)
+  }
+
+  // Attach live indicator
+  ;(function setupAuthThemeWatcher() {
+    const theme = localStorage.getItem('fs-theme') || 'system'
+    applyAuthThemeAndIcons(theme)
+    (function() {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const onThemeChange = () => {
+        const liveTheme = localStorage.getItem('fs-theme') || 'system'
+        if (liveTheme === 'system') applyAuthThemeAndIcons('system')
+      }
+      if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
+      else if (typeof mq.addListener === 'function') mq.addListener(onThemeChange)
+    })()
+  })()
 
   // Attach live indicator
   const pwInput = document.getElementById('password')

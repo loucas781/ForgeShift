@@ -7,8 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
   <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <script>
@@ -28,6 +34,7 @@
   <header class="topbar" id="topbar"></header>
   <main class="page-content" style="padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
       <div class="cal-wrapper">
+        <div class="cal-main">
         <!-- Toolbar -->
         <div class="cal-toolbar">
           <div class="cal-nav">
@@ -75,6 +82,21 @@
           <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
         </div>
         <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <!-- Shift Details Side Panel -->
+        <div id="shiftPanel" class="shift-panel" aria-label="Shift details">
+          <div class="shift-panel-header">
+            <div class="shift-panel-title-row">
+              <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button id="shiftPanelDayAddBtn" class="btn btn-secondary btn-sm" style="display:none" onclick="shiftPanelAddForDay()">+ Shift</button>
+                <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
+                <button class="btn btn-ghost btn-icon shift-panel-close" onclick="closeShiftPanel()" aria-label="Close panel">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="shift-panel-body" id="shiftPanelBody"></div>
+        </div>
       </div>
       <!-- Mobile FAB: Copy Week (week view + managers only) -->
       <button id="copyWeekFab" class="copy-week-fab" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week" aria-label="Copy week">
@@ -253,20 +275,6 @@
   </div>
 </div>
 
-<!-- Shift Details Side Panel -->
-<div id="shiftPanel" class="shift-panel" aria-label="Shift details">
-  <div class="shift-panel-header">
-    <div class="shift-panel-title-row">
-      <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
-        <button class="btn btn-ghost btn-icon" onclick="closeShiftPanel()" aria-label="Close panel" style="font-size:16px;width:32px;height:32px">✕</button>
-      </div>
-    </div>
-  </div>
-  <div class="shift-panel-body" id="shiftPanelBody"></div>
-</div>
-<div id="shiftPanelBackdrop" class="shift-panel-backdrop" onclick="closeShiftPanel()"></div>
 
 <script src="/js/shell.js"></script>
 <script src="/js/prefs.js"></script>
@@ -749,15 +757,21 @@ function renderMonth() {
       html += '<div class="cal-wknum">' + _isoWeekNumber(d) + '</div>'
     }
 
+    const dayAssignments = taskMap[ds] || []
+    const dayTaskCount = dayAssignments.length
+    const dayShiftCount = dayShifts.length
+
     // Task banner — shown on every day that has assignments (or + Task prompt for managers)
     let taskBannerHtml = ''
     if (cfg.featureTasks && taskLists.length) {
-      const dayAssignments = taskMap[ds] || []
       const clickAttr = canManage()
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       if (dayAssignments.length) {
-        taskBannerHtml = dayAssignments.map(a => {
+        const MAX_TASK_BANNERS = 1
+        const visibleAssignments = dayAssignments.slice(0, MAX_TASK_BANNERS)
+        const hiddenAssignments = dayAssignments.length - visibleAssignments.length
+        taskBannerHtml = visibleAssignments.map(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
           const accent = getTaskBannerPresentation(a, '22')
           return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}" ` +
@@ -765,6 +779,9 @@ function renderMonth() {
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         }).join('')
+        if (hiddenAssignments > 0) {
+          taskBannerHtml += `<div class="cal-more-badge cal-task-more-badge${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">+${hiddenAssignments} task${hiddenAssignments > 1 ? 's' : ''}</div>`
+        }
       } else if (canManage() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
@@ -782,6 +799,9 @@ function renderMonth() {
       '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
       (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
+    if ((dayShiftCount + dayTaskCount) >= 4) {
+      html += '<div class="cal-day-summary">' + dayShiftCount + ' shift' + (dayShiftCount !== 1 ? 's' : '') + ' · ' + dayTaskCount + ' task' + (dayTaskCount !== 1 ? 's' : '') + '</div>'
+    }
 
     // Holiday label(s) — pinned, non-interactive, behind shifts
     if (dayHols.length) {
@@ -793,7 +813,7 @@ function renderMonth() {
     if (taskBannerHtml) html += taskBannerHtml
 
     // Shift chips — show up to 3, then "+N more"
-    const MAX_CHIPS = 3
+    const MAX_CHIPS = dayTaskCount > 0 ? 2 : 3
     const chipsToShow = dayShifts.slice(0, MAX_CHIPS)
     const overflow    = dayShifts.length - MAX_CHIPS
     chipsToShow.forEach(s => {
@@ -967,7 +987,10 @@ function renderWeek() {
         : ''
       html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
       if (dayAssignments.length) {
-        dayAssignments.forEach(a => {
+        const MAX_WEEK_TASK_BANNERS = 1
+        const visibleAssignments = dayAssignments.slice(0, MAX_WEEK_TASK_BANNERS)
+        const hiddenAssignments = dayAssignments.length - visibleAssignments.length
+        visibleAssignments.forEach(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
           const accent = getTaskBannerPresentation(a, '22')
           html += `<div class="cal-task-banner week-task-banner${canManage() ? ' clickable' : ''}"
@@ -977,6 +1000,9 @@ function renderWeek() {
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
         })
+        if (hiddenAssignments > 0) {
+          html += `<div class="cal-more-badge cal-task-more-badge${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">+${hiddenAssignments} task${hiddenAssignments > 1 ? 's' : ''}</div>`
+        }
       } else if (canManage() && taskLists.length && isSingleUserView) {
         html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
@@ -1134,7 +1160,7 @@ function handleCellClick(date) {
     const dayHasShift = shifts.some(s => s.date === date)
     if (!dayHasShift) { pasteShift(date); return }
   }
-  openCreateModal(date)
+  openDayPanel(date)
 }
 
 // ── Copy / Paste ───────────────────────────────────────────────────────────────
@@ -1933,6 +1959,8 @@ document.addEventListener('keydown', e => {
       } else if (modalOpen) {
         if (modalOpen.id === 'shiftModal') closeModal()
         else if (modalOpen.id === 'taskAssignModal') closeTaskAssignModal()
+      } else if (document.getElementById('shiftPanel')?.classList.contains('open')) {
+        closeShiftPanel()
       }
       break
     case '?':
@@ -1947,11 +1975,13 @@ document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
 
 // ── Shift details side panel ───────────────────────────────────────────────────
 let _shiftPanelId = null
+let _shiftPanelDay = null
 
 function openShiftPanel(shiftId) {
   const s = shifts.find(x => x.id == shiftId)
   if (!s) return
   _shiftPanelId = shiftId
+  _shiftPanelDay = s.date
 
   // Title
   const title = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
@@ -1960,6 +1990,7 @@ function openShiftPanel(shiftId) {
   // Edit button (managers only)
   const editBtn = document.getElementById('shiftPanelEditBtn')
   editBtn.style.display = canManage() ? '' : 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = 'none'
 
   // Body
   const rows = []
@@ -2009,19 +2040,76 @@ function openShiftPanel(shiftId) {
 
   // Open panel
   document.getElementById('shiftPanel').classList.add('open')
-  document.getElementById('shiftPanelBackdrop').classList.add('open')
+  document.body.classList.add('shift-panel-open')
+}
+
+function openDayPanel(dateStr) {
+  _shiftPanelId = null
+  _shiftPanelDay = dateStr
+
+  const dateObj = new Date(dateStr + 'T00:00:00')
+  const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  document.getElementById('shiftPanelTitle').textContent = dateLabel
+
+  document.getElementById('shiftPanelEditBtn').style.display = 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() ? '' : 'none'
+
+  const dayShifts = shifts
+    .filter(s => s.date === dateStr)
+    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+
+  const dayTasks = taskAssignments.filter(a => a.date === dateStr)
+
+  const shiftCards = dayShifts.length
+    ? dayShifts.map(s => {
+      const label = s.is_off ? 'Day Off' : (s.location_name || 'Shift')
+      const meta = [
+        s.user_name || '',
+        s.is_oncall ? 'On call' : '',
+        (s.start_time && s.end_time) ? `${s.start_time} - ${s.end_time}` : ''
+      ].filter(Boolean).join(' • ')
+      return `<div class="shift-panel-task-card" style="cursor:pointer" onclick="openShiftPanel('${s.id}')">` +
+        `<div class="shift-panel-task-name">${escHtml(label)}</div>` +
+        (meta ? `<div class="shift-panel-task-notes">${escHtml(meta)}</div>` : '') +
+        (s.notes ? `<div class="shift-panel-task-notes">${escHtml(s.notes)}</div>` : '') +
+        `</div>`
+    }).join('')
+    : `<div class="shift-panel-task-notes" style="padding:2px 0 0">No shifts for this day.</div>`
+
+  const taskCards = dayTasks.length
+    ? dayTasks.map(a => {
+      const who = a.user_name ? ` • ${a.user_name}` : ''
+      return `<div class="shift-panel-task-card">` +
+        `<div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}${escHtml(who)}</div>` +
+        (a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : '') +
+        `</div>`
+    }).join('')
+    : ''
+
+  document.getElementById('shiftPanelBody').innerHTML =
+    `<div class="shift-panel-section"><div class="shift-panel-section-title">Shifts</div>${shiftCards}</div>` +
+    (taskCards ? `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks</div>${taskCards}</div>` : '')
+
+  document.getElementById('shiftPanel').classList.add('open')
+  document.body.classList.add('shift-panel-open')
 }
 
 function closeShiftPanel() {
   document.getElementById('shiftPanel').classList.remove('open')
-  document.getElementById('shiftPanelBackdrop').classList.remove('open')
+  document.body.classList.remove('shift-panel-open')
   _shiftPanelId = null
+  _shiftPanelDay = null
 }
 
 function shiftPanelEdit() {
   const id = _shiftPanelId
   closeShiftPanel()
   if (id) openEditModal(id)
+}
+
+function shiftPanelAddForDay() {
+  if (!canManage() || !_shiftPanelDay) return
+  openCreateModal(_shiftPanelDay)
 }
 
 // ── Real-time SSE ──────────────────────────────────────────────────────────────
@@ -2618,22 +2706,46 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
-  position: fixed;
+  position: absolute;
   top: 0;
-  right: -420px;
+  right: 0;
   width: 380px;
-  max-width: 100vw;
+  max-width: 380px;
   height: 100%;
   background: var(--surface);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px;
   box-shadow: -8px 0 32px rgba(0,0,0,.12);
   z-index: 500;
   display: flex;
   flex-direction: column;
-  transition: right .25s cubic-bezier(.32,1,.23,1);
   overflow: hidden;
+  opacity: 0;
+  transform: translateX(16px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .25s cubic-bezier(.32,1,.23,1);
 }
-.shift-panel.open { right: 0; }
+.shift-panel.open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.shift-panel-close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 15px;
+  padding: 0;
+}
+@media (min-width: 641px) {
+  body.shift-panel-open .cal-wrapper {
+    padding-right: 394px;
+    transition: padding-right .25s cubic-bezier(.32,1,.23,1);
+  }
+}
 .shift-panel-backdrop {
   display: none;
   position: fixed;
@@ -2678,8 +2790,26 @@ init()
 .shift-panel-task-desc-body p { margin: 0 0 4px; }
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
-  .shift-panel { width: 100%; border-left: none; border-radius: 20px 20px 0 0; top: auto; bottom: -100%; right: 0; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
-  .shift-panel.open { bottom: 0; right: 0; }
+  body.shift-panel-open .cal-wrapper {
+    padding-right: 0;
+  }
+  .shift-panel {
+    position: fixed;
+    width: calc(100% - 12px);
+    max-width: 100%;
+    border-left: none;
+    border-radius: 14px 14px 0 0;
+    right: 6px;
+    bottom: -100%;
+    height: 85dvh;
+    transition: bottom .25s cubic-bezier(.32,1,.23,1);
+    z-index: 500;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .shift-panel.open { display: flex; bottom: 0; right: 6px; }
 }
 </style>
 </body>
