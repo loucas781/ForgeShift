@@ -151,7 +151,7 @@
         document.getElementById('mainForm').style.display = 'none'
         document.getElementById('disabledState').style.display = 'block'
       }
-      const envColour = d.appEnv === 'production' ? '#dc2626' : d.appEnv === 'staging' ? '#d97706' : '#059669'
+      const envColour = d.appEnv === 'staging' ? '#d97706' : d.appEnv === 'development' ? '#6554c0' : '#0a7c41'
       document.getElementById('versionFooter').innerHTML =
         `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
     } catch {}
