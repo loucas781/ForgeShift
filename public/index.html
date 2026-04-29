@@ -2712,6 +2712,7 @@ init()
   --shift-panel-gap: 14px;
   position: absolute;
   top: 0;
+  left: auto;
   right: 0;
   width: var(--shift-panel-width);
   max-width: var(--shift-panel-width);
@@ -2729,7 +2730,7 @@ init()
   pointer-events: none;
   transition: opacity .2s ease, transform .25s cubic-bezier(.32,1,.23,1);
 }
-body.shift-panel-left .shift-panel {
+body.shift-panel-left:not(.shift-panel-open) .shift-panel {
   left: 0;
   right: auto;
   box-shadow: 8px 0 32px rgba(0,0,0,.12);
@@ -2769,14 +2770,17 @@ body.shift-panel-left .shift-panel {
   body.shift-panel-open .shift-panel {
     position: relative;
     order: 2;
-    top: auto;
-    right: auto;
-    left: auto;
+    inset: auto;
     height: auto;
     max-height: none;
     flex: 0 0 var(--shift-panel-width, 380px);
+    margin: 0;
+    box-shadow: -8px 0 32px rgba(0,0,0,.12);
   }
-  body.shift-panel-left.shift-panel-open .shift-panel { order: 1; }
+  body.shift-panel-left.shift-panel-open .shift-panel {
+    order: 1;
+    box-shadow: 8px 0 32px rgba(0,0,0,.12);
+  }
   body.shift-panel-left.shift-panel-open .cal-main { order: 2; }
   body.shift-panel-left.shift-panel-open .shift-panel,
   body.shift-panel-left.shift-panel-open .cal-main {
