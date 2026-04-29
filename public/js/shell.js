@@ -73,6 +73,33 @@ function _syncStandaloneClass() {
   document.documentElement.classList.toggle('standalone-app', _isStandaloneApp())
 }
 
+function _resolvedTheme(theme) {
+  if (theme === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return theme === 'dark' || theme === 'oled' ? 'dark' : 'light'
+}
+
+function _applyAppIconTheme(theme) {
+  const mode = _resolvedTheme(theme)
+  const iconHref = mode === 'dark' ? '/icons/app-icon-dark-1024.png' : '/icons/app-icon-light-1024.png'
+  const manifestHref = mode === 'dark' ? '/manifest-dark.json' : '/manifest-light.json'
+
+  const manifest = document.getElementById('appManifest')
+  if (manifest) manifest.setAttribute('href', manifestHref)
+
+  const appleTouch = document.querySelector('link[rel="apple-touch-icon"]')
+  if (appleTouch) appleTouch.setAttribute('href', iconHref)
+
+  let runtimeIcon = document.getElementById('runtimeAppIcon')
+  if (!runtimeIcon) {
+    runtimeIcon = document.createElement('link')
+    runtimeIcon.id = 'runtimeAppIcon'
+    runtimeIcon.rel = 'icon'
+    runtimeIcon.type = 'image/png'
+    document.head.appendChild(runtimeIcon)
+  }
+  runtimeIcon.setAttribute('href', iconHref)
+}
+
 async function loadConfig() {
   if (_config) return _config
   const r = await fetch('/api/config')
@@ -93,6 +120,7 @@ function applyTheme(theme) {
   } else {
     document.documentElement.setAttribute('data-theme', theme)
   }
+  _applyAppIconTheme(theme)
 }
 
 function getTheme() {
@@ -111,11 +139,13 @@ function getTheme() {
   } else {
     document.documentElement.setAttribute('data-theme', t)
   }
+  _applyAppIconTheme(t)
   // Watch for OS-level changes when in system mode
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
     if ((localStorage.getItem('fs-theme') || 'system') === 'system') {
       document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '')
       if (!e.matches) document.documentElement.removeAttribute('data-theme')
+      _applyAppIconTheme('system')
     }
   })
   const standaloneMq = window.matchMedia('(display-mode: standalone)')

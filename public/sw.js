@@ -1,6 +1,14 @@
 'use strict'
 const CACHE = 'forgeshift-v2'
-const STATIC = ['/css/main.css', '/js/shell.js', '/js/prefs.js', '/favicon.svg']
+const STATIC = [
+  '/css/main.css',
+  '/js/shell.js',
+  '/js/prefs.js',
+  '/icons/app-icon-light-1024.png',
+  '/icons/app-icon-dark-1024.png',
+  '/manifest-light.json',
+  '/manifest-dark.json'
+]
 
 self.addEventListener('install', e =>
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting()))
