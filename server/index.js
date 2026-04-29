@@ -59,6 +59,10 @@ const emailSvc = require('./email')
 const logger   = require('./utils/logger')
 
 const app = express()
+const GITHUB_REPO = process.env.GITHUB_REPO || 'loucas781/ForgeShift'
+const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases`
+const GITHUB_RELEASES_CACHE_MS = 5 * 60 * 1000
+let githubReleasesCache = { fetchedAt: 0, data: null }
 
 app.use(express.json({ limit: '5mb' }))
 app.use(express.urlencoded({ extended: false, limit: '1mb' }))
@@ -70,6 +74,45 @@ app.use((req, res, next) => {
   logger.debug(`[req] ${req.method} ${req.path}`)
   next()
 })
+
+async function fetchPublishedReleases() {
+  const now = Date.now()
+  if (githubReleasesCache.data && (now - githubReleasesCache.fetchedAt) < GITHUB_RELEASES_CACHE_MS) {
+    return githubReleasesCache.data
+  }
+
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'ForgeShift/1.0',
+  }
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+
+  const res = await fetch(GITHUB_RELEASES_URL, {
+    headers,
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!res.ok) throw new Error(`GitHub releases API returned ${res.status}`)
+
+  const payload = await res.json()
+  const releases = Array.isArray(payload) ? payload.map(rel => ({
+    id: rel.id,
+    version: String(rel.tag_name || '').replace(/^v/i, ''),
+    tagName: rel.tag_name || '',
+    name: rel.name || rel.tag_name || 'Untitled release',
+    publishedAt: rel.published_at || rel.created_at || null,
+    prerelease: !!rel.prerelease,
+    draft: !!rel.draft,
+    url: rel.html_url || null,
+    notes: String(rel.body || '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('#') && !line.startsWith('>'))
+      .slice(0, 8),
+  })).filter(rel => rel.version && !rel.draft) : []
+
+  githubReleasesCache = { fetchedAt: now, data: releases }
+  return releases
+}
 
 if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1)
 
@@ -143,6 +186,22 @@ app.get('/api/config', optionalAuth, (req, res) => {
     featureTasks,
     featureDragDrop,
   })
+})
+
+// ── Published GitHub releases for update checks ───────────────────────────────
+app.get('/api/releases', requireAuth, async (req, res) => {
+  try {
+    const releases = await fetchPublishedReleases()
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300')
+    res.json({
+      repo: GITHUB_REPO,
+      fetchedAt: new Date().toISOString(),
+      releases,
+    })
+  } catch (err) {
+    logger.error('releases:', err.message)
+    res.status(502).json({ error: 'Failed to load published releases' })
+  }
 })
 
 // ── GET/PATCH /api/features — admin feature flag management ───────────────────

@@ -316,6 +316,7 @@ async function init() {
   if (!cfg) return
   renderShell(cfg, 'calendar')
   prefs = await loadPrefs()
+  document.body.classList.toggle('shift-panel-left', (prefs.shiftPanelSide || 'right') === 'left')
 
   view = prefs.defaultView || 'month'
 
@@ -768,19 +769,20 @@ function renderMonth() {
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       if (dayAssignments.length) {
-        const MAX_TASK_BANNERS = 1
+        const MAX_TASK_BANNERS = 2
         const visibleAssignments = dayAssignments.slice(0, MAX_TASK_BANNERS)
         const hiddenAssignments = dayAssignments.length - visibleAssignments.length
-        taskBannerHtml = visibleAssignments.map(a => {
+        taskBannerHtml = '<div class="cal-task-stack">' + visibleAssignments.map(a => {
           const safeData = encodeURIComponent(JSON.stringify(a))
           const accent = getTaskBannerPresentation(a, '22')
           return `<div class="cal-task-banner${canManage() ? ' clickable' : ''}" style="background:${accent.background};border-left:3px solid ${accent.border};color:${accent.color}" ` +
             `onmouseenter="showTaskPopover(event,decodeData('${safeData}'))" onmouseleave="hideTaskPopover()" ${canManage() ? clickAttr : ''}>` +
             (canManage() ? `<span class="task-banner-user">${a.user_name?.split(' ')[0]}: </span>` : '') +
             `<span>${a.task_list_name}</span></div>`
-        }).join('')
+        }).join('') + '</div>'
         if (hiddenAssignments > 0) {
-          taskBannerHtml += `<div class="cal-more-badge cal-task-more-badge${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">+${hiddenAssignments} task${hiddenAssignments > 1 ? 's' : ''}</div>`
+          const totalTaskLists = dayAssignments.length
+          taskBannerHtml += `<div class="cal-task-summary${canManage() ? ' clickable' : ''}" ${canManage() ? clickAttr : ''} title="${hiddenAssignments} more task assignment${hiddenAssignments > 1 ? 's' : ''}">${totalTaskLists} task list${totalTaskLists > 1 ? 's' : ''}</div>`
         }
       } else if (canManage() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
@@ -2706,11 +2708,14 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
+  --shift-panel-width: 380px;
+  --shift-panel-gap: 14px;
   position: absolute;
   top: 0;
+  left: auto;
   right: 0;
-  width: 380px;
-  max-width: 380px;
+  width: var(--shift-panel-width);
+  max-width: var(--shift-panel-width);
   height: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2725,10 +2730,20 @@ init()
   pointer-events: none;
   transition: opacity .2s ease, transform .25s cubic-bezier(.32,1,.23,1);
 }
+body.shift-panel-left:not(.shift-panel-open) .shift-panel {
+  left: 0;
+  right: auto;
+  box-shadow: 8px 0 32px rgba(0,0,0,.12);
+  transform: translateX(-16px);
+}
 .shift-panel.open {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
+}
+.cal-main {
+  margin-left: 0;
+  margin-right: 0;
 }
 .shift-panel-close {
   width: 32px;
@@ -2742,8 +2757,34 @@ init()
 }
 @media (min-width: 641px) {
   body.shift-panel-open .cal-wrapper {
-    padding-right: 394px;
-    transition: padding-right .25s cubic-bezier(.32,1,.23,1);
+    display: flex;
+    flex-direction: row;
+    gap: var(--shift-panel-gap, 14px);
+    align-items: stretch;
+  }
+  body.shift-panel-open .cal-main {
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  body.shift-panel-open .shift-panel {
+    position: relative;
+    order: 2;
+    inset: auto;
+    height: auto;
+    max-height: none;
+    flex: 0 0 var(--shift-panel-width, 380px);
+    margin: 0;
+    box-shadow: -8px 0 32px rgba(0,0,0,.12);
+  }
+  body.shift-panel-left.shift-panel-open .shift-panel {
+    order: 1;
+    box-shadow: 8px 0 32px rgba(0,0,0,.12);
+  }
+  body.shift-panel-left.shift-panel-open .cal-main { order: 2; }
+  body.shift-panel-left.shift-panel-open .shift-panel,
+  body.shift-panel-left.shift-panel-open .cal-main {
+    min-width: 0;
   }
 }
 .shift-panel-backdrop {
@@ -2790,8 +2831,9 @@ init()
 .shift-panel-task-desc-body p { margin: 0 0 4px; }
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
-  body.shift-panel-open .cal-wrapper {
-    padding-right: 0;
+  body.shift-panel-open .cal-main {
+    margin-right: 0;
+    margin-left: 0;
   }
   .shift-panel {
     position: fixed;
@@ -2810,6 +2852,10 @@ init()
     pointer-events: auto;
   }
   .shift-panel.open { display: flex; bottom: 0; right: 6px; }
+  body.shift-panel-left .shift-panel {
+    left: auto;
+    right: 6px;
+  }
 }
 </style>
 </body>

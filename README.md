@@ -83,7 +83,9 @@ Enable in repo **Settings → Actions → General → Read and write permissions
 | `staging` | Bumps patch + `-rc` suffix on PR merge — e.g. `0.0.2-rc` |
 | `main` | Bumps minor, clean version on PR merge — e.g. `0.1.0` |
 
-The version is displayed in the topbar env badge (`development v0.0.1-dev.42`), on the login page footer, and in Settings → Version.
+The version is displayed in the topbar env badge (`development v0.0.1-dev.42`), on the login page footer, and in Settings → Build Info.
+
+The Settings → Updates page checks published GitHub Releases for this repository. Production builds only compare against full releases, staging builds only compare against GitHub prereleases, and development builds are shown as unreleased builds rather than updateable releases.
 
 ---
 
@@ -94,6 +96,8 @@ The version is displayed in the topbar env badge (`development v0.0.1-dev.42`), 
 | `JWT_SECRET` | JWT signing secret — generate: `openssl rand -hex 48` |
 | `PASSWORD_PEPPER` | HMAC pepper mixed into every password hash — generate: `openssl rand -hex 32` |
 | `DATABASE_PATH` | SQLite file path (default: `./data/forgeshift.db`) |
+| `GITHUB_REPO` | GitHub repo used by the Updates page, in `owner/repo` format |
+| `GITHUB_TOKEN` | Optional GitHub token to reduce rate-limit risk when checking releases |
 | `PORT` | HTTP server port (default: `3000`) |
 | `APP_URL` | Public-facing URL — used in iCal feed links |
 | `COOKIE_SECURE` | Set `true` when running behind HTTPS |

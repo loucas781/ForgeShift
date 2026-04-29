@@ -493,6 +493,8 @@ async function init() {
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
     { id: 'backup', label: 'Backup', roles: ['admin'],
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
+    { id: 'updates', label: 'Updates', roles: ['admin','manager','shift_lead','member'],
+      icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>' },
     { id: 'buildinfo', label: 'Build Info', roles: ['admin','manager','shift_lead','member'],
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
     { id: 'about', label: 'About', roles: ['admin','manager','shift_lead','member'],
@@ -539,6 +541,7 @@ async function init() {
     isAdmin ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderAuditPanel() : Promise.resolve(),
     isAdmin ? renderBackupPanel() : Promise.resolve(),
+    renderUpdatesPanel(),
     renderBuildInfoPanel(),
     renderAboutPanel(),
   ])
@@ -551,6 +554,167 @@ async function init() {
 }
 
 // initCollapsibleSections is defined in shell.js
+
+function _normalizeChannel(env, version) {
+  const envNorm = String(env || '').toLowerCase()
+  if (envNorm === 'development' || envNorm === 'staging' || envNorm === 'production') return envNorm
+  const raw = String(version || '')
+  if (raw.includes('-dev.')) return 'development'
+  if (raw.includes('-rc')) return 'staging'
+  return 'production'
+}
+
+function _parseVersionParts(version) {
+  const raw = String(version || '').trim()
+  const [main, pre = ''] = raw.split('-')
+  const nums = main.split('.').map(n => Number.parseInt(n, 10) || 0)
+  return {
+    major: nums[0] || 0,
+    minor: nums[1] || 0,
+    patch: nums[2] || 0,
+    pre,
+    hasPre: pre.length > 0
+  }
+}
+
+function _compareVersions(a, b) {
+  const x = _parseVersionParts(a)
+  const y = _parseVersionParts(b)
+  if (x.major !== y.major) return x.major - y.major
+  if (x.minor !== y.minor) return x.minor - y.minor
+  if (x.patch !== y.patch) return x.patch - y.patch
+  if (x.hasPre && !y.hasPre) return -1
+  if (!x.hasPre && y.hasPre) return 1
+  return x.pre.localeCompare(y.pre, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function _releaseBadge(channel) {
+  return channel === 'development' ? 'purple' : channel === 'staging' ? 'orange' : 'green'
+}
+
+function _releaseChannelLabel(channel) {
+  if (channel === 'development') return 'Development'
+  if (channel === 'staging') return 'Staging (pre-release)'
+  return 'Production'
+}
+
+function _releaseKindLabel(release) {
+  return release && release.prerelease ? 'Pre-release' : 'Release'
+}
+
+function _displayReleaseTitle(release) {
+  const name = String(release?.name || '').trim()
+  const version = `v${String(release?.version || '').trim()}`
+  if (!name || name.toLowerCase() === String(release?.tagName || '').trim().toLowerCase() || name === version) return ''
+  return name
+}
+
+function _githubReleaseChannel(release) {
+  return release && release.prerelease ? 'staging' : 'production'
+}
+
+function _releaseDateLabel(iso) {
+  if (!iso) return 'Date unknown'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function _releaseNotesHtml(notes) {
+  if (!Array.isArray(notes) || !notes.length) {
+    return '<div style="margin-top:8px;font-size:13px;color:var(--text-3)">No release notes provided.</div>'
+  }
+  return `<ul style="margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--text-2)">${notes.map(n => `<li>${escHtml(n)}</li>`).join('')}</ul>`
+}
+
+async function renderUpdatesPanel() {
+  const el = document.getElementById('panel-updates')
+  const currentVersion = String(cfg.version || '0.0.0')
+  const currentChannel = _normalizeChannel(cfg.appEnv, currentVersion)
+  const currentEnvLabel = currentChannel.toUpperCase()
+
+  el.innerHTML = `
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Updates</h2>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Current Build</h3></div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:20px;font-weight:800;font-family:var(--mono)">v${escHtml(currentVersion)}</span>
+          <span class="badge badge-${_releaseBadge(currentChannel)}" style="font-size:11px">${currentEnvLabel}</span>
+        </div>
+        <p style="font-size:13px;color:var(--text-3);margin:10px 0 0">
+          Channel: <strong>${_releaseChannelLabel(currentChannel)}</strong>
+        </p>
+        <div id="updatesStatus" style="margin-top:12px;font-size:13px;color:var(--text-3)">Checking for newer releases…</div>
+      </div>
+    </div>
+    <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Release History</h3></div>
+      <div class="card-body" id="updatesHistory">
+        <div style="font-size:13px;color:var(--text-3)">Loading…</div>
+      </div>
+    </div>
+  `
+
+  const statusEl = document.getElementById('updatesStatus')
+  const historyEl = document.getElementById('updatesHistory')
+
+  try {
+    const r = await fetch('/api/releases', { credentials: 'include' })
+    const d = await r.json()
+    if (!r.ok) throw new Error(d.error || 'Failed to load releases')
+
+    const releases = Array.isArray(d.releases) ? d.releases.slice() : []
+    if (!releases.length) {
+      statusEl.textContent = 'No published GitHub releases found yet.'
+      historyEl.innerHTML = '<div style="font-size:13px;color:var(--text-3)">No published releases available.</div>'
+      return
+    }
+
+    releases.sort((a, b) => _compareVersions(String(b.version || ''), String(a.version || '')))
+    const sameChannel = releases.filter(x => _githubReleaseChannel(x) === currentChannel)
+    const latestChannel = sameChannel[0]
+    const hasNewer = latestChannel && _compareVersions(String(latestChannel.version || ''), currentVersion) > 0
+
+    if (currentChannel === 'development') {
+      const latestStable = releases.find(x => _githubReleaseChannel(x) === 'production')
+      const latestPrerelease = releases.find(x => _githubReleaseChannel(x) === 'staging')
+      statusEl.innerHTML = `
+        <span class="badge badge-purple" style="font-size:11px;margin-right:8px">Development build</span>
+        This build is unreleased. Published updates are tracked from GitHub Releases only.
+        ${latestStable ? ` Latest production: <strong>v${escHtml(latestStable.version)}</strong>.` : ''}
+        ${latestPrerelease ? ` Latest staging: <strong>v${escHtml(latestPrerelease.version)}</strong>.` : ''}
+      `
+    } else if (hasNewer) {
+      statusEl.innerHTML = `<span class="badge badge-orange" style="font-size:11px;margin-right:8px">Update available</span> Newer ${currentChannel} release: <strong>v${escHtml(latestChannel.version)}</strong>`
+    } else {
+      statusEl.innerHTML = `<span class="badge badge-green" style="font-size:11px;margin-right:8px">Up to date</span> You are on the latest published ${currentChannel} release.`
+    }
+
+    historyEl.innerHTML = releases.map(rel => {
+      const relChannel = _githubReleaseChannel(rel)
+      const relTitle = _displayReleaseTitle(rel)
+      return `
+        <div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--panel)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-family:var(--mono);font-weight:700">v${escHtml(rel.version || 'unknown')}</span>
+              <span class="badge badge-${_releaseBadge(relChannel)}" style="font-size:10px">${escHtml(_releaseKindLabel(rel))}</span>
+              ${String(rel.version || '') === currentVersion ? '<span class="badge badge-blue" style="font-size:10px">Current</span>' : ''}
+            </div>
+            <span style="font-size:12px;color:var(--text-3)">${escHtml(_releaseDateLabel(rel.publishedAt))}</span>
+          </div>
+          ${relTitle ? `<div style="margin-top:8px;font-size:14px;font-weight:700;color:var(--text-1)">${escHtml(relTitle)}</div>` : ''}
+          ${rel.url ? `<div style="margin-top:8px"><a href="${escHtml(rel.url)}" target="_blank" rel="noopener" style="font-size:12px">View GitHub release</a></div>` : ''}
+          ${_releaseNotesHtml(rel.notes)}
+        </div>
+      `
+    }).join('')
+  } catch (err) {
+    statusEl.textContent = 'Could not check for published releases.'
+    historyEl.innerHTML = `<div style="font-size:13px;color:var(--red,#b91c1c)">Failed to load published releases: ${escHtml(err.message || 'Unknown error')}</div>`
+  }
+}
 
 // ── Avatar helper — mirrors shell.js avatarEl ─────────────────────────────────
 // Returns an outerHTML string for an avatar element that shows the photo if
@@ -704,6 +868,17 @@ async function renderPreferencesPanel() {
           </label>
         </div>
 
+        <div class="pref-row">
+          <div class="pref-info">
+            <strong>Shift details side</strong>
+            <span>Choose which side the shift details panel opens from on desktop</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="pref-choice-btn${(p.shiftPanelSide || 'right')==='left'?' active':''}" id="sps-left" onclick="pickShiftPanelSide('left')">Left</button>
+            <button class="pref-choice-btn${(p.shiftPanelSide || 'right')==='right'?' active':''}" id="sps-right" onclick="pickShiftPanelSide('right')">Right</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -847,6 +1022,13 @@ function pickDefaultView(v) {
   window._pendingDefaultView = v
 }
 
+function pickShiftPanelSide(side) {
+  const v = side === 'left' ? 'left' : 'right'
+  document.getElementById('sps-left')?.classList.toggle('active', v === 'left')
+  document.getElementById('sps-right')?.classList.toggle('active', v === 'right')
+  window._pendingShiftPanelSide = v
+}
+
 async function savePrefsPanel() {
   // Read all controls
   const wsd = window._pendingWeekStart !== undefined
@@ -865,6 +1047,7 @@ async function savePrefsPanel() {
     defaultView:       dv,
     showWeekNumbers:   document.getElementById('prefShowWkNums')?.checked ?? false,
     compactChips:      document.getElementById('prefCompact')?.checked ?? false,
+    shiftPanelSide:    window._pendingShiftPanelSide || (document.getElementById('sps-left')?.classList.contains('active') ? 'left' : 'right'),
     defaultShiftStart: document.getElementById('prefDefaultStart')?.value || '',
     defaultShiftEnd:   document.getElementById('prefDefaultEnd')?.value || '',
     holidays,
@@ -873,6 +1056,7 @@ async function savePrefsPanel() {
   // Clear pending
   delete window._pendingWeekStart
   delete window._pendingDefaultView
+  delete window._pendingShiftPanelSide
 
   await savePrefs(updates)
   toast('Preferences saved', 'success')
@@ -3838,7 +4022,7 @@ async function renderBuildInfoPanel() {
       <div class="card-body">
         <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
           <span style="font-size:32px;font-weight:900;letter-spacing:-.04em;font-family:var(--mono)">v${cfg.version}</span>
-          <span class="badge badge-${cfg.appEnv==='production'?'red':cfg.appEnv==='staging'?'orange':'green'}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
+          <span class="badge badge-${cfg.appEnv==='staging'?'orange':cfg.appEnv==='development'?'purple':'green'}" style="font-size:11px">${cfg.appEnv.toUpperCase()}</span>
         </div>
         <table style="width:100%;font-size:13px;border-collapse:collapse">
           <tr>

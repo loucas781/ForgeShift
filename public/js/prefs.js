@@ -13,6 +13,7 @@ const PREFS_DEFAULTS = {
   defaultShiftStart: '',     // e.g. '09:00'
   defaultShiftEnd:   '',
   compactChips:      false,
+  shiftPanelSide:    'right', // 'left' | 'right'
 }
 
 let _prefs = null
