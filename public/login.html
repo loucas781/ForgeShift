@@ -77,7 +77,7 @@
     <div class="auth-link" id="signupLink">
       Don't have an account? <a href="/signup.html">Sign up</a>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter"></div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter">ForgeShift</div>
   </div>
 </div>
 
@@ -97,6 +97,17 @@
     if (!el) return
     el.innerHTML = `ForgeShift <span style="color:${envColour};font-weight:600">${env}</span> v${version}`
   }
+  renderVersionFooter(guessEnvFromHost(), '...')
+  ;(async function nudgeFreshLoginPage() {
+    try {
+      if (!('serviceWorker' in navigator)) return
+      const regs = await navigator.serviceWorker.getRegistrations()
+      for (const reg of regs) {
+        const scope = String(reg.scope || '')
+        if (scope.includes(window.location.origin)) await reg.update()
+      }
+    } catch {}
+  })()
 
   // Remember login details toggle
   function onRememberChange(cb) {
@@ -113,15 +124,17 @@
 
   // Restore saved credentials
   ;(function restoreSaved() {
-    const savedEmail = localStorage.getItem('fs-saved-email')
-    const savedPassword = localStorage.getItem('fs-saved-password')
-    if (savedEmail && savedPassword) {
-      document.getElementById('email').value = savedEmail
-      document.getElementById('password').value = savedPassword
-      const cb = document.getElementById('rememberToggle')
-      cb.checked = true
-      onRememberChange(cb)
-    }
+    try {
+      const savedEmail = localStorage.getItem('fs-saved-email')
+      const savedPassword = localStorage.getItem('fs-saved-password')
+      if (savedEmail && savedPassword) {
+        document.getElementById('email').value = savedEmail
+        document.getElementById('password').value = savedPassword
+        const cb = document.getElementById('rememberToggle')
+        cb.checked = true
+        onRememberChange(cb)
+      }
+    } catch {}
   })()
 
   function applyAuthThemeAndIcons(theme) {
@@ -145,12 +158,14 @@
     runtimeIcon.setAttribute('href', href)
   }
 
-  const t = localStorage.getItem('fs-theme') || 'system'
+  let t = 'system'
+  try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
   applyAuthThemeAndIcons(t)
   (function() {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const onThemeChange = () => {
-        const liveTheme = localStorage.getItem('fs-theme') || 'system'
+        let liveTheme = 'system'
+        try { liveTheme = localStorage.getItem('fs-theme') || 'system' } catch {}
         if (liveTheme === 'system') applyAuthThemeAndIcons('system')
       }
       if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
