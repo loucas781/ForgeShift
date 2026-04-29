@@ -8,11 +8,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/auth.css">
-  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429" media="(prefers-color-scheme: light)">
-  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429" media="(prefers-color-scheme: dark)">
-  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429">
-  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429">
-  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
   <script>
     (function(){
       var t = localStorage.getItem('fs-theme') || 'system'
@@ -26,7 +28,7 @@
 <div class="auth-page">
   <div class="auth-card">
     <div class="auth-logo">
-      <img id="authLogoImg" class="auth-logo-img" src="/icons/app-icon-light-1024.png?v=20260429" alt="ForgeShift">
+      <img id="authLogoImg" class="auth-logo-img" src="/icons/app-icon-light-1024.png?v=20260429c" alt="ForgeShift">
       <span class="auth-logo-text">ForgeShift</span>
     </div>
 
@@ -102,7 +104,7 @@
     if (theme === 'light') document.documentElement.removeAttribute('data-theme')
     else if (isDark) document.documentElement.setAttribute('data-theme', 'dark')
     else document.documentElement.removeAttribute('data-theme')
-    const href = isDark ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429'
+    const href = isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
     const appleTouch = document.querySelector('link[rel="apple-touch-icon"]')
     if (appleTouch) appleTouch.setAttribute('href', href)
     const logo = document.getElementById('authLogoImg')

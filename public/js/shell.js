@@ -80,8 +80,8 @@ function _resolvedTheme(theme) {
 
 function _applyAppIconTheme(theme) {
   const mode = _resolvedTheme(theme)
-  const iconHref = mode === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429'
-  const manifestHref = mode === 'dark' ? '/manifest-dark.json?v=20260429' : '/manifest-light.json?v=20260429'
+  const iconHref = mode === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
+  const manifestHref = mode === 'dark' ? '/manifest-dark.json?v=20260429c' : '/manifest-light.json?v=20260429c'
 
   const manifest = document.getElementById('appManifest')
   if (manifest) manifest.setAttribute('href', manifestHref)
@@ -240,7 +240,7 @@ function renderShell(cfg, activePage) {
       <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M3 5h14a1 1 0 110 2H3a1 1 0 110-2zm0 4h14a1 1 0 110 2H3a1 1 0 110-2zm0 4h14a1 1 0 110 2H3a1 1 0 110-2z" clip-rule="evenodd"/></svg>
     </button>
     <a href="/" class="topbar-logo">
-      <img id="topbarLogoImg" class="topbar-logo-img" src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429'}" alt="ForgeShift">
+      <img id="topbarLogoImg" class="topbar-logo-img" src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'}" alt="ForgeShift">
       <span class="topbar-logo-text">ForgeShift</span>
     </a>
     <span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>

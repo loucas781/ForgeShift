@@ -7,12 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
-  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429" media="(prefers-color-scheme: light)">
-  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429" media="(prefers-color-scheme: dark)">
-  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429">
-  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429">
-  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429">
-  <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
   <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -4045,8 +4047,8 @@ async function renderAboutPanel() {
   const el = document.getElementById('panel-about')
   const currentTheme = document.documentElement.getAttribute('data-theme')
   const aboutIcon = (currentTheme === 'dark' || currentTheme === 'oled')
-    ? '/icons/app-icon-dark-1024.png?v=20260429'
-    : '/icons/app-icon-light-1024.png?v=20260429'
+    ? '/icons/app-icon-dark-1024.png?v=20260429c'
+    : '/icons/app-icon-light-1024.png?v=20260429c'
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">About ForgeShift</h2>
     <div class="card section-card">
@@ -4106,18 +4108,8 @@ function syncAboutIcon() {
   if (!icon) return
   const currentTheme = document.documentElement.getAttribute('data-theme')
   const isDark = currentTheme === 'dark' || currentTheme === 'oled'
-  icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429' : '/icons/app-icon-light-1024.png?v=20260429')
+  icon.setAttribute('src', isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c')
 }
-
-// Keep About icon in sync regardless of where theme was changed.
-// Guarded to avoid breaking settings on older embedded webviews.
-;(function watchThemeChangesForAboutIcon() {
-  try {
-    if (typeof MutationObserver !== 'function') return
-    const observer = new MutationObserver(() => syncAboutIcon())
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-  } catch {}
-})()
 
 // Close modals on overlay click
 ['editUserModal','locModal'].forEach(id => {
