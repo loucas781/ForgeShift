@@ -75,6 +75,20 @@
           <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
         </div>
         <div class="cal-grid" id="calGrid"></div>
+        <!-- Shift Details Side Panel -->
+        <div id="shiftPanel" class="shift-panel" aria-label="Shift details">
+          <div class="shift-panel-header">
+            <div class="shift-panel-title-row">
+              <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button id="shiftPanelDayAddBtn" class="btn btn-secondary btn-sm" style="display:none" onclick="shiftPanelAddForDay()">+ Shift</button>
+                <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
+                <button class="btn btn-ghost btn-icon" onclick="closeShiftPanel()" aria-label="Close panel" style="font-size:16px;width:32px;height:32px">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="shift-panel-body" id="shiftPanelBody"></div>
+        </div>
       </div>
       <!-- Mobile FAB: Copy Week (week view + managers only) -->
       <button id="copyWeekFab" class="copy-week-fab" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week" aria-label="Copy week">
@@ -253,20 +267,6 @@
   </div>
 </div>
 
-<!-- Shift Details Side Panel -->
-<div id="shiftPanel" class="shift-panel" aria-label="Shift details">
-  <div class="shift-panel-header">
-    <div class="shift-panel-title-row">
-      <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button id="shiftPanelDayAddBtn" class="btn btn-secondary btn-sm" style="display:none" onclick="shiftPanelAddForDay()">+ Shift</button>
-        <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
-        <button class="btn btn-ghost btn-icon" onclick="closeShiftPanel()" aria-label="Close panel" style="font-size:16px;width:32px;height:32px">✕</button>
-      </div>
-    </div>
-  </div>
-  <div class="shift-panel-body" id="shiftPanelBody"></div>
-</div>
 
 <script src="/js/shell.js"></script>
 <script src="/js/prefs.js"></script>
@@ -2698,14 +2698,15 @@ init()
 
 /* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
 .shift-panel {
-  position: fixed;
-  top: 0;
+  position: absolute;
+  top: 8px;
   right: -420px;
   width: 380px;
-  max-width: 100vw;
-  height: 100%;
+  max-width: calc(100% - 16px);
+  height: calc(100% - 16px);
   background: var(--surface);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 14px 0 0 14px;
   box-shadow: -8px 0 32px rgba(0,0,0,.12);
   z-index: 500;
   display: flex;
@@ -2713,13 +2714,13 @@ init()
   transition: right .25s cubic-bezier(.32,1,.23,1);
   overflow: hidden;
 }
-.shift-panel.open { right: 0; }
+.shift-panel.open { right: 8px; }
 .cal-wrapper {
-  transition: margin-right .25s cubic-bezier(.32,1,.23,1);
+  transition: padding-right .25s cubic-bezier(.32,1,.23,1);
 }
 @media (min-width: 641px) {
   body.shift-panel-open .cal-wrapper {
-    margin-right: 394px;
+    padding-right: 394px;
   }
 }
 .shift-panel-backdrop {
@@ -2766,8 +2767,8 @@ init()
 .shift-panel-task-desc-body p { margin: 0 0 4px; }
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
-  .shift-panel { width: 100%; border-left: none; border-radius: 20px 20px 0 0; top: auto; bottom: -100%; right: 0; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
-  .shift-panel.open { bottom: 0; right: 0; }
+  .shift-panel { width: calc(100% - 12px); max-width: 100%; border-left: none; border-radius: 14px 14px 0 0; top: auto; bottom: -100%; right: 6px; height: 85dvh; transition: bottom .25s cubic-bezier(.32,1,.23,1); }
+  .shift-panel.open { bottom: 0; right: 6px; }
 }
 </style>
 </body>
