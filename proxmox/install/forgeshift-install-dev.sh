@@ -145,8 +145,18 @@ cat > /etc/systemd/system/getty@tty1.service.d/override.conf << 'GETTYEOF'
 ExecStart=
 ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
 GETTYEOF
+
+# Proxmox console can attach via serial in some templates/setups.
+mkdir -p /etc/systemd/system/serial-getty@ttyS0.service.d
+cat > /etc/systemd/system/serial-getty@ttyS0.service.d/override.conf << 'SERIALGETTYEOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --keep-baud 115200,38400,9600 %I $TERM
+SERIALGETTYEOF
+
 systemctl daemon-reload
 systemctl restart getty@tty1 || true
+systemctl restart serial-getty@ttyS0 || true
 msg_ok "Root console autologin enabled"
 
 # ── 10. Verify service is running ──────────────────────────────────────────────
