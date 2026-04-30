@@ -138,26 +138,15 @@ msg_ok "ForgeShift service started"
 
 # ── 9. Enable root console autologin (Proxmox pct console) ───────────────────
 msg_info "Configuring root console autologin"
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/override.conf << 'GETTYEOF'
+mkdir -p /etc/systemd/system/container-getty@1.service.d
+cat > /etc/systemd/system/container-getty@1.service.d/override.conf << 'GETTYEOF'
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%I 115200,38400,9600 $TERM
 GETTYEOF
 
-# Proxmox console can attach via serial in some templates/setups.
-mkdir -p /etc/systemd/system/serial-getty@ttyS0.service.d
-cat > /etc/systemd/system/serial-getty@ttyS0.service.d/override.conf << 'SERIALGETTYEOF'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --keep-baud 115200,38400,9600 %I $TERM
-SERIALGETTYEOF
-
 systemctl daemon-reload
-systemctl enable getty@tty1.service || true
-systemctl enable serial-getty@ttyS0.service || true
-systemctl restart getty@tty1 || true
-systemctl restart serial-getty@ttyS0 || true
+systemctl restart container-getty@1.service || true
 msg_ok "Root console autologin enabled"
 
 # ── 10. Verify service is running ──────────────────────────────────────────────
