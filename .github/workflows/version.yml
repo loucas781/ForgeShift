@@ -12,7 +12,7 @@ on:
         type: choice
         options: [develop, staging, main]
       bump_type:
-        description: 'For main only: patch, minor, or major (pushes still default to patch)'
+        description: 'For manual main bumps only: patch, minor, or major'
         required: true
         default: 'patch'
         type: choice
@@ -65,12 +65,15 @@ jobs:
         run: |
           BRANCH="${{ steps.branch.outputs.name }}"
           BUMP_TYPE="patch"
+          EVENT="${{ github.event_name }}"
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "$BRANCH" == "main" ]]; then
+          if [[ "$EVENT" == "workflow_dispatch" && "$BRANCH" == "main" ]]; then
             BUMP_TYPE="${{ github.event.inputs.bump_type }}"
           fi
 
-          if [[ "$BRANCH" == "staging" || "$BRANCH" == "main" ]]; then
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            CURRENT=$(cat .version | tr -d '[:space:]')
+          elif [[ "$BRANCH" == "staging" || "$BRANCH" == "main" ]]; then
             MERGE_MSG="${{ github.event.head_commit.message }}"
             SOURCE_BRANCH=$(echo "$MERGE_MSG" | grep -oP '(?<=from [a-zA-Z0-9_-]+/)[\w\-/]+' | head -1)
             if [[ -z "$SOURCE_BRANCH" ]]; then
@@ -90,14 +93,20 @@ jobs:
           PATCH=$(echo "$BASE" | cut -d. -f3)
 
           if [[ "$BRANCH" == "main" ]]; then
-            if [[ "$BUMP_TYPE" == "major" ]]; then
-              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
-            elif [[ "$BUMP_TYPE" == "minor" ]]; then
-              MINOR=$((MINOR + 1)); PATCH=0
+            if [[ "$EVENT" == "workflow_dispatch" ]]; then
+              if [[ "$BUMP_TYPE" == "major" ]]; then
+                MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+              elif [[ "$BUMP_TYPE" == "minor" ]]; then
+                MINOR=$((MINOR + 1)); PATCH=0
+              else
+                PATCH=$((PATCH + 1))
+              fi
+              NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
             else
-              PATCH=$((PATCH + 1))
+              # On normal pushes, production adopts the promoted base version.
+              # Example: staging 1.0.12-rc -> main 1.0.12
+              NEW_VERSION="${BASE}"
             fi
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           elif [[ "$BRANCH" == "staging" ]]; then
             PATCH=$((PATCH + 1))
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
@@ -141,7 +150,7 @@ jobs:
           BRANCH="${{ steps.branch.outputs.name }}"
           NEW_BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
           DOWNSTREAM=""
-          [[ "$BRANCH" == "main" ]]    && DOWNSTREAM="staging develop"
+          [[ "$BRANCH" == "main" ]]    && DOWNSTREAM="develop"
           [[ "$BRANCH" == "staging" ]] && DOWNSTREAM="develop"
 
           for TARGET in $DOWNSTREAM; do
