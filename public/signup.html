@@ -137,12 +137,6 @@
     })()
   })()
 
-  // Attach live indicator
-  const pwInput = document.getElementById('password')
-  const indicator = createPasswordIndicator()
-  document.getElementById('pwIndicator').appendChild(indicator)
-  pwInput.addEventListener('input', () => updatePasswordIndicator(indicator, pwInput.value))
-
   const footer = document.getElementById('versionFooter')
   const footerEnvColor = (env) => env === 'staging' ? '#d97706' : env === 'development' ? '#6554c0' : '#0a7c41'
   const inferEnvFromHost = () => {
@@ -157,6 +151,18 @@
   }
 
   setFooter(inferEnvFromHost(), '...')
+
+  // Attach password strength indicator if helper is available.
+  // This must not block footer/env rendering.
+  const pwInput = document.getElementById('password')
+  if (pwInput && typeof createPasswordIndicator === 'function' && typeof updatePasswordIndicator === 'function') {
+    const indicator = createPasswordIndicator()
+    const host = document.getElementById('pwIndicator')
+    if (host) {
+      host.appendChild(indicator)
+      pwInput.addEventListener('input', () => updatePasswordIndicator(indicator, pwInput.value))
+    }
+  }
 
   async function init() {
     try {
@@ -193,7 +199,7 @@
     if (!email) { fieldErr('email', 'Email is required.'); valid = false }
     else if (!/\S+@\S+\.\S+/.test(email)) { fieldErr('email', 'Enter a valid email address.'); valid = false }
     if (!pw) { fieldErr('password', 'Password is required.'); valid = false }
-    else {
+    else if (typeof validatePasswordClient === 'function') {
       const pv = validatePasswordClient(pw)
       if (!pv.ok) { fieldErr('password', pv.errors.join(' ')); valid = false }
     }
