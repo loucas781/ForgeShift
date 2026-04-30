@@ -155,6 +155,8 @@ ExecStart=-/sbin/agetty --autologin root --keep-baud 115200,38400,9600 %I $TERM
 SERIALGETTYEOF
 
 systemctl daemon-reload
+systemctl enable getty@tty1.service || true
+systemctl enable serial-getty@ttyS0.service || true
 systemctl restart getty@tty1 || true
 systemctl restart serial-getty@ttyS0 || true
 msg_ok "Root console autologin enabled"
