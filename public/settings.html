@@ -766,11 +766,11 @@ function _releaseMarkdownToHtml(markdown) {
       continue
     }
 
-    const ol = line.match(/^\s*\d+\.\s+(.+)$/)
+    const ol = line.match(/^\s*(\d+)\.\s+(.+)$/)
     if (ol) {
       if (inUl) { html.push('</ul>'); inUl = false }
-      if (!inOl) { html.push('<ol>'); inOl = true }
-      html.push(`<li>${_releaseInlineFormat(ol[1])}</li>`)
+      if (!inOl) { html.push(`<ol start="${Number.parseInt(ol[1], 10) || 1}">`); inOl = true }
+      html.push(`<li>${_releaseInlineFormat(ol[2])}</li>`)
       continue
     }
 
