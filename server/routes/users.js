@@ -17,7 +17,7 @@ if (!fs.existsSync(AVATARS_DIR)) fs.mkdirSync(AVATARS_DIR, { recursive: true })
 
 const avatarStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, AVATARS_DIR),
-  filename: (req, _file, cb) => cb(null, `${req.user.id}.jpg`),
+  filename: (req, _file, cb) => cb(null, `${req.avatarTargetId || req.user.id}.jpg`),
 })
 const avatarUpload = multer({
   storage: avatarStorage,
@@ -187,6 +187,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
 
 // ── POST /api/users/me/avatar — upload profile photo ─────────────────────────
 router.post('/me/avatar', requireAuth, (req, res) => {
+  req.avatarTargetId = req.user.id
   avatarUpload.single('avatar')(req, res, err => {
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
@@ -206,6 +207,38 @@ router.delete('/me/avatar', requireAuth, (req, res) => {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
     db.prepare('UPDATE users SET avatar = NULL WHERE id = ?').run(req.user.id)
     audit(req.user.id, 'user.avatar_remove', 'user', req.user.id, null)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/users/:id/avatar — admin upload profile photo ──────────────────
+router.post('/:id/avatar', requireAuth, requireAdmin, (req, res) => {
+  req.avatarTargetId = req.params.id
+  const targetUser = db.prepare('SELECT id, name FROM users WHERE id = ?').get(req.params.id)
+  if (!targetUser) return res.status(404).json({ error: 'User not found' })
+
+  avatarUpload.single('avatar')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.message })
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+
+    const avatarUrl = `/uploads/avatars/${req.params.id}.jpg?v=${Date.now()}`
+    db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(avatarUrl, req.params.id)
+    audit(req.user.id, 'user.avatar_upload', 'user', req.params.id, targetUser.name, { by: req.user.name })
+    res.json({ ok: true, avatar: avatarUrl })
+  })
+})
+
+// ── DELETE /api/users/:id/avatar — admin remove profile photo ────────────────
+router.delete('/:id/avatar', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const targetUser = db.prepare('SELECT id, name FROM users WHERE id = ?').get(req.params.id)
+    if (!targetUser) return res.status(404).json({ error: 'User not found' })
+    const filePath = path.join(AVATARS_DIR, `${req.params.id}.jpg`)
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    db.prepare('UPDATE users SET avatar = NULL WHERE id = ?').run(req.params.id)
+    audit(req.user.id, 'user.avatar_remove', 'user', req.params.id, targetUser.name, { by: req.user.name })
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
