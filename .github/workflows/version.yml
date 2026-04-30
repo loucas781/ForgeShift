@@ -33,7 +33,8 @@ jobs:
         !contains(github.event.head_commit.message, '[skip ci]') &&
         (
           github.ref == 'refs/heads/develop' ||
-          startsWith(github.event.head_commit.message, 'Merge')
+          github.ref == 'refs/heads/staging' ||
+          github.ref == 'refs/heads/main'
         )
       )
 
