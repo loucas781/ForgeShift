@@ -103,11 +103,7 @@ async function fetchPublishedReleases(forceRefresh = false) {
     prerelease: !!rel.prerelease,
     draft: !!rel.draft,
     url: rel.html_url || null,
-    notes: String(rel.body || '')
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith('#') && !line.startsWith('>'))
-      .slice(0, 8),
+    notes: String(rel.body || ''),
   })).filter(rel => rel.version && !rel.draft) : []
 
   githubReleasesCache = { fetchedAt: now, data: releases }
