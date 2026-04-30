@@ -137,7 +137,19 @@ systemctl daemon-reload
 systemctl enable forgeshift --now
 msg_ok "ForgeShift service started"
 
-# ── 9. Verify service is running ───────────────────────────────────────────────
+# ── 9. Enable root console autologin (Proxmox pct console) ───────────────────
+msg_info "Configuring root console autologin"
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/override.conf << 'GETTYEOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+GETTYEOF
+systemctl daemon-reload
+systemctl restart getty@tty1 || true
+msg_ok "Root console autologin enabled"
+
+# ── 10. Verify service is running ──────────────────────────────────────────────
 msg_info "Verifying service"
 sleep 3
 if systemctl is-active --quiet forgeshift; then
@@ -149,7 +161,7 @@ else
   exit 1
 fi
 
-# ── 10. Update helper script ───────────────────────────────────────────────────
+# ── 11. Update helper script ───────────────────────────────────────────────────
 cat > /opt/forgeshift/update-dev.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e
