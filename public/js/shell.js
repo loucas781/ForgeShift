@@ -234,6 +234,7 @@ function renderShell(cfg, activePage) {
   if (!topbar) return
 
   const envClass = cfg.appEnv || 'development'
+  const showEnvBadges = envClass !== 'production'
 
   topbar.innerHTML = `
     <button class="topbar-menu-btn" id="menuToggle" aria-label="Menu">
@@ -243,7 +244,7 @@ function renderShell(cfg, activePage) {
       <img id="topbarLogoImg" class="topbar-logo-img" src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'}" alt="ForgeShift">
       <span class="topbar-logo-text">ForgeShift</span>
     </a>
-    <span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>
+    ${showEnvBadges ? `<span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>` : ''}
     <span class="version-badge">v${cfg.version}</span>
     <nav class="topbar-nav">
       <a href="/" class="topbar-nav-btn${activePage==='calendar'?' active':''}">
@@ -370,15 +371,19 @@ function renderShell(cfg, activePage) {
     </button>
   `
 
-  // Inject fixed bottom-right env pill (ForgeTrack style)
+  // Inject fixed bottom-right env pill for non-production only.
   let envPill = document.getElementById('envCornerPill')
-  if (!envPill) {
-    envPill = document.createElement('span')
-    envPill.id = 'envCornerPill'
+  if (showEnvBadges) {
+    if (!envPill) {
+      envPill = document.createElement('span')
+      envPill.id = 'envCornerPill'
+      document.body.appendChild(envPill)
+    }
     envPill.className = `env-badge ${envClass}`
-    document.body.appendChild(envPill)
+    envPill.textContent = envClass
+  } else if (envPill) {
+    envPill.remove()
   }
-  envPill.textContent = envClass
 
   // Set initial theme active state on option rows
   _updateThemeOptions(getTheme())
