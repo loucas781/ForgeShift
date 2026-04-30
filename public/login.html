@@ -60,6 +60,10 @@
         <label class="form-label">Authentication code</label>
         <input type="text" class="form-input" id="totpCode" placeholder="000000" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text-2);cursor:pointer">
+        <input type="checkbox" id="rememberDeviceToggle" checked>
+        Remember this device for 30 days
+      </label>
       <button class="btn btn-primary auth-btn" id="totpBtn" onclick="doTOTPLogin()">Verify</button>
       <button type="button" style="width:100%;margin-top:8px;background:none;border:none;color:var(--text-3);font-size:13px;cursor:pointer;padding:4px 0" onclick="cancelTOTP()">Back to sign in</button>
     </div>
@@ -319,7 +323,12 @@
     if (!code) { err.textContent = 'Please enter your authentication code.'; err.classList.add('show'); return }
     btn.disabled = true; btn.textContent = 'Verifying…'
     try {
-      const r = await fetch('/api/auth/2fa/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ pendingToken: _pendingToken, code }) })
+      const rememberDevice = !!document.getElementById('rememberDeviceToggle')?.checked
+      const r = await fetch('/api/auth/2fa/login', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pendingToken: _pendingToken, code, rememberDevice })
+      })
       const d = await readJsonOrText(r)
       if (!r.ok) { err.textContent = d.error || `Verification failed (${r.status})`; err.classList.add('show'); return }
       window.location.href = '/'

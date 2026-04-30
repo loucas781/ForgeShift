@@ -11,6 +11,10 @@ const emailSvc = require('../email')
 const { authenticator } = require('otplib')
 const logger  = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
+
+const TWO_FA_TRUST_COOKIE = 'fs_2fa_trust'
+const TWO_FA_TRUST_DAYS = 30
+const TWO_FA_GRACE_SECONDS = 10
 function hashToken(raw) {
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
@@ -29,6 +33,70 @@ function makeToken(user, sessionId) {
     process.env.JWT_SECRET,
     { expiresIn: `${process.env.COOKIE_MAX_AGE_HOURS || 72}h` }
   )
+}
+
+function twoFaTrustCookieOpts() {
+  const secure = process.env.COOKIE_SECURE === 'true'
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? 'strict' : 'lax',
+    maxAge: TWO_FA_TRUST_DAYS * 24 * 3600000,
+    path: '/',
+  }
+}
+
+function trustFingerprint(req) {
+  const ua = String(req.headers['user-agent'] || '')
+  const lang = String(req.headers['accept-language'] || '')
+  return hashToken(`${ua}|${lang}`)
+}
+
+function signTwoFaTrustToken(user, req) {
+  return jwt.sign(
+    {
+      twofa_trust: true,
+      uid: user.id,
+      tv: user.token_version || 0,
+      fp: trustFingerprint(req),
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: `${TWO_FA_TRUST_DAYS}d` }
+  )
+}
+
+function hasValidTrusted2FA(req, user) {
+  const raw = req.cookies?.[TWO_FA_TRUST_COOKIE]
+  if (!raw) return false
+  try {
+    const payload = jwt.verify(raw, process.env.JWT_SECRET)
+    return !!(
+      payload &&
+      payload.twofa_trust === true &&
+      payload.uid === user.id &&
+      payload.tv === (user.token_version || 0) &&
+      payload.fp === trustFingerprint(req)
+    )
+  } catch {
+    return false
+  }
+}
+
+function verifyTotpWithGrace(secret, code) {
+  const token = String(code || '').replace(/\s/g, '')
+  if (!token) return false
+  if (authenticator.verify({ token, secret })) return true
+  const stepSeconds = Number(authenticator?.allOptions?.().step || 30)
+  const secondsIntoStep = Math.floor(Date.now() / 1000) % stepSeconds
+  if (secondsIntoStep > TWO_FA_GRACE_SECONDS) return false
+
+  const prevOptions = authenticator.options
+  try {
+    authenticator.options = { ...prevOptions, epoch: Date.now() - stepSeconds * 1000 }
+    return authenticator.verify({ token, secret })
+  } finally {
+    authenticator.options = prevOptions
+  }
 }
 
 function parseDeviceLabel(ua = '') {
@@ -102,8 +170,20 @@ router.post('/login', async (req, res) => {
     const { ok: pwOk, needsRehash } = await comparePassword(password, user.password)
     if (!pwOk) return res.status(401).json({ error: 'Invalid email or password.' })
     if (needsRehash) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(await hashPassword(password), user.id)
-    // If 2FA is enabled, return a short-lived pending token instead of a full session
+    // If 2FA is enabled, allow trusted devices to skip the prompt.
     if (user.totp_enabled) {
+      if (hasValidTrusted2FA(req, user)) {
+        const { password: _, ...pubTrusted } = user
+        const trustedSessionId = createSession(req, pubTrusted.id)
+        res.cookie('token', makeToken(pubTrusted, trustedSessionId), cookieOpts())
+        const trustedIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
+        audit(pubTrusted.id, 'user.login', 'user', pubTrusted.id, pubTrusted.name, {
+          ip: trustedIp,
+          ua: req.headers['user-agent'],
+          twofaTrustedDevice: true,
+        })
+        return res.json({ ok: true, user: pubTrusted })
+      }
       const pendingToken = jwt.sign(
         { totp_pending: true, uid: user.id },
         process.env.JWT_SECRET,
@@ -123,7 +203,7 @@ router.post('/login', async (req, res) => {
 // ── POST /api/auth/2fa/login ───────────────────────────────────────────────────
 router.post('/2fa/login', async (req, res) => {
   try {
-    const { pendingToken, code } = req.body
+    const { pendingToken, code, rememberDevice } = req.body
     if (!pendingToken || !code)
       return res.status(400).json({ error: 'Pending token and code are required.' })
     let payload
@@ -137,11 +217,14 @@ router.post('/2fa/login', async (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.uid)
     if (!user || !user.totp_enabled || !user.totp_secret)
       return res.status(401).json({ error: 'Invalid token.' })
-    const isValid = authenticator.verify({ token: code.replace(/\s/g, ''), secret: user.totp_secret })
+    const isValid = verifyTotpWithGrace(user.totp_secret, code)
     if (!isValid) return res.status(401).json({ error: 'Invalid authentication code.' })
     const { password: _, ...pub } = user
     const sessionId = createSession(req, pub.id)
     res.cookie('token', makeToken(pub, sessionId), cookieOpts())
+    if (rememberDevice) {
+      res.cookie(TWO_FA_TRUST_COOKIE, signTwoFaTrustToken(pub, req), twoFaTrustCookieOpts())
+    }
     const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
     audit(pub.id, 'user.login', 'user', pub.id, pub.name, { ip, ua: req.headers['user-agent'] })
     res.json({ ok: true, user: pub })
@@ -429,7 +512,7 @@ router.post('/2fa/verify', requireAuth, (req, res) => {
   const { secret, code } = req.body
   if (!secret || !code) return res.status(400).json({ error: 'Secret and code required' })
   try {
-    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret })
+    const valid = verifyTotpWithGrace(secret, code)
     if (!valid) return res.status(400).json({ error: 'Invalid code — try again' })
     db.prepare('UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE id = ?').run(secret, req.user.id)
     audit(req.user.id, 'user.2fa_enabled', 'user', req.user.id, req.user.name)
@@ -447,9 +530,10 @@ router.post('/2fa/disable', requireAuth, (req, res) => {
   try {
     const user = db.prepare('SELECT totp_secret FROM users WHERE id = ?').get(req.user.id)
     if (!user?.totp_secret) return res.status(400).json({ error: '2FA is not set up' })
-    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret: user.totp_secret })
+    const valid = verifyTotpWithGrace(user.totp_secret, code)
     if (!valid) return res.status(400).json({ error: 'Invalid code' })
     db.prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?').run(req.user.id)
+    res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts())
     audit(req.user.id, 'user.2fa_disabled', 'user', req.user.id, req.user.name)
     res.json({ ok: true })
   } catch (err) {
@@ -521,6 +605,7 @@ router.get('/login-history', requireAuth, (req, res) => {
 router.post('/logout-all', requireAuth, (req, res) => {
   db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(req.user.id)
   res.clearCookie('token', clearCookieOpts())
+  res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts())
   audit(req.user.id, 'user.logout_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
 })
@@ -555,6 +640,7 @@ router.post('/revoke-all', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.user.id)
   db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(req.user.id)
   res.clearCookie('token', clearCookieOpts())
+  res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts())
   audit(req.user.id, 'user.revoke_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
 })
