@@ -75,6 +75,13 @@ STORAGE=$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {print $1; exit}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 check_whiptail() { command -v whiptail &>/dev/null || apt-get install -y -qq whiptail; }
+generate_password() {
+  if command -v openssl &>/dev/null; then
+    openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20
+  else
+    date +%s | sha256sum | cut -c1-20
+  fi
+}
 
 pick_storage() {
   local menu_items=()
@@ -167,10 +174,6 @@ if whiptail --backtitle "ForgeShift Install" --title "SETTINGS" --yesno \
   STORAGE=$(pick_storage)
   pick_network
 
-  CT_PASSWORD=$(whiptail --backtitle "ForgeShift Install" \
-    --passwordbox "Root password for the container\n(leave blank for no password)" 9 58 \
-    --title "ROOT PASSWORD" 3>&1 1>&2 2>&3) || exit 1
-
   APP_ENV=$(whiptail --backtitle "ForgeShift Install" --title "ENVIRONMENT" \
     --menu "Select deployment environment:" 12 58 3 \
     "development" "Developer channel (origin/develop)" \
@@ -193,10 +196,6 @@ else
 
   RAM_SIZE=$(whiptail --backtitle "ForgeShift Install" --inputbox "RAM (MiB)" 8 58 "$RAM_SIZE" \
     --title "RAM SIZE" 3>&1 1>&2 2>&3) || exit 1
-
-  CT_PASSWORD=$(whiptail --backtitle "ForgeShift Install" \
-    --passwordbox "Root password for the container\n(leave blank for no password)" 9 58 \
-    --title "ROOT PASSWORD" 3>&1 1>&2 2>&3) || exit 1
 
   BRIDGE=$(whiptail --backtitle "ForgeShift Install" --inputbox "Network Bridge" 8 58 "$BRIDGE" \
     --title "BRIDGE" 3>&1 1>&2 2>&3) || exit 1
@@ -268,6 +267,7 @@ fi
 msg_info "Creating LXC container ${CTID}"
 FEATURES="nesting=1"
 [[ "$CT_TYPE" == "1" ]] && FEATURES="keyctl=1,nesting=1"
+CT_PASSWORD="$(generate_password)"
 
 CT_PASSWORD_ARGS=()
 [[ -n "$CT_PASSWORD" ]] && CT_PASSWORD_ARGS=(--password "$CT_PASSWORD")
@@ -354,7 +354,7 @@ echo -e " ${CREATING}${GN}ForgeShift is ready!${CL}"
 echo -e " ${GATEWAY}${BGN}http://${IP}:3000${CL}               (app)"
 echo -e " ${GATEWAY}${BGN}http://${IP}:3000/signup.html${CL}   (first-time setup)"
 echo ""
-echo -e " ${INFO}${YW}Container root password: ${YWB}${CT_PASSWORD:-"(none set)"}${CL}"
+echo -e " ${INFO}${YW}Container root password (auto-generated): ${YWB}${CT_PASSWORD}${CL}"
 echo -e " ${INFO}${YW}Environment: ${YWB}${APP_ENV}${CL}"
 echo -e " ${INFO}${YW}To update ForgeShift later:${CL}"
 echo -e "${TAB}${TAB}${DGN}pct exec ${CTID} -- bash /opt/forgeshift/update-dev.sh${CL}"
