@@ -75,9 +75,9 @@ app.use((req, res, next) => {
   next()
 })
 
-async function fetchPublishedReleases() {
+async function fetchPublishedReleases(forceRefresh = false) {
   const now = Date.now()
-  if (githubReleasesCache.data && (now - githubReleasesCache.fetchedAt) < GITHUB_RELEASES_CACHE_MS) {
+  if (!forceRefresh && githubReleasesCache.data && (now - githubReleasesCache.fetchedAt) < GITHUB_RELEASES_CACHE_MS) {
     return githubReleasesCache.data
   }
 
@@ -191,8 +191,9 @@ app.get('/api/config', optionalAuth, (req, res) => {
 // ── Published GitHub releases for update checks ───────────────────────────────
 app.get('/api/releases', requireAuth, async (req, res) => {
   try {
-    const releases = await fetchPublishedReleases()
-    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300')
+    const forceRefresh = req.query.refresh === '1'
+    const releases = await fetchPublishedReleases(forceRefresh)
+    res.set('Cache-Control', 'no-store')
     res.json({
       repo: GITHUB_REPO,
       fetchedAt: new Date().toISOString(),

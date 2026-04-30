@@ -2853,30 +2853,32 @@ body.shift-panel-left:not(.shift-panel-open) .shift-panel {
   }
   .shift-panel {
     position: fixed;
-    width: calc(100% - 12px);
+    top: calc(var(--safe-top) + var(--topbar-h));
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
     max-width: 100%;
     border-left: none;
     border-radius: 14px 14px 0 0;
-    right: 6px;
-    bottom: 0;
-    height: 85dvh;
+    height: auto;
+    max-height: none;
     transition: transform .25s cubic-bezier(.32,1,.23,1), opacity .2s ease;
     z-index: 150;
-    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+    box-shadow: none;
     opacity: 0;
     transform: translateY(105%);
     pointer-events: none;
   }
   .shift-panel.open {
     display: flex;
-    right: 6px;
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
   }
   body.shift-panel-left .shift-panel {
-    left: auto;
-    right: 6px;
+    left: 0;
+    right: 0;
   }
 }
 </style>
