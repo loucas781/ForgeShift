@@ -377,6 +377,18 @@
           <span class="form-label" style="margin:0">Account active</span>
         </div>
       </div>
+      <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <label class="form-label">Profile photo</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="euAvatarPreview"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="file" id="euAvatarInput" accept="image/*" style="display:none" onchange="uploadEditedUserAvatar(this)">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('euAvatarInput').click()">Upload photo</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="euAvatarRemoveBtn" style="color:var(--red);display:none" onclick="removeEditedUserAvatar()">Remove photo</button>
+          </div>
+        </div>
+        <p style="margin:8px 0 0;color:var(--text-3);font-size:12px">Admins can manage user profile photos here.</p>
+      </div>
       <!-- Set Password toggle -->
       <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -2080,7 +2092,50 @@ function openEditUser(id) {
   document.getElementById('euNewPw').value  = ''
   document.getElementById('euNewPw2').value = ''
   euPwIndicator.innerHTML = ''
+  document.getElementById('euAvatarInput').value = ''
+  document.getElementById('euAvatarPreview').innerHTML = _avatarHTML(u, 'lg')
+  document.getElementById('euAvatarRemoveBtn').style.display = u.avatar ? 'inline-flex' : 'none'
   document.getElementById('editUserModal').classList.add('open')
+}
+
+async function uploadEditedUserAvatar(input) {
+  try {
+    const file = input?.files?.[0]
+    if (!editingUserId || !file) return
+    const fd = new FormData()
+    fd.append('avatar', file)
+    const r = await fetch(`/api/users/${editingUserId}/avatar`, { method: 'POST', body: fd })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`)
+    const user = users.find(u => u.id === editingUserId)
+    if (user) user.avatar = d.avatar
+    document.getElementById('euAvatarPreview').innerHTML = _avatarHTML(user || { name: 'User', avatar: d.avatar }, 'lg')
+    document.getElementById('euAvatarRemoveBtn').style.display = 'inline-flex'
+    input.value = ''
+    renderTeamList()
+    toast('Profile photo updated', 'success')
+  } catch (err) {
+    toast(err.message || 'Failed to upload photo', 'error')
+  }
+}
+
+async function removeEditedUserAvatar() {
+  if (!editingUserId) return
+  if (!confirm('Remove this user profile photo?')) return
+  try {
+    const r = await fetch(`/api/users/${editingUserId}/avatar`, { method: 'DELETE' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`)
+    const user = users.find(u => u.id === editingUserId)
+    if (user) user.avatar = null
+    document.getElementById('euAvatarPreview').innerHTML = _avatarHTML(user || { name: 'User' }, 'lg')
+    document.getElementById('euAvatarRemoveBtn').style.display = 'none'
+    document.getElementById('euAvatarInput').value = ''
+    renderTeamList()
+    toast('Profile photo removed', 'success')
+  } catch (err) {
+    toast(err.message || 'Failed to remove photo', 'error')
+  }
 }
 function toggleEuSetPw() {
   const show = document.getElementById('euSetPwToggle').checked

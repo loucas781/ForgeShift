@@ -312,13 +312,15 @@ function renderTaskDots(dayAssignments, dateStr, className = '') {
     ? `onclick="event.stopPropagation();openTaskAssignModal('${dateStr}')"`
     : ''
   const count = dayAssignments.length
-  const sample = dayAssignments[0]
-  const accent = getTaskBannerPresentation(sample, '22')
+  const dotsHtml = dayAssignments.map(a => {
+    const accent = getTaskBannerPresentation(a, '22')
+    return `<span class="cal-task-dot" style="background:${accent.border}"></span>`
+  }).join('')
   const title = dayAssignments.map(a =>
     `${a.task_list_name || 'Task'}${a.user_name ? ' • ' + a.user_name : ''}`
   ).join('\n')
   return `<div class="cal-task-dots${canManage() ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canManage() ? clickAttr : ''} title="${escHtml(title)}">` +
-    `<span class="cal-task-dot" style="background:${accent.border}"></span>` +
+    `<span class="cal-task-dot-row">${dotsHtml}</span>` +
     `<span class="cal-task-dot-label">${count} task list${count === 1 ? '' : 's'}</span>` +
   `</div>`
 }
@@ -806,10 +808,6 @@ function renderMonth() {
       '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
       (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
     html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
-    if ((dayShiftCount + dayTaskCount) >= 4) {
-      html += '<div class="cal-day-summary">' + dayShiftCount + ' shift' + (dayShiftCount !== 1 ? 's' : '') + ' · ' + dayTaskCount + ' task' + (dayTaskCount !== 1 ? 's' : '') + '</div>'
-    }
-
     // Holiday label(s) — pinned, non-interactive, behind shifts
     if (dayHols.length) {
       const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
