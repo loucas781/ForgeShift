@@ -85,30 +85,18 @@ function hasValidTrusted2FA(req, user) {
 function verifyTotpWithGrace(secret, code) {
   const token = String(code || '').replace(/\s/g, '')
   if (!token) return false
-
+  if (authenticator.verify({ token, secret })) return true
   const stepSeconds = Number(authenticator?.allOptions?.().step || 30)
-  const verifyAtEpoch = (epochMs) => {
-    const prevOptions = authenticator.options
-    try {
-      authenticator.options = {
-        ...prevOptions,
-        window: 0,
-        epoch: epochMs,
-      }
-      return authenticator.verify({ token, secret })
-    } finally {
-      authenticator.options = prevOptions
-    }
-  }
-
-  // Always verify the current window first with strict windowing.
-  if (verifyAtEpoch(Date.now())) return true
-
-  // Only allow previous-window token briefly after rollover.
   const secondsIntoStep = Math.floor(Date.now() / 1000) % stepSeconds
   if (secondsIntoStep > TWO_FA_GRACE_SECONDS) return false
 
-  return verifyAtEpoch(Date.now() - stepSeconds * 1000)
+  const prevOptions = authenticator.options
+  try {
+    authenticator.options = { ...prevOptions, epoch: Date.now() - stepSeconds * 1000 }
+    return authenticator.verify({ token, secret })
+  } finally {
+    authenticator.options = prevOptions
+  }
 }
 
 function parseDeviceLabel(ua = '') {
