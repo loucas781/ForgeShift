@@ -83,7 +83,9 @@
       <a href="/login.html" class="btn btn-primary auth-btn" style="justify-content:center">Back to Sign In</a>
     </div>
 
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3)" id="versionFooter"></div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3);white-space:normal;word-break:break-word;overflow:visible;text-overflow:clip" id="versionFooter">
+      ForgeShift <span style="font-weight:700">v...</span>
+    </div>
   </div>
 </div>
 <script>
@@ -135,11 +137,32 @@
     })()
   })()
 
-  // Attach live indicator
+  const footer = document.getElementById('versionFooter')
+  const footerEnvColor = (env) => env === 'staging' ? '#d97706' : env === 'development' ? '#6554c0' : '#0a7c41'
+  const inferEnvFromHost = () => {
+    const host = (window.location.hostname || '').toLowerCase()
+    return host.includes('staging') ? 'staging' : (host.includes('dev') || host.includes('develop') || host.includes('localhost') || host === '') ? 'development' : 'production'
+  }
+  function setFooter(env, version) {
+    if (!footer) return
+    const envLabel = String(env || inferEnvFromHost()).toUpperCase()
+    const versionLabel = String(version || '...')
+    footer.innerHTML = `ForgeShift <span style="color:${footerEnvColor(envLabel.toLowerCase())};font-weight:700">${envLabel}</span> v${versionLabel}`
+  }
+
+  setFooter(inferEnvFromHost(), '...')
+
+  // Attach password strength indicator if helper is available.
+  // This must not block footer/env rendering.
   const pwInput = document.getElementById('password')
-  const indicator = createPasswordIndicator()
-  document.getElementById('pwIndicator').appendChild(indicator)
-  pwInput.addEventListener('input', () => updatePasswordIndicator(indicator, pwInput.value))
+  if (pwInput && typeof createPasswordIndicator === 'function' && typeof updatePasswordIndicator === 'function') {
+    const indicator = createPasswordIndicator()
+    const host = document.getElementById('pwIndicator')
+    if (host) {
+      host.appendChild(indicator)
+      pwInput.addEventListener('input', () => updatePasswordIndicator(indicator, pwInput.value))
+    }
+  }
 
   async function init() {
     try {
@@ -151,10 +174,10 @@
         document.getElementById('mainForm').style.display = 'none'
         document.getElementById('disabledState').style.display = 'block'
       }
-      const envColour = d.appEnv === 'staging' ? '#d97706' : d.appEnv === 'development' ? '#6554c0' : '#0a7c41'
-      document.getElementById('versionFooter').innerHTML =
-        `ForgeShift &nbsp;·&nbsp; <span style="color:${envColour};font-weight:600">${d.appEnv}</span> &nbsp;·&nbsp; v${d.version}`
-    } catch {}
+      setFooter(d.appEnv, d.version)
+    } catch {
+      setFooter(inferEnvFromHost(), 'unknown')
+    }
   }
   init()
 
@@ -176,7 +199,7 @@
     if (!email) { fieldErr('email', 'Email is required.'); valid = false }
     else if (!/\S+@\S+\.\S+/.test(email)) { fieldErr('email', 'Enter a valid email address.'); valid = false }
     if (!pw) { fieldErr('password', 'Password is required.'); valid = false }
-    else {
+    else if (typeof validatePasswordClient === 'function') {
       const pv = validatePasswordClient(pw)
       if (!pv.ok) { fieldErr('password', pv.errors.join(' ')); valid = false }
     }
