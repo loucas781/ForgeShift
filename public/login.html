@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ForgeShift — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img id="authLogoImg" class="auth-logo-img" src="/icons/app-icon-light-1024.png?v=20260429c" alt="ForgeShift">
+      <span class="auth-logo-text">ForgeShift</span>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to manage your shift rota</p>
+
+    <div class="auth-error" id="loginError"></div>
+
+    <div id="credentialsForm">
+      <div class="form-group">
+        <label class="form-label">Email address</label>
+        <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="rememberRow" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="position:relative;flex-shrink:0">
+            <input type="checkbox" id="rememberToggle" style="appearance:none;-webkit-appearance:none;width:36px;height:20px;border-radius:10px;background:var(--border);cursor:pointer;transition:background .2s;display:block" onchange="onRememberChange(this)">
+            <span style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;pointer-events:none;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)" id="rememberKnob"></span>
+          </div>
+          <label for="rememberToggle" style="font-size:13px;font-weight:500;color:var(--text-1);cursor:pointer;line-height:1">Remember login details</label>
+        </div>
+        <a href="/forgot-password.html" id="forgotPwLink" style="font-size:13px;font-weight:400;white-space:nowrap">Forgot password?</a>
+      </div>
+      <div id="rememberWarning" style="display:none;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(217,119,6,.35);background:rgba(217,119,6,.08)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <p style="margin:0;font-size:13px;color:#d97706;line-height:1.45">Only enable on private devices you own and trust. Credentials will be saved in your browser.</p>
+      </div>
+      <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
+    </div>
+
+    <div id="totpForm" style="display:none">
+      <p style="font-size:14px;color:var(--text-2);margin-bottom:16px">Enter the 6-digit code from your authenticator app.</p>
+      <div class="form-group">
+        <label class="form-label">Authentication code</label>
+        <input type="text" class="form-input" id="totpCode" placeholder="000000" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text-2);cursor:pointer">
+        <input type="checkbox" id="rememberDeviceToggle" checked>
+        Remember this device for 30 days
+      </label>
+      <button class="btn btn-primary auth-btn" id="totpBtn" onclick="doTOTPLogin()">Verify</button>
+      <button type="button" style="width:100%;margin-top:8px;background:none;border:none;color:var(--text-3);font-size:13px;cursor:pointer;padding:4px 0" onclick="cancelTOTP()">Back to sign in</button>
+    </div>
+
+    <div id="passkeyDivider" style="display:none;align-items:center;gap:10px;margin:16px 0">
+      <hr style="flex:1;border:none;border-top:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--text-3)">or</span>
+      <hr style="flex:1;border:none;border-top:1px solid var(--border)">
+    </div>
+    <button class="btn btn-secondary auth-btn" id="passkeyBtn" style="display:none" onclick="doPasskeyLogin()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      Sign in with passkey
+    </button>
+
+    <div class="auth-link" id="signupLink">
+      Don't have an account? <a href="/signup.html">Sign up</a>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3);white-space:normal;word-break:break-word;overflow:visible;text-overflow:clip" id="versionFooter">
+      ForgeShift <span style="font-weight:700">v...</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Remember login details toggle
+  function onRememberChange(cb) {
+    const knob = document.getElementById('rememberKnob')
+    const warning = document.getElementById('rememberWarning')
+    cb.style.background = cb.checked ? '#4f46e5' : 'var(--border)'
+    knob.style.transform = cb.checked ? 'translateX(16px)' : 'translateX(0)'
+    warning.style.display = cb.checked ? 'flex' : 'none'
+    if (!cb.checked) {
+      localStorage.removeItem('fs-saved-email')
+      localStorage.removeItem('fs-saved-password')
+    }
+  }
+
+  // Restore saved credentials
+  ;(function restoreSaved() {
+    try {
+      const savedEmail = localStorage.getItem('fs-saved-email')
+      const savedPassword = localStorage.getItem('fs-saved-password')
+      if (savedEmail && savedPassword) {
+        document.getElementById('email').value = savedEmail
+        document.getElementById('password').value = savedPassword
+        const cb = document.getElementById('rememberToggle')
+        cb.checked = true
+        onRememberChange(cb)
+      }
+    } catch {}
+  })()
+
+  function applyAuthThemeAndIcons(theme) {
+    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    if (theme === 'light') document.documentElement.removeAttribute('data-theme')
+    else if (isDark) document.documentElement.setAttribute('data-theme', 'dark')
+    else document.documentElement.removeAttribute('data-theme')
+    const href = isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
+    const appleTouch = document.querySelector('link[rel="apple-touch-icon"]')
+    if (appleTouch) appleTouch.setAttribute('href', href)
+    const logo = document.getElementById('authLogoImg')
+    if (logo) logo.setAttribute('src', href)
+    let runtimeIcon = document.getElementById('runtimeAppIcon')
+    if (!runtimeIcon) {
+      runtimeIcon = document.createElement('link')
+      runtimeIcon.id = 'runtimeAppIcon'
+      runtimeIcon.rel = 'icon'
+      runtimeIcon.type = 'image/png'
+      document.head.appendChild(runtimeIcon)
+    }
+    runtimeIcon.setAttribute('href', href)
+  }
+
+  let t = 'system'
+  try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
+  applyAuthThemeAndIcons(t);
+  (function() {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const onThemeChange = () => {
+        let liveTheme = 'system'
+        try { liveTheme = localStorage.getItem('fs-theme') || 'system' } catch {}
+        if (liveTheme === 'system') applyAuthThemeAndIcons('system')
+      }
+      if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
+      else if (typeof mq.addListener === 'function') mq.addListener(onThemeChange)
+    })()
+
+  const footer = document.getElementById('versionFooter')
+  const footerEnvColor = (env) => env === 'staging' ? '#d97706' : env === 'development' ? '#6554c0' : '#0a7c41'
+  const inferEnvFromHost = () => {
+    const host = (window.location.hostname || '').toLowerCase()
+    return host.includes('staging') ? 'staging' : (host.includes('dev') || host.includes('develop') || host.includes('localhost') || host === '') ? 'development' : 'production'
+  }
+  function setFooter(env, version) {
+    if (!footer) return
+    const envLabel = String(env || inferEnvFromHost()).toUpperCase()
+    const versionLabel = String(version || '...')
+    footer.innerHTML = `ForgeShift <span style="color:${footerEnvColor(envLabel.toLowerCase())};font-weight:700">${envLabel}</span> v${versionLabel}`
+  }
+  function showPasskeyOption() {
+    const divider = document.getElementById('passkeyDivider')
+    const button = document.getElementById('passkeyBtn')
+    if (divider) divider.style.display = 'flex'
+    if (button) button.style.display = 'block'
+  }
+  async function readJsonOrText(response) {
+    if (response.status === 204) return {}
+    const text = await response.text()
+    if (!text) return {}
+    try { return JSON.parse(text) } catch { return { error: text } }
+  }
+
+  setFooter(inferEnvFromHost(), '...')
+  showPasskeyOption()
+
+  async function init() {
+    try {
+      const r = await fetch('/api/config')
+      const d = await readJsonOrText(r)
+      if (!r.ok) throw new Error(d.error || `Config failed (${r.status})`)
+      if (d.user) window.location.href = '/'
+      if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
+      setFooter(d.appEnv, d.version)
+      // Disable "remember login details" on non-production builds
+      if (d.appEnv === 'development') {
+        document.getElementById('rememberRow').style.display = 'none'
+        document.getElementById('rememberWarning').style.display = 'none'
+        localStorage.removeItem('fs-saved-email')
+        localStorage.removeItem('fs-saved-password')
+      }
+      // Update forgot-password link hint based on SMTP
+      const fpLink = document.getElementById('forgotPwLink')
+      if (fpLink && !d.smtpEnabled) {
+        fpLink.title = 'No email server configured — ask your admin to generate a reset link from Settings → Team'
+      }
+    } catch {
+      setFooter(inferEnvFromHost(), 'unknown')
+    }
+    showPasskeyOption()
+  }
+  init()
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return
+    if (document.getElementById('totpForm').style.display !== 'none') doTOTPLogin()
+    else doLogin()
+  })
+
+  function _b64url(str) {
+    const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - base64.length % 4)
+    const bin = atob(base64 + pad)
+    return Uint8Array.from(bin, c => c.charCodeAt(0)).buffer
+  }
+  function _ab2b64url(buf) {
+    return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')
+  }
+
+  async function doPasskeyLogin() {
+    const btn = document.getElementById('passkeyBtn')
+    const err = document.getElementById('loginError')
+    err.classList.remove('show')
+    if (!window.PublicKeyCredential || !navigator.credentials?.get) {
+      err.textContent = 'Passkeys are not available in this browser or connection. Use HTTPS or sign in with email and password.'
+      err.classList.add('show')
+      return
+    }
+    btn.disabled = true; btn.textContent = 'Waiting for passkey…'
+    try {
+      const email = document.getElementById('email').value.trim()
+      const optRes = await fetch('/api/passkeys/auth-options', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(email ? { email } : {})
+      })
+      const opts = await readJsonOrText(optRes)
+      if (!optRes.ok) { err.textContent = opts.error || 'Failed to start passkey login'; err.classList.add('show'); return }
+
+      const challenge = _b64url(opts.challenge)
+      const allowCredentials = (opts.allowCredentials || []).map(c => ({ ...c, id: _b64url(c.id) }))
+
+      const assertion = await navigator.credentials.get({
+        publicKey: { ...opts, challenge, allowCredentials }
+      })
+
+      const credential = {
+        id: assertion.id,
+        rawId: _ab2b64url(assertion.rawId),
+        type: assertion.type,
+        response: {
+          authenticatorData: _ab2b64url(assertion.response.authenticatorData),
+          clientDataJSON:    _ab2b64url(assertion.response.clientDataJSON),
+          signature:         _ab2b64url(assertion.response.signature),
+          userHandle:        assertion.response.userHandle ? _ab2b64url(assertion.response.userHandle) : null,
+        }
+      }
+
+      const verRes = await fetch('/api/passkeys/auth-verify', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ credential, nonce: opts.nonce || opts._nonce })
+      })
+      const verData = await readJsonOrText(verRes)
+      if (!verRes.ok) { err.textContent = verData.error || 'Passkey verification failed'; err.classList.add('show'); return }
+      window.location.href = verData.redirectTo || '/'
+    } catch (e) {
+      if (e.name !== 'NotAllowedError') {
+        err.textContent = 'Passkey sign-in failed — ' + (e.message || 'please try again')
+        err.classList.add('show')
+      }
+    } finally {
+      btn.disabled = false
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>Sign in with passkey'
+    }
+  }
+
+  let _pendingToken = null
+
+  async function doLogin() {
+    const btn = document.getElementById('loginBtn')
+    const err = document.getElementById('loginError')
+    const email = document.getElementById('email').value.trim()
+    const password = document.getElementById('password').value
+    err.classList.remove('show')
+    if (!email || !password) { err.textContent = 'Please enter your email and password.'; err.classList.add('show'); return }
+    btn.disabled = true; btn.textContent = 'Signing in…'
+    try {
+      const r = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
+      const d = await readJsonOrText(r)
+      if (!r.ok) { err.textContent = d.error || `Login failed (${r.status})`; err.classList.add('show'); return }
+      if (document.getElementById('rememberToggle').checked) {
+        localStorage.setItem('fs-saved-email', email)
+        localStorage.setItem('fs-saved-password', password)
+      } else {
+        localStorage.removeItem('fs-saved-email')
+        localStorage.removeItem('fs-saved-password')
+      }
+      if (d.requiresTOTP) {
+        _pendingToken = d.pendingToken
+        document.getElementById('credentialsForm').style.display = 'none'
+        document.getElementById('totpForm').style.display = ''
+        document.getElementById('totpCode').focus()
+        return
+      }
+      window.location.href = '/'
+    } catch (e) {
+      err.textContent = `Connection error — ${e.message || 'please try again'}`
+      err.classList.add('show')
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sign in'
+    }
+  }
+
+  async function doTOTPLogin() {
+    const btn = document.getElementById('totpBtn')
+    const err = document.getElementById('loginError')
+    const code = document.getElementById('totpCode').value.trim()
+    err.classList.remove('show')
+    if (!code) { err.textContent = 'Please enter your authentication code.'; err.classList.add('show'); return }
+    btn.disabled = true; btn.textContent = 'Verifying…'
+    try {
+      const rememberDevice = !!document.getElementById('rememberDeviceToggle')?.checked
+      const r = await fetch('/api/auth/2fa/login', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pendingToken: _pendingToken, code, rememberDevice })
+      })
+      const d = await readJsonOrText(r)
+      if (!r.ok) { err.textContent = d.error || `Verification failed (${r.status})`; err.classList.add('show'); return }
+      window.location.href = '/'
+    } catch (e) {
+      err.textContent = `Connection error — ${e.message || 'please try again'}`
+      err.classList.add('show')
+    } finally {
+      btn.disabled = false; btn.textContent = 'Verify'
+    }
+  }
+
+  function cancelTOTP() {
+    _pendingToken = null
+    document.getElementById('totpForm').style.display = 'none'
+    document.getElementById('credentialsForm').style.display = ''
+    document.getElementById('loginError').classList.remove('show')
+    document.getElementById('totpCode').value = ''
+  }
+</script>
+</body>
+</html>

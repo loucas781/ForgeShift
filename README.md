@@ -92,7 +92,7 @@ Update behavior:
 
 ## Build & Release Visibility (In-App Updates Page)
 
-The Settings -> Updates page reads GitHub Releases for `GITHUB_REPO`.
+The Settings → Updates page reads GitHub Releases for `GITHUB_REPO`.
 
 - `staging` builds compare against published **pre-releases**
 - `main` builds compare against published **releases**

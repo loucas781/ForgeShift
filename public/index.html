@@ -1,0 +1,2884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ForgeShift — Calendar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <script>
+    (function(){
+      var t = localStorage.getItem("fs-theme") || "system"
+      if (t === "system") {
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches)
+          document.documentElement.setAttribute("data-theme","dark")
+      } else if (t !== "light") {
+        document.documentElement.setAttribute("data-theme", t)
+      }
+    })()
+  </script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <main class="page-content" style="padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
+      <div class="cal-wrapper">
+        <div class="cal-main">
+        <!-- Toolbar -->
+        <div class="cal-toolbar">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" id="prevBtn" title="Previous">&#8249;</button>
+            <button class="cal-today-btn" onclick="goToday()">Today</button>
+            <button class="cal-nav-btn" id="nextBtn" title="Next">&#8250;</button>
+          </div>
+          <h2 class="cal-title" id="calTitle">Loading…</h2>
+          <div id="userFilterWrap" style="display:none">
+            <select class="cal-user-filter" id="teamFilter" onchange="renderView()">
+              <option value="">My shifts</option>
+            </select>
+          </div>
+          <div class="cal-toolbar-end">
+            <span id="hoursStat" class="cal-hours-stat"></span>
+            <button id="copyWeekBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+              Copy week
+            </button>
+            <button id="csvExportBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="exportCSV()" title="Export CSV">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              CSV
+            </button>
+            <button class="btn btn-ghost btn-icon" onclick="window.print()" title="Print rota">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a1 1 0 001 1h8a1 1 0 001-1v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a1 1 0 00-1-1H6a1 1 0 00-1 1zm2 0h6v3H7V4zm-1 9h8v4H6v-4zm7-4a1 1 0 110 2 1 1 0 010-2z" clip-rule="evenodd"/></svg>
+            </button>
+            <div class="cal-toolbar-sep"></div>
+            <button class="btn btn-ghost btn-icon" onclick="toggleKbdHelp()" title="Keyboard shortcuts" style="font-size:14px">?</button>
+            <div id="liveIndicator" class="cal-live-dot" style="display:none" title="Live updates connected"></div>
+          </div>
+          <div class="cal-view-tabs">
+            <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+              <span>Month</span>
+            </button>
+            <button class="cal-view-tab" id="tabWeek" onclick="setView('week')">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+              <span>Week</span>
+            </button>
+          </div>
+        </div>
+        <!-- Grid -->
+        <div id="calEmptyBanner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;margin:0 0 6px;background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;font-size:13px;color:var(--text-3)">
+          <span id="calEmptyBannerMsg"></span>
+          <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <!-- Shift Details Side Panel -->
+        <div id="shiftPanel" class="shift-panel" aria-label="Shift details">
+          <div class="shift-panel-header">
+            <div class="shift-panel-title-row">
+              <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button id="shiftPanelDayAddBtn" class="btn btn-secondary btn-sm" style="display:none" onclick="shiftPanelAddForDay()">+ Shift</button>
+                <button id="shiftPanelEditBtn" class="btn btn-primary btn-sm" style="display:none" onclick="shiftPanelEdit()">Edit</button>
+                <button class="btn btn-ghost btn-icon shift-panel-close" onclick="closeShiftPanel()" aria-label="Close panel">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="shift-panel-body" id="shiftPanelBody"></div>
+        </div>
+      </div>
+      <!-- Mobile FAB: Copy Week (week view + managers only) -->
+      <button id="copyWeekFab" class="copy-week-fab" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week" aria-label="Copy week">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+      </button>
+    </main>
+</div>
+
+<!-- Shift Modal -->
+<div class="modal-overlay" id="shiftModal">
+  <div class="modal modal--shift">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Shift</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="adminUserField" style="display:none" class="form-group">
+        <label class="form-label">Team member</label>
+        <select class="form-select" id="modalUser"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="modalDate">
+      </div>
+      <div id="repeatDaysWrap" class="form-group" style="display:none">
+        <label class="form-label">Repeat on days</label>
+        <div id="repeatDayBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px"></div>
+        <p style="font-size:11px;color:var(--text-3);margin:6px 0 0">Creates the same shift on each selected day within this week.</p>
+      </div>
+      <div id="modalTemplateQuickWrap" class="form-group" style="display:none">
+        <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+            <label class="form-label" style="margin:0">Quick template apply</label>
+            <span id="modalTemplateRangeLabel" style="font-size:11px;color:var(--text-3)"></span>
+          </div>
+          <p style="font-size:12px;color:var(--text-3);margin:0 0 10px">Apply a saved template from this date to the end of the week. Manual shift entry below still works if you prefer.</p>
+          <div id="modalTemplateEmpty" style="display:none;font-size:12px;color:var(--text-3)">No compatible templates are available for your current role.</div>
+          <div id="modalTemplateControls" style="display:none">
+            <div class="form-group" style="margin-bottom:8px">
+              <select class="form-select" id="modalTemplateSelect">
+                <option value="">Select a template…</option>
+              </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+              <input type="checkbox" id="modalTemplateSkipHolidays" checked style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+              <span style="font-size:12px;color:var(--text-2)">Skip bank holidays</span>
+            </label>
+            <div style="font-size:11px;color:var(--text-3);margin-top:8px">Only the remaining days in that week will be updated. Existing shifts on matching days will be replaced.</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <select class="form-select" id="modalLocation">
+          <option value="">— No location —</option>
+        </select>
+      </div>
+      <div class="modal-grid-2">
+        <div class="form-group">
+          <label class="form-label">Start time</label>
+          <input type="time" class="form-input" id="modalStart">
+        </div>
+        <div class="form-group">
+          <label class="form-label">End time</label>
+          <input type="time" class="form-input" id="modalEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="modalNotes" placeholder="Add any notes for this day…" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Shift colour <span style="font-weight:400;color:var(--text-3);font-size:11px">(used when no location colour is set)</span></label>
+        <div id="modalColourPicker"></div>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <label class="toggle">
+          <input type="checkbox" id="modalIsOff">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="form-label" style="margin:0">Day off / leave</span>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <label class="toggle">
+          <input type="checkbox" id="modalIsOncall">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="form-label" style="margin:0">On-call</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-secondary" id="applyTemplateBtn" style="display:none" onclick="applyTemplateFromModal()">Apply template</button>
+      <button class="btn btn-primary" onclick="saveShift()">Save shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task Assignment Modal -->
+<div class="modal-overlay" id="taskAssignModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="taskAssignModalTitle">Assign Task</h3>
+      <button class="modal-close" onclick="closeTaskAssignModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for one or more days this week.</p>
+      <div class="form-group">
+        <label class="form-label">Team member</label>
+        <select class="form-select" id="taUser"></select>
+      </div>
+      <div class="form-group">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="form-label" style="margin:0">Days</label>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('weekdays')" style="font-size:11px;padding:2px 8px">Weekdays</button>
+            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('all')" style="font-size:11px;padding:2px 8px">All week</button>
+            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('none')" style="font-size:11px;padding:2px 8px">Clear</button>
+          </div>
+        </div>
+        <div id="taDayPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div id="taGroupTabsWrap" style="display:none;margin-bottom:4px">
+        <div id="taGroupTabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
+      </div>
+      <div id="taLocationTabsWrap" style="display:none;margin-bottom:4px">
+        <div id="taLocationTabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Task list</label>
+        <select class="form-select" id="taTaskList">
+          <option value="">— Select a task list —</option>
+        </select>
+      </div>
+      <!-- Current assignments for the selected user across this week -->
+      <div id="taCurrentAssignments" style="display:none;margin-top:4px">
+        <label class="form-label" style="margin-bottom:6px">Already assigned this week</label>
+        <div id="taAssignmentList" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeTaskAssignModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTaskAssignment()">Add assignment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task Detail Popover -->
+<div id="taskDetailPopover" style="display:none;position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px 16px;min-width:220px;max-width:320px;pointer-events:none">
+  <div id="taskDetailName" style="font-weight:700;font-size:14px;margin-bottom:4px"></div>
+  <div id="taskDetailUser" style="font-size:12px;color:var(--text-3);margin-bottom:8px"></div>
+  <div id="taskDetailDesc" style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:8px;display:none"></div>
+  <div id="taskDetailLocation" style="font-size:12px;color:var(--text-3);display:none"></div>
+</div>
+
+<!-- Keyboard Shortcuts Help Overlay -->
+<div id="kbdHelpOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;min-width:320px;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0;font-size:15px;font-weight:700">Keyboard Shortcuts</h3>
+      <button onclick="toggleKbdHelp()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-3);padding:0;line-height:1">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px">
+      <kbd class="kbd-key">←</kbd><span style="color:var(--text-2)">Previous week / month</span>
+      <kbd class="kbd-key">→</kbd><span style="color:var(--text-2)">Next week / month</span>
+      <kbd class="kbd-key">T</kbd><span style="color:var(--text-2)">Go to today</span>
+      <kbd class="kbd-key">W</kbd><span style="color:var(--text-2)">Switch to week view</span>
+      <kbd class="kbd-key">M</kbd><span style="color:var(--text-2)">Switch to month view</span>
+      <kbd class="kbd-key">N</kbd><span style="color:var(--text-2)">New shift (today)</span>
+      <kbd class="kbd-key">C</kbd><span style="color:var(--text-2)">Copy week → next week (week view)</span>
+      <kbd class="kbd-key">P</kbd><span style="color:var(--text-2)">Print rota</span>
+      <kbd class="kbd-key">Esc</kbd><span style="color:var(--text-2)">Close modal / overlay</span>
+      <kbd class="kbd-key">?</kbd><span style="color:var(--text-2)">Toggle this help panel</span>
+    </div>
+  </div>
+</div>
+
+
+<script src="/js/shell.js"></script>
+<script src="/js/prefs.js"></script>
+<script>
+'use strict'
+
+let cfg = null
+// Helper: true for admin, manager, and shift_lead (all can manage shifts/assignments)
+function canManage() { return cfg && (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') }
+let prefs = null
+let view = 'month'
+let currentDate = new Date()
+let shifts = []
+let locations = []
+let users = []
+let templates = []
+let taskLists = []
+let taskAssignments = []
+let editingShiftId = null
+let selectedColour = '#4f46e5'
+let selectedCalendarDate = null
+const NEUTRAL_CALENDAR_COLOUR = '#6b7280'
+
+function getShiftDisplayColour(shift) {
+  return pickColourValue(shift.location_color, shift.note_color) || NEUTRAL_CALENDAR_COLOUR
+}
+
+function getTaskBannerPresentation(taskAssignment, alpha = '22') {
+  return getAccentPresentation(taskAssignment.task_list_color, { alpha })
+}
+
+function renderTaskDots(dayAssignments, dateStr, className = '') {
+  if (!cfg.featureTasks || !dayAssignments.length) return ''
+  const clickAttr = canManage()
+    ? `onclick="event.stopPropagation();openTaskAssignModal('${dateStr}')"`
+    : ''
+  const count = dayAssignments.length
+  const dotsHtml = dayAssignments.map(a => {
+    const accent = getTaskBannerPresentation(a, '22')
+    return `<span class="cal-task-dot" style="background:${accent.border}"></span>`
+  }).join('')
+  const title = dayAssignments.map(a =>
+    `${a.task_list_name || 'Task'}${a.user_name ? ' • ' + a.user_name : ''}`
+  ).join('\n')
+  return `<div class="cal-task-dots${canManage() ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canManage() ? clickAttr : ''} title="${escHtml(title)}">` +
+    `<span class="cal-task-dot-row">${dotsHtml}</span>` +
+    `<span class="cal-task-dot-label">${count} task list${count === 1 ? '' : 's'}</span>` +
+  `</div>`
+}
+
+// Copy/paste state
+let copiedShift = null   // { location_id, start_time, end_time, notes, note_color, is_off }
+
+// Holiday map cache: { year: { 'YYYY-MM-DD': [{name, emoji}] } }
+let _holidayCache = {}
+
+async function init() {
+  cfg = await loadConfig()
+  if (!cfg) return
+  renderShell(cfg, 'calendar')
+  prefs = await loadPrefs()
+  document.body.classList.toggle('shift-panel-left', (prefs.shiftPanelSide || 'right') === 'left')
+
+  view = prefs.defaultView || 'month'
+
+  if (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') {
+    document.getElementById('userFilterWrap').style.display = 'block'
+    document.getElementById('adminUserField').style.display = 'block'
+  }
+
+  // loadUsers must complete before loadTeams — loadTeams filters the users array for shift_leads
+  await loadUsers()
+  const _initResults = await Promise.allSettled([loadLocations(), loadTeams(), loadTaskLists(), loadTemplates()])
+  const _initFailed = _initResults.filter(r => r.status === 'rejected')
+  if (_initFailed.length) console.warn('Init: some data failed to load', _initFailed.map(r => r.reason?.message))
+  renderView()
+
+  document.getElementById('prevBtn').addEventListener('click', prev)
+  document.getElementById('nextBtn').addEventListener('click', next)
+  document.getElementById('modalDate').addEventListener('change', updateTemplateQuickApplyState)
+  document.getElementById('modalUser').addEventListener('change', updateTemplateQuickApplyState)
+  document.getElementById('modalTemplateSelect').addEventListener('change', updateTemplateQuickApplyState)
+
+  // Context menu: dismiss on outside click
+  document.addEventListener('click', () => dismissContextMenu())
+
+  // Real-time SSE
+  connectSSE()
+  _initSwipe()
+  _initLongPress()
+}
+
+async function loadLocations() {
+  locations = await api('/api/locations')
+  const sel = document.getElementById('modalLocation')
+  const selFrag = document.createDocumentFragment()
+  locations.forEach(l => {
+    const o = document.createElement('option')
+    o.value = l.id; o.textContent = l.name
+    selFrag.appendChild(o)
+  })
+  sel.appendChild(selFrag)
+}
+
+async function loadUsers() {
+  if (cfg.user.role === 'member') { users = [cfg.user]; return }
+  // admin and shift_lead both load users — backend scopes appropriately for shift_lead via teams
+  const allUsers = await api('/api/users')
+  if (cfg.user.role === 'shift_lead') {
+    // Get team members from the shift_lead's own teams (loaded in loadTeams)
+    // We'll populate after teams load; for now load all active members + leads
+    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.role === 'shift_lead'))
+  } else {
+    users = allUsers
+  }
+  const msel = document.getElementById('modalUser')
+  const tasel = document.getElementById('taUser')
+  const mFrag = document.createDocumentFragment()
+  const taFrag = document.createDocumentFragment()
+  users.filter(u => u.is_active).forEach(u => {
+    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+    mFrag.appendChild(o)
+    const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+    taFrag.appendChild(o2)
+  })
+  msel.appendChild(mFrag)
+  tasel.appendChild(taFrag)
+}
+
+let teams = []
+async function loadTeams() {
+  if (cfg.user.role === 'member') return
+  try { teams = await api('/api/teams') } catch { teams = [] }
+
+  // For shift_lead: refine the user list to only themselves + their team members
+  if (cfg.user.role === 'shift_lead') {
+    const teamMemberIds = new Set()
+    teamMemberIds.add(cfg.user.id)
+    teams.forEach(t => (t.members || []).forEach(m => { if (m.is_active) teamMemberIds.add(m.id) }))
+    // Re-filter users to only those in scope, and repopulate selects
+    const allUsers = users  // already loaded in loadUsers
+    users = allUsers.filter(u => teamMemberIds.has(u.id))
+    const msel = document.getElementById('modalUser')
+    const tasel = document.getElementById('taUser')
+    const mFrag2 = document.createDocumentFragment()
+    const taFrag2 = document.createDocumentFragment()
+    users.forEach(u => {
+      const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
+      mFrag2.appendChild(o)
+      const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
+      taFrag2.appendChild(o2)
+    })
+    msel.innerHTML = ''
+    msel.appendChild(mFrag2)
+    tasel.innerHTML = ''
+    tasel.appendChild(taFrag2)
+  }
+
+  const sel = document.getElementById('teamFilter')
+  while (sel.options.length > 1) sel.remove(1)
+  // Individual users group.
+  // Admins: all active users.
+  // Shift leads: only members of their own teams (the `users` array has already
+  //   been narrowed to team scope inside loadTeams(), so no extra filtering needed).
+  // Both roles can open and EDIT the rota for any user shown here.
+  const scopeUsers = users.filter(u => u.is_active)
+  if (scopeUsers.length) {
+    const uGrp = document.createElement('optgroup')
+    uGrp.label = 'Individual'
+    scopeUsers.forEach(u => {
+      const o = document.createElement('option')
+      o.value = 'user:' + u.id
+      o.textContent = u.name + (u.id === cfg.user.id ? ' (me)' : '')
+      uGrp.appendChild(o)
+    })
+    sel.appendChild(uGrp)
+  }
+}
+
+async function loadTaskLists() {
+  if (!cfg.featureTasks) return
+  try { taskLists = await api('/api/tasks/lists') } catch { taskLists = [] }
+  renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentLocationOptions()
+  renderTaskAssignmentTaskListOptions()
+}
+
+function _taBucketId(t) {
+  if (t.label)  return `label_${t.label}`
+  if (t.org_id) return `org_${t.org_id}`
+  return 'ungrouped'
+}
+
+function _taBucketName(t) {
+  if (t.label)  return t.label
+  if (t.org_id) return t.org_name || 'Unknown'
+  return 'General'
+}
+
+function _taFilterByGroup(lists) {
+  if (_taGroupFilter === 'all') return lists
+  return lists.filter(t => _taBucketId(t) === _taGroupFilter)
+}
+
+function _taTabBar(containerId, options, activeId, onClickFn) {
+  const bar = document.getElementById(containerId)
+  if (!bar) return
+  bar.innerHTML = options.map(o => {
+    const active = o.id === activeId
+    return `<button onclick="${onClickFn}('${o.id}')" type="button" style="
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 14px;border:none;background:none;cursor:pointer;white-space:nowrap;
+      font-size:13px;font-weight:${active ? '600' : '500'};font-family:var(--font);
+      color:${active ? 'var(--blue)' : 'var(--text-2)'};
+      border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
+      margin-bottom:-1px;transition:color .15s,border-color .15s
+    ">${escHtml(o.label)} <span style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${o.count}</span></button>`
+  }).join('')
+}
+
+function renderTaskAssignmentTaskGroupOptions() {
+  const wrap = document.getElementById('taGroupTabsWrap')
+  if (!wrap) return
+
+  const buckets = new Map()
+  taskLists.forEach(t => {
+    const id = _taBucketId(t)
+    if (!buckets.has(id)) buckets.set(id, { id, name: _taBucketName(t), count: 0 })
+    buckets.get(id).count++
+  })
+
+  if (buckets.size <= 1) { wrap.style.display = 'none'; _taGroupFilter = 'all'; return }
+
+  const options = [
+    { id: 'all', label: 'All', count: taskLists.length },
+    ...Array.from(buckets.values()).map(b => ({ id: b.id, label: b.name, count: b.count }))
+  ]
+  if (!options.some(o => o.id === _taGroupFilter)) _taGroupFilter = 'all'
+  wrap.style.display = ''
+  _taTabBar('taGroupTabs', options, _taGroupFilter, 'setTaGroupFilter')
+}
+
+function renderTaskAssignmentLocationOptions() {
+  const wrap = document.getElementById('taLocationTabsWrap')
+  if (!wrap) return
+
+  const groupFiltered = _taFilterByGroup(taskLists)
+  // Cross-reference with the membership-filtered locations array (non-admins only see their locations)
+  const accessibleLocIds = new Set(locations.map(l => l.id))
+  const visibleLocs = []
+  const seen = new Set()
+  groupFiltered.forEach(t => {
+    if (t.location_id && accessibleLocIds.has(t.location_id) && !seen.has(t.location_id)) {
+      seen.add(t.location_id)
+      visibleLocs.push({ id: t.location_id, name: t.location_name || 'Unknown' })
+    }
+  })
+
+  if (visibleLocs.length <= 1) { wrap.style.display = 'none'; _taLocationFilter = 'all'; return }
+
+  const options = [
+    { id: 'all', label: 'All locations', count: groupFiltered.length },
+    ...visibleLocs.map(l => ({ id: l.id, label: l.name, count: groupFiltered.filter(t => t.location_id === l.id).length }))
+  ]
+  if (!options.some(o => o.id === _taLocationFilter)) _taLocationFilter = 'all'
+  wrap.style.display = ''
+  _taTabBar('taLocationTabs', options, _taLocationFilter, 'setTaLocationFilter')
+}
+
+function setTaGroupFilter(id) {
+  _taGroupFilter = id
+  _taLocationFilter = 'all'
+  renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentLocationOptions()
+  renderTaskAssignmentTaskListOptions()
+}
+
+function setTaLocationFilter(id) {
+  _taLocationFilter = id
+  renderTaskAssignmentLocationOptions()
+  renderTaskAssignmentTaskListOptions()
+}
+
+function renderTaskAssignmentTaskListOptions() {
+  const sel = document.getElementById('taTaskList')
+  if (!sel) return
+
+  sel.innerHTML = '<option value="">— Select a task list —</option>'
+
+  let visible = _taFilterByGroup(taskLists)
+  if (_taLocationFilter !== 'all') visible = visible.filter(t => t.location_id === _taLocationFilter)
+
+  const needsGrouping = _taGroupFilter === 'all' && new Set(visible.map(_taBucketId)).size > 1
+  if (needsGrouping) {
+    const buckets = new Map()
+    visible.forEach(t => {
+      const id = _taBucketId(t)
+      if (!buckets.has(id)) buckets.set(id, { name: _taBucketName(t), lists: [] })
+      buckets.get(id).lists.push(t)
+    })
+    buckets.forEach(b => {
+      const grp = document.createElement('optgroup')
+      grp.label = b.name
+      b.lists.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; grp.appendChild(o) })
+      sel.appendChild(grp)
+    })
+    return
+  }
+
+  visible.forEach(t => {
+    const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o)
+  })
+}
+
+async function loadTemplates() {
+  if (!canManage()) { templates = []; return }
+  try { templates = await api('/api/templates') } catch { templates = [] }
+}
+
+// ── Holiday map ────────────────────────────────────────────────────────────────
+function getHolidayMap(year) {
+  if (_holidayCache[year]) return _holidayCache[year]
+  const enabled = prefs?.holidays || []
+  _holidayCache[year] = buildHolidayMap(year, enabled)
+  return _holidayCache[year]
+}
+
+function invalidateHolidayCache(year) {
+  if (year != null) delete _holidayCache[year]
+  else _holidayCache = {}
+}
+
+// ── Data loading ───────────────────────────────────────────────────────────────
+// Returns { start, end } Date objects for the currently visible calendar range.
+function getViewDateRange() {
+  const weekStart = prefs?.weekStartDay ?? 1
+  if (view === 'month') {
+    const year  = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const first = new Date(year, month, 1)
+    const last  = new Date(year, month + 1, 0)
+    const startOffset = (first.getDay() - weekStart + 7) % 7
+    const start = new Date(year, month, 1 - startOffset)
+    const endOffset = (weekStart + 6 - last.getDay() + 7) % 7
+    const end = new Date(year, month, last.getDate() + endOffset)
+    return { start, end }
+  } else {
+    const start = startOfWeek(currentDate, weekStart)
+    const end   = new Date(start); end.setDate(end.getDate() + 6)
+    return { start, end }
+  }
+}
+
+async function loadShifts() {
+  const { start, end } = getViewDateRange()
+  const queryStart = new Date(start)
+  // Week view needs one extra day so overnight shifts from the previous day
+  // can render their after-midnight segment in the visible week.
+  if (view === 'week') queryStart.setDate(queryStart.getDate() - 1)
+  const params = new URLSearchParams({ start: toDateStr(queryStart), end: toDateStr(end) })
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  const role = cfg.user.role
+
+  if (role === 'member') {
+    params.set('user_id', cfg.user.id)
+  } else if (role === 'admin' || role === 'manager' || role === 'shift_lead') {
+    if (filterVal === '') {
+      // No filter selected — show own shifts only
+      params.set('user_id', cfg.user.id)
+    } else if (filterVal.startsWith('user:')) {
+      // Individual rota view — single user, admin/shift_lead can edit
+      params.set('user_id', filterVal.slice(5))
+    }
+  }
+  shifts = await api('/api/shifts?' + params)
+}
+
+async function loadTaskAssignments() {
+  const { start, end } = getViewDateRange()
+  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  const role = cfg.user.role
+  if (role === 'member') {
+    // Members always see only their own tasks
+    params.set('user_id', cfg.user.id)
+  } else {
+    // Admins and shift_leads: scope tasks to match the current shift view
+    if (filterVal === '') {
+      // "My shifts" — only own tasks
+      params.set('user_id', cfg.user.id)
+    } else if (filterVal.startsWith('user:')) {
+      // Individual user's rota — only their tasks
+      params.set('user_id', filterVal.slice(5))
+    }
+  }
+  try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
+}
+
+async function renderView() {
+  // Show a loading shimmer while data is in flight
+  const grid = document.getElementById('calGrid')
+  if (grid && !grid.dataset.loaded) {
+    grid.innerHTML = '<div class="cal-skeleton"><div class="cal-skeleton-grid">' +
+      Array.from({length: 35}, () => '<div class="cal-skeleton-cell"><div class="cal-skeleton-date"></div><div class="cal-skeleton-chip"></div></div>').join('') +
+      '</div></div>'
+  }
+  await loadShifts()
+  if (cfg.featureTasks && taskLists.length) await loadTaskAssignments()
+  if (grid) grid.dataset.loaded = '1'
+  updateTitle()
+  if (view === 'month') renderMonth()
+  else renderWeek()
+  document.getElementById('tabMonth').className = 'cal-view-tab' + (view==='month'?' active':'')
+  document.getElementById('tabWeek').className  = 'cal-view-tab' + (view==='week'?' active':'')
+  // Update copy indicator
+  updatePasteHint()
+  // Hours summary
+  updateHoursStat()
+  // Drag-and-drop (week view only, re-attach after each render)
+  if (view === 'week') _initDragDrop()
+  // CSV export button visibility (managers only)
+  const csvBtn = document.getElementById('csvExportBtn')
+  if (csvBtn) csvBtn.style.display = canManage() ? 'inline-flex' : 'none'
+  // Copy week button: week view + managers only
+  const copyBtn = document.getElementById('copyWeekBtn')
+  if (copyBtn) copyBtn.style.display = (view === 'week' && canManage()) ? 'inline-flex' : 'none'
+  // Mobile FAB — mirrors the copy-week button
+  const fabBtn = document.getElementById('copyWeekFab')
+  if (fabBtn) fabBtn.style.display = (view === 'week' && canManage()) ? 'flex' : 'none'
+}
+
+function updateTitle() {
+  const weekStart = prefs?.weekStartDay ?? 1
+  const todayNow = new Date()
+  let isCurrentPeriod
+  if (view === 'month') {
+    document.getElementById('calTitle').textContent = MONTH_NAMES[currentDate.getMonth()] + ' ' + currentDate.getFullYear()
+    isCurrentPeriod = currentDate.getFullYear() === todayNow.getFullYear() && currentDate.getMonth() === todayNow.getMonth()
+  } else {
+    const ws = startOfWeek(currentDate, weekStart)
+    const we = new Date(ws); we.setDate(we.getDate() + 6)
+    document.getElementById('calTitle').textContent =
+      ws.getDate() + ' ' + MONTH_NAMES[ws.getMonth()].slice(0,3) + ' – ' +
+      we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3) + ' ' + we.getFullYear()
+    isCurrentPeriod = todayNow >= ws && todayNow <= we
+  }
+  const todayBtn = document.querySelector('.cal-today-btn')
+  if (todayBtn) todayBtn.classList.toggle('cal-today-btn--away', !isCurrentPeriod)
+}
+
+// ── Month render ───────────────────────────────────────────────────────────────
+function renderMonth() {
+  const grid       = document.getElementById('calGrid')
+  const today      = toDateStr(new Date())
+  const year       = currentDate.getFullYear()
+  const month      = currentDate.getMonth()
+  const _fv        = document.getElementById('teamFilter')?.value || ''
+  const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
+  const first      = new Date(year, month, 1)
+  const last       = new Date(year, month + 1, 0)
+  const weekStart  = prefs?.weekStartDay ?? 1
+  const showWkNums = prefs?.showWeekNumbers ?? false
+  const compact    = prefs?.compactChips ?? false
+  const holidays   = getHolidayMap(year)
+
+  const startOffset = (first.getDay() - weekStart + 7) % 7
+  const totalCells  = Math.ceil((startOffset + last.getDate()) / 7) * 7
+
+  const visibleShifts = shifts
+
+  const shiftMap = {}
+  visibleShifts.forEach(s => { if (!shiftMap[s.date]) shiftMap[s.date] = []; shiftMap[s.date].push(s) })
+
+  // Task assignment map: date -> [assignment, ...]
+  const taskMap = {}
+  taskAssignments.forEach(a => {
+    if (!taskMap[a.date]) taskMap[a.date] = []
+    taskMap[a.date].push(a)
+  })
+
+  // Build ordered day abbreviations starting from weekStart
+  const allAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  const dayAbbrs = Array.from({length:7}, (_,i) => allAbbr[(weekStart + i) % 7])
+
+  let html = '<div class="cal-month' + (compact?' compact-chips':'') + (showWkNums?' has-weeknums':'') + '">'
+
+  // Week number header gutter
+  if (showWkNums) html += '<div class="cal-wknum-header"></div>'
+  dayAbbrs.forEach(d => { html += '<div class="cal-day-header">' + d + '</div>' })
+
+  for (let i = 0; i < totalCells; i++) {
+    const d  = new Date(year, month, 1 - startOffset + i)
+    const ds = toDateStr(d)
+    const isCurrentMonth = d.getMonth() === month
+    const isToday        = ds === today
+    const dayShifts      = shiftMap[ds] || []
+    const dayHols        = holidays[ds] || []
+
+    // Week number at start of each row
+    if (showWkNums && i % 7 === 0) {
+      html += '<div class="cal-wknum">' + _isoWeekNumber(d) + '</div>'
+    }
+
+    const dayAssignments = taskMap[ds] || []
+    const dayTaskCount = dayAssignments.length
+    const dayShiftCount = dayShifts.length
+
+    // Task indicator — compact dots keeps month view clean.
+    let taskBannerHtml = ''
+    if (cfg.featureTasks && taskLists.length) {
+      const clickAttr = canManage()
+        ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
+        : ''
+      if (dayAssignments.length) {
+        taskBannerHtml = renderTaskDots(dayAssignments, ds)
+      } else if (canManage() && isSingleUserView) {
+        taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
+      }
+    }
+
+    const hasPaste = copiedShift && dayShifts.length === 0
+
+    const isEmpty = dayShifts.length === 0 && !hasPaste
+    html += '<div class="cal-cell' +
+      (isCurrentMonth ? '' : ' other-month') +
+      (isToday ? ' today' : '') +
+      (selectedCalendarDate === ds ? ' selected-day' : '') +
+      (dayHols.length ? ' is-holiday' : '') +
+      (hasPaste ? ' can-paste' : '') +
+      (isEmpty && canManage() ? ' can-add' : '') +
+      '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
+      (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
+    html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
+    // Holiday label(s) — pinned, non-interactive, behind shifts
+    if (dayHols.length) {
+      const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
+      html += '<div class="cal-holiday-label" title="' + names + '">' + names + '</div>'
+    }
+
+    // Task banner (first column of week only)
+    if (taskBannerHtml) html += taskBannerHtml
+
+    // Shift chips — show up to 3, then "+N more"
+    const MAX_CHIPS = dayTaskCount > 0 ? 2 : 3
+    const chipsToShow = dayShifts.slice(0, MAX_CHIPS)
+    const overflow    = dayShifts.length - MAX_CHIPS
+    chipsToShow.forEach(s => {
+      const color = getShiftDisplayColour(s)
+      const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
+      const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      // Duration badge
+      let durBadge = ''
+      if (!s.is_off && s.start_time && s.end_time) {
+        const mins = _shiftDurationMins(s.start_time, s.end_time)
+        if (mins > 0) {
+          const h = Math.floor(mins / 60); const m = mins % 60
+          durBadge = `<span style="opacity:.75;font-size:9px;margin-left:3px">${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''}</span>`
+        }
+      }
+      const titleStr = (s.user_name ? s.user_name + ': ' : '') + label + (s.start_time ? ' ' + s.start_time + '–' + s.end_time : '')
+      html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
+        '" style="background:' + color + '"' +
+        ' title="' + titleStr + '"' +
+        ' onclick="event.stopPropagation();openShiftPanel(\'' + s.id + '\')"' +
+        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')"' : '') +
+        ' data-shift-id="' + s.id + '"' + '>' +
+        name + label + durBadge + '</div>'
+    })
+    if (overflow > 0) {
+      html += '<div class="cal-more-badge" onclick="event.stopPropagation();openCreateModal(\'' + ds + '\')" title="' + overflow + ' more shift' + (overflow > 1 ? 's' : '') + '">+' + overflow + ' more</div>'
+    }
+
+    // Paste hint
+    if (hasPaste) {
+      html += '<div class="cal-paste-hint" onclick="event.stopPropagation();pasteShift(\'' + ds + '\')">📋 Paste</div>'
+    }
+
+    html += '</div>'
+  }
+  html += '</div>'
+  grid.innerHTML = html
+
+  // Empty state banner — full calendar always renders, banner shown above when no shifts
+  const hasShiftsThisMonth = visibleShifts.some(s => s.date >= toDateStr(first) && s.date <= toDateStr(last))
+  const banner = document.getElementById('calEmptyBanner')
+  const bannerMsg = document.getElementById('calEmptyBannerMsg')
+  const bannerBtn = document.getElementById('calEmptyBannerBtn')
+  if (banner) {
+    if (!hasShiftsThisMonth) {
+      bannerMsg.textContent = 'No shifts this month.'
+      if (canManage()) {
+        bannerBtn.textContent = '+ Add first shift'
+        bannerBtn.onclick = () => openCreateModal(toDateStr(new Date()))
+        bannerBtn.style.display = ''
+      } else {
+        bannerBtn.style.display = 'none'
+      }
+      banner.style.display = 'flex'
+    } else {
+      banner.style.display = 'none'
+    }
+  }
+  grid.style.position = ''
+}
+
+// ── Week render ────────────────────────────────────────────────────────────────
+// ── Week view helpers ──────────────────────────────────────────────────────────
+function _timeToMins(t) {
+  // "HH:MM" → total minutes from midnight
+  if (!t) return null
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + (m || 0)
+}
+function _shiftDurationMins(startTime, endTime) {
+  const start = _timeToMins(startTime)
+  const end = _timeToMins(endTime)
+  if (start === null || end === null) return null
+  if (end < start) return (1440 - start) + end
+  return end - start
+}
+function _addDaysToDateStr(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + days)
+  return toDateStr(dt)
+}
+function _pct(mins) {
+  // minutes → pixel offset (60px per hour)
+  return Math.round((mins / 60) * 60)
+}
+
+function renderWeek() {
+  const emptyBanner = document.getElementById('calEmptyBanner')
+  if (emptyBanner) emptyBanner.style.display = 'none'
+  const grid      = document.getElementById('calGrid')
+  const todayStr  = toDateStr(new Date())
+  const weekStart = prefs?.weekStartDay ?? 1
+  const ws        = startOfWeek(currentDate, weekStart)
+  const year      = ws.getFullYear()
+  const holidays  = getHolidayMap(year)
+  const _fv       = document.getElementById('teamFilter')?.value || ''
+  const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
+
+  const visibleShiftsWeek = shifts
+  const shiftMap = {}
+  visibleShiftsWeek.forEach(s => {
+    if (!shiftMap[s.date]) shiftMap[s.date] = []
+    const startMins = _timeToMins(s.start_time)
+    const endMins = _timeToMins(s.end_time)
+
+    if (startMins !== null && endMins !== null) {
+      // Overnight shifts are split across two day columns.
+      if (endMins < startMins) {
+        shiftMap[s.date].push({ shift: s, timed: true, segStart: startMins, segEnd: 1440, overnight: true, continuation: false })
+        const nextDate = _addDaysToDateStr(s.date, 1)
+        if (!shiftMap[nextDate]) shiftMap[nextDate] = []
+        shiftMap[nextDate].push({ shift: s, timed: true, segStart: 0, segEnd: endMins, overnight: true, continuation: true })
+      } else if (endMins > startMins) {
+        shiftMap[s.date].push({ shift: s, timed: true, segStart: startMins, segEnd: endMins, overnight: false, continuation: false })
+      } else {
+        shiftMap[s.date].push({ shift: s, timed: false, overnight: false, continuation: false })
+      }
+      return
+    }
+
+    shiftMap[s.date].push({ shift: s, timed: false, overnight: false, continuation: false })
+  })
+
+  // Task assignment map for this week: date -> [assignments]
+  const taskMap = {}
+  if (cfg.featureTasks) {
+    taskAssignments.forEach(a => {
+      if (!taskMap[a.date]) taskMap[a.date] = []
+      taskMap[a.date].push(a)
+    })
+  }
+  const weekEnd = new Date(ws.getTime() + 6 * 86400000)
+  const weekHasTasks = cfg.featureTasks && (
+    taskLists.length > 0 ||
+    Object.keys(taskMap).some(d => d >= toDateStr(ws) && d <= toDateStr(weekEnd))
+  )
+
+  // ── Build day-date list ──────────────────────────────────────────────────────
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(ws); d.setDate(d.getDate() + i)
+    return d
+  })
+
+  // ── Header row (sticky) ──────────────────────────────────────────────────────
+  let html = `<div class="cal-week-scroll-wrap"><div class="cal-week-outer">`
+
+  // Sticky header: gutter + 7 day headers
+  html += `<div class="cal-week-header-row">`
+  html += `<div class="cal-week-header-gutter"></div>`
+  days.forEach(d => {
+    const ds      = toDateStr(d)
+    const isToday = ds === todayStr
+    const hols    = holidays[ds] || []
+    html += `<div class="cal-week-day-header${isToday ? ' today' : ''}${hols.length ? ' is-holiday' : ''}">
+      <div class="day-name">${DAY_ABBR[d.getDay()]}</div>
+      <div class="day-num">${d.getDate()}</div>
+    </div>`
+  })
+  html += `</div>` // end header-row
+
+  // ── Task row (optional, sits between header and time body) ───────────────────
+  if (cfg.featureTasks && (weekHasTasks || canManage())) {
+    html += `<div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border);flex-shrink:0">`
+    html += `<div style="border-right:1px solid var(--border)"></div>` // gutter spacer
+    days.forEach(d => {
+      const ds = toDateStr(d)
+      const dayAssignments = taskMap[ds] || []
+      const clickAttr = canManage() && taskLists.length
+        ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
+        : ''
+      html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
+      if (dayAssignments.length) {
+        html += renderTaskDots(dayAssignments, ds, 'week-task-dots')
+      } else if (canManage() && taskLists.length && isSingleUserView) {
+        html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
+      }
+      html += `</div>`
+    })
+    html += `</div>` // end task row
+  }
+
+  // ── Scrollable time body ─────────────────────────────────────────────────────
+  html += `<div class="cal-week-body">`
+
+  // Time gutter (24 hour labels)
+  html += `<div class="cal-week-time-gutter">`
+  for (let h = 0; h < 24; h++) {
+    const label = h === 0 ? '' : (h < 10 ? '0' + h : h) + ':00'
+    html += `<div class="cal-week-hour-label">${label}</div>`
+  }
+  html += `</div>` // end time-gutter
+
+  // 7 day columns
+  days.forEach(d => {
+    const ds        = toDateStr(d)
+    const dayShifts = shiftMap[ds] || []
+    const dayHols   = holidays[ds] || []
+    const hasPaste  = copiedShift && dayShifts.length === 0
+
+    html += `<div class="cal-week-day-col${selectedCalendarDate === ds ? ' selected-day' : ''}${dayHols.length ? ' is-holiday' : ''}" onclick="handleCellClick('${ds}')">`
+    html += `<div class="cal-week-col-inner">`
+
+    // Hour grid lines
+    for (let h = 0; h < 24; h++) {
+      html += `<div class="cal-week-hour-row" style="position:absolute;top:${h*60}px;left:0;right:0"></div>`
+    }
+
+    // Holiday label pinned near top
+    if (dayHols.length) {
+      const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
+      html += `<div class="cal-holiday-label week-holiday-label" style="position:absolute;top:4px;left:0;right:0;z-index:3" title="${names}">${names}</div>`
+    }
+
+    // Paste hint
+    if (hasPaste) {
+      html += `<div class="cal-week-paste-hint" onclick="event.stopPropagation();pasteShift('${ds}')">📋 Paste shift</div>`
+    }
+
+    // Shift blocks — positioned by time, or all-day chip if no time
+    dayShifts.forEach(entry => {
+      const s = entry.shift
+      const color = getShiftDisplayColour(s)
+      const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
+      const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      const clickFn = `openShiftPanel('${s.id}')`
+      const ctxAttr = canManage()
+        ? `oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')"`
+        : ''
+
+      if (entry.timed) {
+        // Time-positioned block
+        const top    = _pct(entry.segStart)
+        const height = Math.max(20, _pct(entry.segEnd - entry.segStart))
+        const timeStr = entry.overnight
+          ? (entry.continuation ? `00:00–${s.end_time}` : `${s.start_time}–24:00`)
+          : `${s.start_time}–${s.end_time}`
+        const showTime = height >= 32
+        const showNotes = s.notes && height >= 52
+        html += `<div class="cal-week-shift-card${s.is_oncall ? ' is-oncall' : ''}"
+          style="background:${color};top:${top}px;height:${height}px"
+          onclick="event.stopPropagation();${clickFn}" ${ctxAttr}>
+          <div class="shift-loc">${prefix}${label}</div>
+          ${showTime ? `<div class="shift-time">${timeStr}</div>` : ''}
+          ${showNotes ? `<div class="shift-notes">${s.notes.slice(0, 50)}${s.notes.length > 50 ? '…' : ''}</div>` : ''}
+          ${canManage() ? '<div class="shift-resize-handle"></div>' : ''}
+        </div>`
+      } else {
+        // No time — floating all-day chip near top (below holiday label if present)
+        const topOffset = dayHols.length ? 26 : 4
+        html += `<div class="cal-week-allday-chip${s.is_oncall ? ' is-oncall' : ''}"
+          style="background:${color};position:absolute;top:${topOffset}px;left:3px;right:3px;z-index:2"
+          onclick="event.stopPropagation();${clickFn}" ${ctxAttr}>
+          ${prefix}${label}
+        </div>`
+      }
+    })
+
+    html += `</div></div>` // end col-inner + day-col
+  })
+
+  html += `</div>` // end cal-week-body
+  html += `</div></div>` // end cal-week-outer + scroll-wrap
+
+  grid.innerHTML = html
+
+  // ── Draw current-time line ───────────────────────────────────────────────────
+  _renderWeekNowLine()
+}
+
+// ── Current-time indicator for week view ──────────────────────────────────────
+function _renderWeekNowLine() {
+  const now       = new Date()
+  const todayStr  = toDateStr(now)
+  const weekStart = prefs?.weekStartDay ?? 1
+  const ws        = startOfWeek(currentDate, weekStart)
+
+  // Only show if today is visible in the current week
+  let colIndex = -1
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ws); d.setDate(d.getDate() + i)
+    if (toDateStr(d) === todayStr) { colIndex = i; break }
+  }
+  if (colIndex === -1) return
+
+  const cols = document.querySelectorAll('.cal-week-day-col')
+  if (!cols[colIndex]) return
+
+  const mins = now.getHours() * 60 + now.getMinutes()
+  const top  = _pct(mins)
+
+  const line = document.createElement('div')
+  line.className = 'cal-week-now-line'
+  line.style.top = top + 'px'
+  cols[colIndex].querySelector('.cal-week-col-inner').appendChild(line)
+
+  // Scroll to current time (offset by ~120px so there's context above)
+  const body = document.querySelector('.cal-week-body')
+  if (body) body.scrollTop = Math.max(0, top - 120)
+}
+
+// ── ISO week number helper ─────────────────────────────────────────────────────
+function _isoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
+}
+
+// ── Nav ────────────────────────────────────────────────────────────────────────
+function prev() {
+  if (view === 'month') currentDate.setMonth(currentDate.getMonth() - 1)
+  else currentDate.setDate(currentDate.getDate() - 7)
+  renderView()
+}
+function next() {
+  if (view === 'month') currentDate.setMonth(currentDate.getMonth() + 1)
+  else currentDate.setDate(currentDate.getDate() + 7)
+  renderView()
+}
+function goToday() { currentDate = new Date(); renderView() }
+function setView(v) { view = v; renderView() }
+
+function syncSelectedDayHighlight() {
+  document.querySelectorAll('.cal-cell.selected-day').forEach(el => el.classList.remove('selected-day'))
+  document.querySelectorAll('.cal-week-day-col.selected-day').forEach(el => el.classList.remove('selected-day'))
+  if (!selectedCalendarDate) return
+  document.querySelectorAll(`.cal-cell[data-date="${selectedCalendarDate}"]`).forEach(el => el.classList.add('selected-day'))
+  const weekCols = document.querySelectorAll('.cal-week-day-col')
+  weekCols.forEach(col => {
+    const onclickAttr = col.getAttribute('onclick') || ''
+    if (onclickAttr.includes(`'${selectedCalendarDate}'`)) col.classList.add('selected-day')
+  })
+}
+
+// ── Cell click — aware of paste mode ──────────────────────────────────────────
+function handleCellClick(date) {
+  dismissContextMenu()
+  selectedCalendarDate = date
+  syncSelectedDayHighlight()
+  if (copiedShift) {
+    // Paste if the day is empty; otherwise open create modal pre-filled
+    const dayHasShift = shifts.some(s => s.date === date)
+    if (!dayHasShift) { pasteShift(date); return }
+  }
+  const dayShifts = shifts
+    .filter(s => s.date === date)
+    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+  if (dayShifts.length) {
+    openShiftPanel(dayShifts[0].id)
+    return
+  }
+  openDayPanel(date)
+}
+
+// ── Copy / Paste ───────────────────────────────────────────────────────────────
+function copyShift(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  copiedShift = {
+    location_id: s.location_id,
+    start_time:  s.start_time,
+    end_time:    s.end_time,
+    notes:       s.notes,
+    note_color:  s.note_color,
+    is_off:      s.is_off,
+  }
+  if (canManage()) copiedShift.user_id = s.user_id
+  updatePasteHint()
+  renderView()
+  toast('Shift copied — click an empty day to paste', 'success', 2500)
+}
+
+async function pasteShift(date) {
+  if (!copiedShift) return
+  try {
+    await api('/api/shifts', { method: 'POST', body: { ...copiedShift, date } })
+    toast('Shift pasted', 'success')
+    renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+function clearCopy() {
+  copiedShift = null
+  updatePasteHint()
+  renderView()
+}
+
+function updatePasteHint() {
+  let hint = document.getElementById('copyPasteHint')
+  if (copiedShift) {
+    if (!hint) {
+      hint = document.createElement('div')
+      hint.id = 'copyPasteHint'
+      hint.className = 'cal-copy-hint'
+      hint.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+        Paste mode — click any empty day &nbsp;
+        <button onclick="clearCopy()" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0;opacity:.7;font-size:13px">✕ Cancel</button>`
+      document.querySelector('.cal-toolbar').appendChild(hint)
+    }
+  } else if (hint) {
+    hint.remove()
+  }
+}
+
+// ── Context menu ───────────────────────────────────────────────────────────────
+function showShiftContextMenu(e, id) {
+  dismissContextMenu()
+  const menu = document.createElement('div')
+  menu.id = 'shiftContextMenu'
+  menu.className = 'cal-context-menu'
+  menu.style.top  = e.clientY + 'px'
+  menu.style.left = e.clientX + 'px'
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="copyShift('${id}');dismissContextMenu()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+      Copy shift
+    </button>
+    <button class="ctx-item" onclick="dismissContextMenu();openDuplicateModal('${id}')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/></svg>
+      Duplicate to…
+    </button>
+    <button class="ctx-item" onclick="openEditModal('${id}');dismissContextMenu()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+      Edit shift
+    </button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item ctx-danger" onclick="quickDeleteShift('${id}');dismissContextMenu()">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+      Delete shift
+    </button>`
+  document.body.appendChild(menu)
+  // Nudge if off-screen
+  const r = menu.getBoundingClientRect()
+  if (r.right  > window.innerWidth)  menu.style.left = (e.clientX - r.width)  + 'px'
+  if (r.bottom > window.innerHeight) menu.style.top  = (e.clientY - r.height) + 'px'
+}
+
+function dismissContextMenu() {
+  document.getElementById('shiftContextMenu')?.remove()
+}
+
+async function quickDeleteShift(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  try {
+    await api(`/api/shifts/${id}`, { method: 'DELETE' })
+    renderView()
+    _showUndoToast('Shift deleted', s)
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// ── Duplicate shift ────────────────────────────────────────────────────────────
+function openDuplicateModal(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  const existing = document.getElementById('duplicateShiftModal')
+  if (existing) existing.remove()
+  const userRows = canManage() ? `
+    <div class="form-group">
+      <label class="form-label">Team member</label>
+      <select class="form-select" id="dupUser">${
+        users.filter(u => u.is_active).map(u =>
+          `<option value="${u.id}"${u.id === s.user_id ? ' selected' : ''}>${u.name}${u.id === cfg.user.id ? ' (me)' : ''}</option>`
+        ).join('')
+      }</select>
+    </div>` : ''
+  const modal = document.createElement('div')
+  modal.id = 'duplicateShiftModal'
+  modal.className = 'modal-overlay open'
+  modal.innerHTML = `
+    <div class="modal" style="max-width:360px">
+      <div class="modal-header">
+        <h3 class="modal-title">Duplicate Shift</h3>
+        <button class="modal-close" onclick="document.getElementById('duplicateShiftModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Choose a date to copy this shift to. The shift details (times, location, notes) will be copied exactly.</p>
+        ${userRows}
+        <div class="form-group">
+          <label class="form-label">Target date</label>
+          <input type="date" class="form-input" id="dupDate">
+        </div>
+        <div id="dupError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('duplicateShiftModal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDuplicate('${id}')">Duplicate</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('dupDate').focus(), 50)
+}
+
+async function saveDuplicate(sourceId) {
+  const s = shifts.find(x => x.id === sourceId)
+  if (!s) return
+  const date = document.getElementById('dupDate').value
+  const errEl = document.getElementById('dupError')
+  if (!date) { errEl.style.display = 'block'; errEl.textContent = 'Please select a target date.'; return }
+  const user_id = canManage() ? document.getElementById('dupUser').value : cfg.user.id
+  const saveBtn = document.querySelector('#duplicateShiftModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Duplicating…' }
+  try {
+    await api('/api/shifts', {
+      method: 'POST',
+      body: {
+        user_id,
+        date,
+        location_id: s.location_id,
+        start_time:  s.start_time,
+        end_time:    s.end_time,
+        notes:       s.notes,
+        note_color:  s.note_color,
+        is_off:      s.is_off,
+        is_oncall:   s.is_oncall,
+      }
+    })
+    document.getElementById('duplicateShiftModal').remove()
+    toast('Shift duplicated', 'success')
+    renderView()
+  } catch (err) {
+    errEl.style.display = 'block'
+    errEl.textContent = err.message
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Duplicate' }
+  }
+}
+
+function getCalendarContextUserId() {
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  if (cfg.user.role === 'member') return cfg.user.id
+  if (filterVal.startsWith('user:')) return filterVal.slice(5)
+  return cfg.user.id
+}
+
+function getSelectedModalUserId() {
+  if (!canManage()) return cfg.user.id
+  return document.getElementById('modalUser').value || getCalendarContextUserId()
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function getTemplateApplyWindow(dateStr) {
+  const start = parseLocalDate(dateStr)
+  const weekStart = startOfWeek(start, 1)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 6)
+  return {
+    week_start: toDateStr(weekStart),
+    start_date: toDateStr(start),
+    end_date: toDateStr(weekEnd),
+  }
+}
+
+function getTemplateOptionLabel(t) {
+  const typeLabel = t.template_type === 'pattern'
+    ? `${t.cycle_length || 7}-day pattern`
+    : 'Weekly'
+  return `${t.name} (${typeLabel})`
+}
+
+function populateModalTemplateSelect() {
+  const select = document.getElementById('modalTemplateSelect')
+  if (!select) return
+  const currentValue = select.value
+  select.innerHTML = '<option value="">Select a template…</option>'
+  if (!templates.length) return
+
+  const grouped = new Map()
+  templates.forEach(t => {
+    const key = t.group_name || '__general__'
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key).push(t)
+  })
+
+  grouped.forEach((items, key) => {
+    if (key === '__general__') {
+      items.forEach(t => {
+        const option = document.createElement('option')
+        option.value = t.id
+        option.textContent = getTemplateOptionLabel(t)
+        select.appendChild(option)
+      })
+      return
+    }
+
+    const group = document.createElement('optgroup')
+    group.label = key
+    items.forEach(t => {
+      const option = document.createElement('option')
+      option.value = t.id
+      option.textContent = getTemplateOptionLabel(t)
+      group.appendChild(option)
+    })
+    select.appendChild(group)
+  })
+
+  if ([...select.querySelectorAll('option')].some(o => o.value === currentValue)) {
+    select.value = currentValue
+  }
+}
+
+function setTemplateQuickApplyVisibility(visible, dateStr = '') {
+  const wrap = document.getElementById('modalTemplateQuickWrap')
+  const btn = document.getElementById('applyTemplateBtn')
+  if (!wrap || !btn) return
+
+  if (!visible || !canManage()) {
+    wrap.style.display = 'none'
+    btn.style.display = 'none'
+    btn.disabled = true
+    return
+  }
+
+  wrap.style.display = ''
+  const hasTemplates = templates.length > 0
+  document.getElementById('modalTemplateControls').style.display = hasTemplates ? '' : 'none'
+  document.getElementById('modalTemplateEmpty').style.display = hasTemplates ? 'none' : ''
+  populateModalTemplateSelect()
+
+  if (dateStr) {
+    const window = getTemplateApplyWindow(dateStr)
+    const end = parseLocalDate(window.end_date)
+    document.getElementById('modalTemplateRangeLabel').textContent =
+      `through ${DAY_ABBR[end.getDay()]} ${end.getDate()} ${MONTH_NAMES[end.getMonth()].slice(0,3)}`
+  } else {
+    document.getElementById('modalTemplateRangeLabel').textContent = ''
+  }
+
+  btn.style.display = hasTemplates ? '' : 'none'
+  updateTemplateQuickApplyState()
+}
+
+function updateTemplateQuickApplyState() {
+  const wrap = document.getElementById('modalTemplateQuickWrap')
+  const btn = document.getElementById('applyTemplateBtn')
+  if (!wrap || !btn || wrap.style.display === 'none') return
+
+  const dateStr = document.getElementById('modalDate').value
+  const hasTemplates = templates.length > 0
+  if (dateStr) {
+    const window = getTemplateApplyWindow(dateStr)
+    const end = parseLocalDate(window.end_date)
+    document.getElementById('modalTemplateRangeLabel').textContent =
+      `through ${DAY_ABBR[end.getDay()]} ${end.getDate()} ${MONTH_NAMES[end.getMonth()].slice(0,3)}`
+  } else {
+    document.getElementById('modalTemplateRangeLabel').textContent = ''
+  }
+
+  btn.disabled = !hasTemplates || !dateStr || !document.getElementById('modalTemplateSelect').value || !getSelectedModalUserId()
+}
+
+async function applyTemplateFromModal() {
+  if (!canManage()) return
+  const templateId = document.getElementById('modalTemplateSelect').value
+  const dateStr = document.getElementById('modalDate').value
+  const userId = getSelectedModalUserId()
+  if (!templateId) { toast('Please select a template', 'error'); return }
+  if (!dateStr) { toast('Please select a date', 'error'); return }
+  if (!userId) { toast('Please select a team member', 'error'); return }
+
+  const template = templates.find(t => t.id === templateId)
+  if (!template) { toast('Template not found', 'error'); return }
+
+  const applyBtn = document.getElementById('applyTemplateBtn')
+  if (applyBtn) {
+    applyBtn.disabled = true
+    applyBtn.textContent = 'Applying…'
+  }
+
+  try {
+    const window = getTemplateApplyWindow(dateStr)
+    const body = {
+      template_id: templateId,
+      user_id: userId,
+      skip_holidays: document.getElementById('modalTemplateSkipHolidays').checked,
+      end_date: window.end_date,
+    }
+
+    if (template.template_type === 'pattern') {
+      body.start_date = window.start_date
+    } else {
+      body.week_start = window.week_start
+      body.range_start = window.start_date
+    }
+
+    const result = await api('/api/shifts/apply-template', { method: 'POST', body })
+    toast(
+      `Template applied — ${result.applied} shift${result.applied !== 1 ? 's' : ''} created${result.skipped ? `, ${result.skipped} skipped` : ''}`,
+      'success',
+      4000
+    )
+    closeModal()
+    await renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  } finally {
+    if (applyBtn) {
+      applyBtn.textContent = 'Apply template'
+      updateTemplateQuickApplyState()
+    }
+  }
+}
+
+// ── Repeat-on-days helpers ─────────────────────────────────────────────────────
+function _getRepeatWeekDates(baseDate) {
+  const d = new Date(baseDate + 'T00:00:00')
+  const jsDay = d.getDay() // 0=Sun, 1=Mon ... 6=Sat
+  const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + mondayOffset)
+  return Array.from({ length: 7 }, (_, i) => {
+    const dt = new Date(monday)
+    dt.setDate(monday.getDate() + i)
+    return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0')
+  })
+}
+
+function _initRepeatDayBtns(baseDate) {
+  const wrap = document.getElementById('repeatDaysWrap')
+  const container = document.getElementById('repeatDayBtns')
+  if (!wrap || !container) return
+  wrap.style.display = ''
+  container.innerHTML = ''
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const d = new Date(baseDate + 'T00:00:00')
+  const jsDay = d.getDay()
+  const activeDayIndex = jsDay === 0 ? 6 : jsDay - 1 // convert to 0=Mon, 6=Sun
+  labels.forEach((label, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.textContent = label
+    btn.dataset.dayIndex = i
+    const isActive = i === activeDayIndex
+    btn.className = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-secondary') + ' repeat-day-btn' + (isActive ? ' selected' : '')
+    btn.addEventListener('click', () => {
+      const nowSelected = btn.classList.toggle('selected')
+      btn.classList.toggle('btn-primary', nowSelected)
+      btn.classList.toggle('btn-secondary', !nowSelected)
+    })
+    container.appendChild(btn)
+  })
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────────
+function openCreateModal(date) {
+  editingShiftId = null
+  selectedColour = '#4f46e5'
+  document.getElementById('modalTitle').textContent = 'Add Shift'
+  document.getElementById('modalDate').value  = date
+  document.getElementById('modalLocation').value = ''
+  // Pre-fill default times from prefs
+  document.getElementById('modalStart').value = prefs?.defaultShiftStart || ''
+  document.getElementById('modalEnd').value   = prefs?.defaultShiftEnd   || ''
+  document.getElementById('modalNotes').value = ''
+  document.getElementById('modalIsOff').checked = false
+  document.getElementById('modalIsOncall').checked = false
+  document.getElementById('deleteShiftBtn').style.display = 'none'
+  if (canManage()) document.getElementById('modalUser').value = getCalendarContextUserId()
+  document.getElementById('modalTemplateSelect').value = ''
+  document.getElementById('modalTemplateSkipHolidays').checked = true
+  setupColourPicker()
+  _initRepeatDayBtns(date)
+  setTemplateQuickApplyVisibility(true, date)
+  document.getElementById('shiftModal').classList.add('open')
+}
+
+function openEditModal(id) {
+  const s = shifts.find(x => x.id === id)
+  if (!s) return
+  editingShiftId = id
+  selectedColour = resolveColourValue(s.note_color, '#4f46e5')
+  document.getElementById('modalTitle').textContent = 'Edit Shift'
+  document.getElementById('modalDate').value  = s.date
+  document.getElementById('modalLocation').value = s.location_id || ''
+  document.getElementById('modalStart').value = s.start_time || ''
+  document.getElementById('modalEnd').value   = s.end_time || ''
+  document.getElementById('modalNotes').value = s.notes || ''
+  document.getElementById('modalIsOff').checked = !!s.is_off
+  document.getElementById('modalIsOncall').checked = !!s.is_oncall
+  document.getElementById('deleteShiftBtn').style.display = 'flex'
+  if (canManage()) document.getElementById('modalUser').value = s.user_id
+  setupColourPicker()
+  const rdw = document.getElementById('repeatDaysWrap')
+  if (rdw) rdw.style.display = 'none'
+  setTemplateQuickApplyVisibility(false)
+  document.getElementById('shiftModal').classList.add('open')
+}
+
+function setupColourPicker() {
+  const el = document.getElementById('modalColourPicker')
+  el.innerHTML = ''
+  renderColourPicker(el, selectedColour, v => { selectedColour = v }, { allowNone: true })
+}
+
+// Read-only shift view — now delegates to the slide-in side panel
+function openViewModal(id) {
+  openShiftPanel(id)
+}
+
+function closeModal() {
+  const modal = document.getElementById('shiftModal')
+  modal.classList.remove('open')
+  modal.querySelector('.modal').classList.remove('modal--readonly')
+  const rdw = document.getElementById('repeatDaysWrap')
+  if (rdw) rdw.style.display = 'none'
+  setTemplateQuickApplyVisibility(false)
+}
+
+async function saveShift() {
+  const body = {
+    date:        document.getElementById('modalDate').value,
+    location_id: document.getElementById('modalLocation').value || null,
+    start_time:  document.getElementById('modalStart').value || null,
+    end_time:    document.getElementById('modalEnd').value || null,
+    notes:       document.getElementById('modalNotes').value.trim() || null,
+    note_color:  selectedColour,
+    is_off:      document.getElementById('modalIsOff').checked,
+    is_oncall:   document.getElementById('modalIsOncall').checked,
+  }
+  if (canManage()) {
+    body.user_id = getSelectedModalUserId()
+  }
+  try {
+    if (editingShiftId) {
+      await api(`/api/shifts/${editingShiftId}`, { method: 'PUT', body })
+      toast('Shift updated', 'success')
+    } else {
+      await api('/api/shifts', { method: 'POST', body })
+      toast('Shift added', 'success')
+    }
+    closeModal()
+    renderView()
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+async function deleteShift() {
+  if (!editingShiftId) return
+  const s = shifts.find(x => x.id === editingShiftId)
+  if (!s) return
+  closeModal()
+  try {
+    await api(`/api/shifts/${editingShiftId}`, { method: 'DELETE' })
+    renderView()
+    _showUndoToast('Shift deleted', s)
+  } catch (err) {
+    toast(err.message, 'error')
+  }
+}
+
+document.getElementById('shiftModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('shiftModal')) closeModal()
+})
+
+document.getElementById('taskAssignModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('taskAssignModal')) closeTaskAssignModal()
+})
+
+// ── Popover helpers ────────────────────────────────────────────────────────────
+function decodeData(encoded) {
+  try { return JSON.parse(decodeURIComponent(encoded)) } catch { return null }
+}
+let _popoverTimer = null
+function showTaskPopover(event, a) {
+  if (!a) return
+  clearTimeout(_popoverTimer)
+  const pop = document.getElementById('taskDetailPopover')
+  document.getElementById('taskDetailName').textContent = a.task_list_name || ''
+  document.getElementById('taskDetailUser').textContent = a.user_name || ''
+  const descEl = document.getElementById('taskDetailDesc')
+  if (a.task_list_description) {
+    descEl.innerHTML = sanitizeDescHtml(a.task_list_description)
+    descEl.style.display = ''
+  } else {
+    descEl.style.display = 'none'
+  }
+  const locEl = document.getElementById('taskDetailLocation')
+  if (a.location_name) {
+    const outer = document.createElement('span')
+    outer.style.cssText = 'display:inline-flex;align-items:center;gap:5px'
+    outer.insertAdjacentHTML('beforeend', renderInlineColourSwatch(a.location_color, { size: 8, title: pickColourValue(a.location_color) || 'No colour' }))
+    outer.appendChild(document.createTextNode(a.location_name))
+    locEl.textContent = ''
+    locEl.appendChild(outer)
+    locEl.style.display = ''
+  } else {
+    locEl.style.display = 'none'
+  }
+  // Position near the cursor
+  const x = Math.min(event.clientX + 12, window.innerWidth - 340)
+  const y = Math.min(event.clientY + 12, window.innerHeight - 160)
+  pop.style.left = x + 'px'
+  pop.style.top  = y + 'px'
+  pop.style.display = ''
+}
+function hideTaskPopover() {
+  _popoverTimer = setTimeout(() => {
+    document.getElementById('taskDetailPopover').style.display = 'none'
+  }, 80)
+}
+
+// ── Task Assignment Modal ──────────────────────────────────────────────────────
+// _taWeekDates: array of 7 date strings [Mon..Sun] for the current modal week
+let _taWeekDates = []
+let _taGroupFilter    = 'all'
+let _taLocationFilter = 'all'
+
+function openTaskAssignModal(dateStr, userId) {
+  // Derive the Monday of the week containing dateStr
+  const clicked  = new Date(dateStr)
+  const dow      = clicked.getDay()
+  const toMon    = dow === 0 ? -6 : 1 - dow
+  const monday   = new Date(clicked); monday.setDate(monday.getDate() + toMon)
+
+  // Build the 7 dates for this week (Mon–Sun) as date strings
+  _taWeekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday); d.setDate(d.getDate() + i); return toDateStr(d)
+  })
+
+  // Title: week range
+  const we = new Date(monday); we.setDate(we.getDate() + 6)
+  document.getElementById('taskAssignModalTitle').textContent =
+    'Assign Task — ' + monday.getDate() + ' ' + MONTH_NAMES[monday.getMonth()].slice(0,3) +
+    ' – ' + we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3)
+
+  // Populate user select value
+  const sel = document.getElementById('taUser')
+  if (userId && sel) sel.value = userId
+
+  // Build day-of-week pill checkboxes
+  _buildDayPicker(dateStr)
+
+  // Reset filters and task list
+  _taGroupFilter    = 'all'
+  _taLocationFilter = 'all'
+  renderTaskAssignmentTaskGroupOptions()
+  renderTaskAssignmentLocationOptions()
+  renderTaskAssignmentTaskListOptions()
+  const taSel = document.getElementById('taTaskList')
+  if (taSel) taSel.value = ''
+
+  // Render existing assignments for user across this week
+  _renderCurrentAssignments(sel ? sel.value : null)
+  if (sel) sel.onchange = () => _renderCurrentAssignments(sel.value)
+
+  // Reset save button in case modal is reopened after a save
+  const saveBtn = document.querySelector('#taskAssignModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Add assignment' }
+
+  document.getElementById('taskAssignModal').classList.add('open')
+}
+
+const _DAY_ABBRS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+
+function _buildDayPicker(preselectedDate) {
+  const container = document.getElementById('taDayPicker')
+  container.innerHTML = _taWeekDates.map((ds, i) => {
+    const checked = ds === preselectedDate
+    const isWeekend = i >= 5  // Sat, Sun
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
+      <input type="checkbox" class="ta-day-cb" data-date="${ds}" ${checked ? 'checked' : ''}
+        style="display:none">
+      <span class="ta-day-pill" data-date="${ds}"
+        style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;
+               border:2px solid ${checked ? 'var(--accent)' : 'var(--border)'};
+               background:${checked ? 'var(--accent)' : 'transparent'};
+               color:${checked ? '#fff' : (isWeekend ? 'var(--text-3)' : 'var(--text-1)')};
+               font-size:11px;font-weight:600;transition:all .15s;cursor:pointer"
+        onclick="_toggleDayPill('${ds}')">
+        ${_DAY_ABBRS[i]}<br><span style="font-size:10px;font-weight:400">${new Date(ds + 'T00:00:00').getDate()}</span>
+      </span>
+    </div>`
+  }).join('')
+}
+
+function _toggleDayPill(ds) {
+  const cb = document.querySelector(`.ta-day-cb[data-date="${ds}"]`)
+  if (!cb) return
+  cb.checked = !cb.checked
+  _updateDayPillStyle(cb)
+}
+
+function _updateDayPillStyle(cb) {
+  const pill = document.querySelector(`.ta-day-pill[data-date="${cb.dataset.date}"]`)
+  if (!pill) return
+  const i = _taWeekDates.indexOf(cb.dataset.date)
+  const isWeekend = i >= 5
+  pill.style.border      = `2px solid ${cb.checked ? 'var(--accent)' : 'var(--border)'}`
+  pill.style.background  = cb.checked ? 'var(--accent)' : 'transparent'
+  pill.style.color       = cb.checked ? '#fff' : (isWeekend ? 'var(--text-3)' : 'var(--text-1)')
+}
+
+function taSelectDays(mode) {
+  _taWeekDates.forEach((ds, i) => {
+    const cb = document.querySelector(`.ta-day-cb[data-date="${ds}"]`)
+    if (!cb) return
+    if      (mode === 'all')      cb.checked = true
+    else if (mode === 'weekdays') cb.checked = i < 5
+    else if (mode === 'none')     cb.checked = false
+    _updateDayPillStyle(cb)
+  })
+}
+
+function _renderCurrentAssignments(userId) {
+  const container = document.getElementById('taCurrentAssignments')
+  const list      = document.getElementById('taAssignmentList')
+  const existing  = taskAssignments.filter(a =>
+    _taWeekDates.includes(a.date) && (!userId || a.user_id === userId)
+  )
+  if (!existing.length) { container.style.display = 'none'; return }
+  container.style.display = ''
+  // Group by date for readability
+  const byDate = {}
+  existing.forEach(a => { if (!byDate[a.date]) byDate[a.date] = []; byDate[a.date].push(a) })
+  list.innerHTML = _taWeekDates.filter(ds => byDate[ds]).map(ds => {
+    const dayLabel = _DAY_ABBRS[_taWeekDates.indexOf(ds)]
+    return byDate[ds].map(a =>
+      (() => {
+        const accent = getTaskBannerPresentation(a)
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:6px;background:${accent.background};border-left:3px solid ${accent.border}">
+        <span style="font-size:13px;color:${accent.color};font-weight:600">${dayLabel} — ${a.task_list_name}</span>
+        <button style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-3);padding:0 2px;line-height:1" title="Remove"
+          onclick="removeTaskAssignment('${a.id}','${ds}','${a.user_id}')">✕</button>
+      </div>`
+      })()
+    ).join('')
+  }).join('')
+}
+
+function closeTaskAssignModal() {
+  const sel = document.getElementById('taUser')
+  if (sel) sel.onchange = null
+  document.getElementById('taskAssignModal').classList.remove('open')
+}
+
+async function removeTaskAssignment(id, dateStr, userId) {
+  try {
+    await api(`/api/tasks/assignments/${id}`, { method: 'DELETE' })
+    toast('Assignment removed', 'success')
+    await renderView()
+    // Re-open on same week (use any date from that week)
+    openTaskAssignModal(dateStr, userId)
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function saveTaskAssignment() {
+  const user_id      = document.getElementById('taUser').value
+  const task_list_id = document.getElementById('taTaskList').value
+  if (!user_id)       { toast('Please select a team member', 'error'); return }
+  if (!task_list_id)  { toast('Please select a task list', 'error'); return }
+
+  const dates = _taWeekDates.filter(ds => {
+    const cb = document.querySelector(`.ta-day-cb[data-date="${ds}"]`)
+    return cb && cb.checked
+  })
+  if (!dates.length) { toast('Please select at least one day', 'error'); return }
+
+  const saveBtn = document.querySelector('#taskAssignModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…' }
+  try {
+    await api('/api/tasks/assignments/bulk', { method: 'POST', body: { user_id, task_list_id, dates } })
+    toast(dates.length === 1 ? 'Task assigned' : `Task assigned for ${dates.length} days`, 'success')
+    await renderView()
+    // Re-open so they can keep adding
+    openTaskAssignModal(dates[0], user_id)
+  } catch (err) {
+    toast(err.message, 'error')
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Add assignment' }
+  }
+}
+
+// ── Hours summary ──────────────────────────────────────────────────────────────
+function calcHours(shiftsArr) {
+  return shiftsArr.reduce((total, s) => {
+    if (!s.start_time || !s.end_time || s.is_off) return total
+    return total + (_shiftDurationMins(s.start_time, s.end_time) / 60)
+  }, 0)
+}
+
+function updateHoursStat() {
+  const el = document.getElementById('hoursStat')
+  if (!el) return
+  const h = calcHours(shifts)
+  const label = view === 'week' ? 'this week' : 'this month'
+  el.textContent = h > 0 ? `${h % 1 === 0 ? h : h.toFixed(1)} hrs ${label}` : ''
+}
+
+// ── CSV Export ─────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const { start, end } = getViewDateRange()
+  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  if (filterVal.startsWith('user:')) params.set('user_id', filterVal.slice(5))
+  // Remember last-used export scope in localStorage
+  try { localStorage.setItem('fs-last-export-filter', filterVal) } catch {}
+  window.location.href = '/api/shifts/export/csv?' + params
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+function toggleKbdHelp() {
+  const el = document.getElementById('kbdHelpOverlay')
+  const isOpen = el.style.display === 'flex'
+  el.style.display = isOpen ? 'none' : 'flex'
+}
+
+document.addEventListener('keydown', e => {
+  // Ignore if typing in an input/textarea
+  const tag = document.activeElement?.tagName?.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+  // Ignore if any modal is open
+  const modalOpen = document.querySelector('.modal-overlay.open')
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      if (!modalOpen) { e.preventDefault(); prev() }
+      break
+    case 'ArrowRight':
+      if (!modalOpen) { e.preventDefault(); next() }
+      break
+    case 't': case 'T':
+      if (!modalOpen) goToday()
+      break
+    case 'w': case 'W':
+      if (!modalOpen) setView('week')
+      break
+    case 'm': case 'M':
+      if (!modalOpen) setView('month')
+      break
+    case 'n': case 'N':
+      if (!modalOpen) openCreateModal(toDateStr(new Date()))
+      break
+    case 'c': case 'C':
+      if (!modalOpen && view === 'week' && canManage()) copyWeekToNext()
+      break
+    case 'p': case 'P':
+      if (!modalOpen) window.print()
+      break
+    case 'Escape':
+      if (document.getElementById('kbdHelpOverlay').style.display === 'flex') {
+        toggleKbdHelp()
+      } else if (modalOpen) {
+        if (modalOpen.id === 'shiftModal') closeModal()
+        else if (modalOpen.id === 'taskAssignModal') closeTaskAssignModal()
+      } else if (document.getElementById('shiftPanel')?.classList.contains('open')) {
+        closeShiftPanel()
+      }
+      break
+    case '?':
+      if (!modalOpen) toggleKbdHelp()
+      break
+  }
+})
+
+document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('kbdHelpOverlay')) toggleKbdHelp()
+})
+
+// ── Shift details side panel ───────────────────────────────────────────────────
+let _shiftPanelId = null
+let _shiftPanelDay = null
+
+function openShiftPanel(shiftId) {
+  const s = shifts.find(x => x.id == shiftId)
+  if (!s) return
+  selectedCalendarDate = s.date
+  syncSelectedDayHighlight()
+  _shiftPanelId = shiftId
+  _shiftPanelDay = s.date
+
+  // Title
+  const title = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
+  document.getElementById('shiftPanelTitle').textContent = title
+
+  // Edit button (managers only)
+  const editBtn = document.getElementById('shiftPanelEditBtn')
+  editBtn.style.display = canManage() ? '' : 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = 'none'
+
+  // Body
+  const rows = []
+
+  if (s.user_name) {
+    rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Team Member</div><div class="shift-panel-value">${escHtml(s.user_name)}</div></div>`)
+  }
+
+  const dateObj = new Date(s.date + 'T00:00:00')
+  const dateStr = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Date</div><div class="shift-panel-value">${escHtml(dateStr)}</div></div>`)
+
+  if (s.is_oncall) {
+    rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">On-call</div><div class="shift-panel-value">📟 Yes</div></div>`)
+  }
+  if (!s.is_off) {
+    if (s.location_name) rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Location</div><div class="shift-panel-value">${escHtml(s.location_name)}</div></div>`)
+    if (s.start_time && s.end_time) {
+      const mins = _shiftDurationMins(s.start_time, s.end_time)
+      const dur = mins > 0 ? ` (${Math.floor(mins/60)}h${mins%60>0?' '+mins%60+'m':''})` : ''
+      rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Time</div><div class="shift-panel-value">${escHtml(s.start_time)} – ${escHtml(s.end_time)}${escHtml(dur)}</div></div>`)
+    }
+  }
+
+  if (s.notes) {
+    rows.push(`<div class="shift-panel-row"><div class="shift-panel-label">Notes</div><div class="shift-panel-value" style="white-space:pre-wrap;line-height:1.5">${escHtml(s.notes)}</div></div>`)
+  }
+
+  // Task assignments for same date + user
+  const relatedTasks = taskAssignments.filter(a => a.date === s.date && a.user_id === s.user_id)
+  let tasksHtml = ''
+  if (relatedTasks.length) {
+    const cards = relatedTasks.map(a => {
+      const notesHtml = a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : ''
+      const descBody  = a.task_list_description
+        ? `<div class="shift-panel-task-desc-body">${sanitizeDescHtml(a.task_list_description)}</div>`
+        : ''
+      return `<div class="shift-panel-task-wrap${descBody ? ' has-desc' : ''}">` +
+        `<div class="shift-panel-task-card"><div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}</div>${notesHtml}</div>` +
+        descBody +
+        `</div>`
+    }).join('')
+    tasksHtml = `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks for this day</div>${cards}</div>`
+  }
+
+  document.getElementById('shiftPanelBody').innerHTML = rows.join('') + tasksHtml
+
+  // Open panel
+  document.getElementById('shiftPanel').classList.add('open')
+  document.body.classList.add('shift-panel-open')
+}
+
+function openDayPanel(dateStr) {
+  selectedCalendarDate = dateStr
+  syncSelectedDayHighlight()
+  _shiftPanelId = null
+  _shiftPanelDay = dateStr
+  const dayShifts = shifts
+    .filter(s => s.date === dateStr)
+    .sort((a, b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+
+  const dateObj = new Date(dateStr + 'T00:00:00')
+  const dateLabel = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  document.getElementById('shiftPanelTitle').textContent = dateLabel
+
+  document.getElementById('shiftPanelEditBtn').style.display = 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() && dayShifts.length === 0 ? '' : 'none'
+
+  const dayTasks = taskAssignments.filter(a => a.date === dateStr)
+
+  const shiftCards = dayShifts.length
+    ? dayShifts.map(s => {
+      const label = s.is_off ? 'Day Off' : (s.location_name || 'Shift')
+      const meta = [
+        s.user_name || '',
+        s.is_oncall ? 'On call' : '',
+        (s.start_time && s.end_time) ? `${s.start_time} - ${s.end_time}` : ''
+      ].filter(Boolean).join(' • ')
+      return `<div class="shift-panel-task-card" style="cursor:pointer" onclick="openShiftPanel('${s.id}')">` +
+        `<div class="shift-panel-task-name">${escHtml(label)}</div>` +
+        (meta ? `<div class="shift-panel-task-notes">${escHtml(meta)}</div>` : '') +
+        (s.notes ? `<div class="shift-panel-task-notes">${escHtml(s.notes)}</div>` : '') +
+        `</div>`
+    }).join('')
+    : `<div class="shift-panel-task-notes" style="padding:2px 0 0">No shifts for this day.</div>`
+
+  const taskCards = dayTasks.length
+    ? dayTasks.map(a => {
+      const who = a.user_name ? ` • ${a.user_name}` : ''
+      return `<div class="shift-panel-task-card">` +
+        `<div class="shift-panel-task-name">${escHtml(a.task_list_name || 'Task')}${escHtml(who)}</div>` +
+        (a.notes ? `<div class="shift-panel-task-notes">${escHtml(a.notes)}</div>` : '') +
+        `</div>`
+    }).join('')
+    : ''
+
+  document.getElementById('shiftPanelBody').innerHTML =
+    `<div class="shift-panel-section"><div class="shift-panel-section-title">Shifts</div>${shiftCards}</div>` +
+    (taskCards ? `<div class="shift-panel-section"><div class="shift-panel-section-title">Tasks</div>${taskCards}</div>` : '')
+
+  document.getElementById('shiftPanel').classList.add('open')
+  document.body.classList.add('shift-panel-open')
+}
+
+function closeShiftPanel() {
+  document.getElementById('shiftPanel').classList.remove('open')
+  document.body.classList.remove('shift-panel-open')
+  _shiftPanelId = null
+  _shiftPanelDay = null
+  selectedCalendarDate = null
+  syncSelectedDayHighlight()
+}
+
+function shiftPanelEdit() {
+  const id = _shiftPanelId
+  closeShiftPanel()
+  if (id) openEditModal(id)
+}
+
+function shiftPanelAddForDay() {
+  if (!canManage() || !_shiftPanelDay) return
+  openCreateModal(_shiftPanelDay)
+}
+
+// ── Real-time SSE ──────────────────────────────────────────────────────────────
+let _sseConn = null
+// Debounced renderView — batches rapid SSE events into a single re-render
+let _sseRenderTimer = null
+function _debouncedRenderView() {
+  clearTimeout(_sseRenderTimer)
+  _sseRenderTimer = setTimeout(renderView, 300)
+}
+function connectSSE() {
+  if (_sseConn) return
+  _sseConn = new EventSource('/api/sse')
+  _sseConn.onopen = () => {
+    const dot = document.getElementById('liveIndicator')
+    if (dot) dot.style.display = 'block'
+  }
+  _sseConn.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (['shift.create','shift.update','shift.delete'].includes(msg.type)) {
+        if (msg.actorId !== cfg?.user?.id) _debouncedRenderView()
+      }
+    } catch {}
+  }
+  _sseConn.onerror = () => {
+    const dot = document.getElementById('liveIndicator')
+    if (dot) dot.style.display = 'none'
+    _sseConn?.close()
+    _sseConn = null
+    setTimeout(connectSSE, 5000)
+  }
+}
+
+// ── Touch swipe navigation ─────────────────────────────────────────────────────
+function _initSwipe() {
+  const wrapper = document.querySelector('.cal-wrapper')
+  if (!wrapper) return
+  let _tx = null, _ty = null, _gridScrollX = null
+
+  // Non-passive document-level touchmove: block horizontal viewport pan while
+  // any modal is open. iOS Safari ignores overflow:hidden on the body and can
+  // still elastically scroll the viewport sideways when the user swipes on
+  // native date/time inputs. Calling preventDefault() here stops that entirely
+  // without affecting vertical scrolling inside the modal body.
+  let _docTx = null, _docTy = null
+  document.addEventListener('touchstart', e => {
+    _docTx = e.touches[0].clientX
+    _docTy = e.touches[0].clientY
+  }, { passive: true })
+  document.addEventListener('touchmove', e => {
+    if (!document.querySelector('.modal-overlay.open')) return
+    if (_docTx === null || e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - _docTx
+    const dy = e.touches[0].clientY - _docTy
+    if (Math.abs(dx) > Math.abs(dy)) e.preventDefault()
+  }, { passive: false })
+
+  wrapper.addEventListener('touchstart', e => {
+    // Don't track swipe if any modal is open or touch starts on a form element
+    if (document.querySelector('.modal-overlay.open') || e.target.closest('input, select, textarea')) {
+      _tx = null; _ty = null; _gridScrollX = null
+      return
+    }
+    _tx = e.touches[0].clientX
+    _ty = e.touches[0].clientY
+    const grid = document.getElementById('calGrid')
+    _gridScrollX = grid ? grid.scrollLeft : 0
+  }, { passive: true })
+  wrapper.addEventListener('touchend', e => {
+    if (_tx === null) return
+    const dx = e.changedTouches[0].clientX - _tx
+    const dy = e.changedTouches[0].clientY - _ty
+    _tx = null; _ty = null
+    // Ignore swipes that are more vertical than horizontal
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) { _gridScrollX = null; return }
+    // Ignore if the grid scrolled horizontally (user was scrolling, not navigating)
+    const grid = document.getElementById('calGrid')
+    const currentScrollX = grid ? grid.scrollLeft : 0
+    if (_gridScrollX !== null && currentScrollX !== _gridScrollX) { _gridScrollX = null; return }
+    _gridScrollX = null
+    dx < 0 ? next() : prev()
+  }, { passive: true })
+}
+
+// ── Long-press on mobile to open shift details ────────────────────────────────
+function _initLongPress() {
+  document.getElementById('calGrid').addEventListener('pointerdown', e => {
+    const chip = e.target.closest('.cal-shift-chip')
+    if (!chip || !chip.dataset.shiftId) return
+    const id = chip.dataset.shiftId
+    const t = setTimeout(() => openViewModal(id), 500)
+    const cancel = () => clearTimeout(t)
+    chip.addEventListener('pointerup',    cancel, { once: true })
+    chip.addEventListener('pointerleave', cancel, { once: true })
+  })
+}
+
+// ── Shift conflict handling ────────────────────────────────────────────────────
+let _conflictBody = null
+async function saveShiftForce() {
+  if (!_conflictBody) return
+  const body = _conflictBody
+  _conflictBody = null
+  const warn = document.getElementById('conflictWarning')
+  if (warn) warn.remove()
+  try {
+    const url = editingShiftId ? `/api/shifts/${editingShiftId}?force=true` : '/api/shifts?force=true'
+    const method = editingShiftId ? 'PUT' : 'POST'
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(async r => { if (!r.ok) { const d = await r.json(); throw new Error(d.error || `HTTP ${r.status}`) }; return r.json() })
+    toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+    closeModal()
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+// Override saveShift (defined above) with conflict-aware and multi-day version
+async function saveShift() {
+  const baseBody = {
+    date:        document.getElementById('modalDate').value,
+    location_id: document.getElementById('modalLocation').value || null,
+    start_time:  document.getElementById('modalStart').value || null,
+    end_time:    document.getElementById('modalEnd').value || null,
+    notes:       document.getElementById('modalNotes').value.trim() || null,
+    note_color:  selectedColour,
+    is_off:      document.getElementById('modalIsOff').checked,
+    is_oncall:   document.getElementById('modalIsOncall').checked,
+  }
+  if (canManage()) baseBody.user_id = getSelectedModalUserId()
+
+  document.getElementById('conflictWarning')?.remove()
+
+  // Collect selected repeat days (create mode only)
+  const repeatWrap = document.getElementById('repeatDaysWrap')
+  let datesToSave = [baseBody.date]
+  if (!editingShiftId && repeatWrap && repeatWrap.style.display !== 'none') {
+    const selectedBtns = [...document.querySelectorAll('#repeatDayBtns .repeat-day-btn.selected')]
+    if (selectedBtns.length > 0) {
+      const weekDates = _getRepeatWeekDates(baseBody.date)
+      datesToSave = selectedBtns.map(btn => weekDates[parseInt(btn.dataset.dayIndex)])
+    }
+  }
+
+  const saveBtn = document.querySelector('#shiftModal .btn-primary')
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…' }
+
+  try {
+    if (!editingShiftId && datesToSave.length > 1) {
+      // Multi-day create: post each date, skip conflicts silently
+      let added = 0, skipped = 0, errors = []
+      for (const date of datesToSave) {
+        const r = await fetch('/api/shifts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...baseBody, date })
+        })
+        if (r.ok) {
+          added++
+        } else {
+          const d = await r.json()
+          if (r.status === 409) skipped++
+          else errors.push(d.error || `Error for ${date}`)
+        }
+      }
+      if (errors.length) {
+        toast(errors[0], 'error')
+      } else {
+        const addedStr = `${added} shift${added !== 1 ? 's' : ''} added`
+        toast(skipped > 0 ? `${addedStr}, ${skipped} skipped (already exist)` : addedStr, 'success')
+      }
+      closeModal()
+      renderView()
+    } else {
+      // Single shift create or edit — original conflict-aware behaviour
+      const body = { ...baseBody }
+      const url    = editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts'
+      const method = editingShiftId ? 'PUT' : 'POST'
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const d = await r.json()
+      if (!r.ok) {
+        if (r.status === 409 && d.conflict) {
+          _conflictBody = body
+          const footer = document.querySelector('#shiftModal .modal-footer')
+          const warn = document.createElement('div')
+          warn.id = 'conflictWarning'
+          warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
+          const msgSpan = document.createElement('span')
+          msgSpan.appendChild(document.createTextNode('⚠️ ' + (d.error || 'Conflict detected')))
+          const forceBtn = document.createElement('button')
+          forceBtn.className = 'btn btn-sm'
+          forceBtn.style.cssText = 'background:#d97706;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px'
+          forceBtn.textContent = 'Save anyway'
+          forceBtn.addEventListener('click', saveShiftForce)
+          warn.appendChild(msgSpan)
+          warn.appendChild(forceBtn)
+          footer.insertAdjacentElement('beforebegin', warn)
+          return
+        }
+        throw new Error(d.error || `HTTP ${r.status}`)
+      }
+      toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+      closeModal()
+      renderView()
+    }
+  } catch (err) {
+    toast(err.message, 'error')
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save shift' }
+  }
+}
+
+// ── Drag-and-drop (week view) ──────────────────────────────────────────────────
+let _drag = null  // { shiftId, date, start_time, end_time, durationMins, ghost, colInnerTop, mode }
+let _ddPointerDownHandler = null  // stored reference so we can remove it before re-adding
+
+function _initDragDrop() {
+  const grid = document.getElementById('calGrid')
+  if (!grid || !canManage() || cfg.featureDragDrop === false) return
+
+  // Remove previous listener to prevent stacking across re-renders
+  if (_ddPointerDownHandler) {
+    grid.removeEventListener('pointerdown', _ddPointerDownHandler)
+    _ddPointerDownHandler = null
+  }
+
+  _ddPointerDownHandler = e => {
+    const card = e.target.closest('.cal-week-shift-card')
+    const handle = e.target.closest('.shift-resize-handle')
+    if (!card) return
+
+    // Determine shift id from onclick attribute (now uses openShiftPanel)
+    const onclickStr = card.getAttribute('onclick') || ''
+    const idMatch = onclickStr.match(/openShiftPanel\('([^']+)'\)/)
+    if (!idMatch) return
+
+    const shiftId = idMatch[1]
+    const shift = shifts.find(s => s.id === shiftId)
+    if (!shift || !shift.start_time) return
+    const start = _timeToMins(shift.start_time)
+    const end = _timeToMins(shift.end_time || shift.start_time)
+    if (start !== null && end !== null && end < start) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    card.setPointerCapture(e.pointerId)
+
+    const startMins = start
+    const endMins   = end
+    const mode = handle ? 'resize' : 'move'
+
+    // Ghost element
+    const ghost = card.cloneNode(true)
+    ghost.className = 'cal-week-shift-ghost'
+    ghost.style.cssText = `position:fixed;pointer-events:none;opacity:.8;z-index:1000;width:${card.offsetWidth}px;height:${card.offsetHeight}px;left:${card.getBoundingClientRect().left}px;top:${card.getBoundingClientRect().top}px;background:${card.style.background};border-radius:6px;padding:4px 8px;box-shadow:0 4px 16px rgba(0,0,0,.3)`
+    document.body.appendChild(ghost)
+
+    card.style.opacity = '.35'
+    card.classList.add('dragging')
+
+    // Find the col-inner for this card to get its bounding rect
+    const colInner = card.closest('.cal-week-col-inner')
+    const colInnerRect = colInner?.getBoundingClientRect()
+
+    _drag = {
+      shiftId, shift, mode,
+      startMins, endMins,
+      durationMins: endMins - startMins,
+      ghost, card, colInner, colInnerRect,
+      originX: e.clientX, originY: e.clientY,
+      currentDate: shift.date,
+    }
+  }
+
+  grid.addEventListener('pointerdown', _ddPointerDownHandler)
+
+  grid.addEventListener('pointermove', e => {
+    if (!_drag) return
+    e.preventDefault()
+
+    _drag.ghost.style.left = (e.clientX - 10) + 'px'
+    _drag.ghost.style.top  = (e.clientY - 10) + 'px'
+
+    // Find target day column
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const targetCol = el?.closest('.cal-week-day-col')
+    const targetColInner = el?.closest('.cal-week-col-inner') || targetCol?.querySelector('.cal-week-col-inner')
+
+    // Highlight drop target
+    document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
+    if (targetCol) targetCol.classList.add('drop-target')
+
+    if (!targetColInner) return
+    const rect = targetColInner.getBoundingClientRect()
+    const relY  = e.clientY - rect.top
+    const snapped = Math.round(relY / 15) * 15  // snap to 15-min
+
+    if (_drag.mode === 'resize') {
+      const newEndMins = Math.max(_drag.startMins + 15, Math.min(snapped, 1440))
+      _drag.previewEnd = newEndMins
+    } else {
+      const newStartMins = Math.max(0, Math.min(snapped, 1440 - _drag.durationMins))
+      _drag.previewStart = newStartMins
+
+      // Determine new date from column position
+      if (targetCol) {
+        const onclickAttr = targetCol.getAttribute('onclick') || ''
+        const dateMatch = onclickAttr.match(/handleCellClick\('([^']+)'\)/)
+        if (dateMatch) _drag.currentDate = dateMatch[1]
+      }
+    }
+  })
+
+  grid.addEventListener('pointerup', async e => {
+    if (!_drag) return
+    const { shiftId, shift, mode, startMins, endMins, durationMins, ghost, card, previewStart, previewEnd, currentDate } = _drag
+    _drag = null
+
+    ghost.remove()
+    card.style.display = 'none'  // hide during API call — renderView() will rebuild
+    card.classList.remove('dragging')
+    document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
+
+    const minsToTime = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+
+    let newStart = shift.start_time
+    let newEnd   = shift.end_time
+    let newDate  = currentDate
+
+    if (mode === 'resize' && previewEnd !== undefined) {
+      newEnd = minsToTime(previewEnd)
+    } else if (mode === 'move' && previewStart !== undefined) {
+      newStart = minsToTime(previewStart)
+      newEnd   = minsToTime(previewStart + durationMins)
+    }
+
+    // Only save if something actually changed
+    if (newStart === shift.start_time && newEnd === shift.end_time && newDate === shift.date) return
+
+    try {
+      await api(`/api/shifts/${shiftId}`, { method: 'PUT', body: {
+        date: newDate,
+        location_id: shift.location_id,
+        start_time: newStart,
+        end_time: newEnd,
+        notes: shift.notes,
+        note_color: shift.note_color,
+        is_off: shift.is_off,
+        is_oncall: shift.is_oncall,
+      }})
+      renderView()
+    } catch (err) { toast(err.message, 'error'); renderView() }
+  })
+
+  // Pointercancel — abort drag
+  grid.addEventListener('pointercancel', () => {
+    if (!_drag) return
+    _drag.ghost.remove()
+    _drag.card.style.opacity = ''
+    _drag.card.style.display = ''
+    _drag.card.classList.remove('dragging')
+    document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
+    _drag = null
+  })
+}
+
+// ── Undo-able delete ───────────────────────────────────────────────────────────
+let _undoTimer = null
+
+function _showUndoToast(message, shiftData) {
+  // Clear any pending undo
+  if (_undoTimer) clearTimeout(_undoTimer)
+
+  let container = document.getElementById('toast-container')
+  if (!container) {
+    container = document.createElement('div')
+    container.id = 'toast-container'
+    container.className = 'toast-container'
+    document.body.appendChild(container)
+  }
+
+  // Remove any existing undo toast
+  document.getElementById('undoDeleteToast')?.remove()
+
+  const t = document.createElement('div')
+  t.id = 'undoDeleteToast'
+  t.className = 'toast'
+  t.style.cssText = 'display:flex;align-items:center;gap:10px;min-width:280px'
+  t.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0;opacity:.7"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+    <span style="flex:1">${message}</span>
+    <button id="undoDeleteBtn" style="background:rgba(255,255,255,.2);border:none;border-radius:5px;color:#fff;font-size:12px;font-weight:700;padding:3px 9px;cursor:pointer;flex-shrink:0">Undo</button>`
+  container.appendChild(t)
+
+  document.getElementById('undoDeleteBtn').addEventListener('click', () => {
+    clearTimeout(_undoTimer)
+    t.remove()
+    undoDeleteShift(shiftData)
+  })
+
+  _undoTimer = setTimeout(() => {
+    t.style.opacity = '0'
+    t.style.transform = 'translateY(8px)'
+    t.style.transition = '200ms'
+    setTimeout(() => t.remove(), 200)
+  }, 5000)
+}
+
+async function undoDeleteShift(s) {
+  try {
+    await api('/api/shifts', {
+      method: 'POST',
+      body: {
+        user_id:     s.user_id,
+        date:        s.date,
+        location_id: s.location_id,
+        start_time:  s.start_time,
+        end_time:    s.end_time,
+        notes:       s.notes,
+        note_color:  s.note_color,
+        is_off:      s.is_off,
+        is_oncall:   s.is_oncall,
+      }
+    })
+    toast('Shift restored', 'success')
+    renderView()
+  } catch (err) {
+    toast('Could not restore shift: ' + err.message, 'error')
+  }
+}
+
+// ── Copy week to next week ─────────────────────────────────────────────────────
+async function copyWeekToNext() {
+  if (view !== 'week') return
+  const weekStart = prefs?.weekStartDay ?? 1
+  const ws   = startOfWeek(currentDate, weekStart)
+  const nextWs = new Date(ws); nextWs.setDate(nextWs.getDate() + 7)
+
+  const filterVal = document.getElementById('teamFilter')?.value || ''
+  // Determine which user IDs we're copying for
+  let targetUserIds = []
+  if (cfg.user.role === 'member' || filterVal === '') {
+    targetUserIds = [cfg.user.id]
+  } else if (filterVal.startsWith('user:')) {
+    targetUserIds = [filterVal.slice(5)]
+  }
+
+  const btn = document.getElementById('copyWeekBtn')
+  if (btn) { btn.disabled = true; btn.textContent = 'Copying…' }
+
+  let created = 0; let skipped = 0
+  try {
+    for (const s of shifts) {
+      if (!targetUserIds.includes(s.user_id)) continue
+      const [y, m, d] = s.date.split('-').map(Number)
+      const srcDate = new Date(y, m - 1, d)
+      const dayOffset = Math.round((srcDate - ws) / 86400000)
+      const targetDate = new Date(nextWs); targetDate.setDate(nextWs.getDate() + dayOffset)
+      const targetDateStr = toDateStr(targetDate)
+      // Skip if target already has a shift for this user
+      const exists = shifts.some(x => x.user_id === s.user_id && x.date === targetDateStr)
+      if (exists) { skipped++; continue }
+      await api('/api/shifts', {
+        method: 'POST',
+        body: {
+          user_id:     s.user_id,
+          date:        targetDateStr,
+          location_id: s.location_id,
+          start_time:  s.start_time,
+          end_time:    s.end_time,
+          notes:       s.notes,
+          note_color:  s.note_color,
+          is_off:      s.is_off,
+          is_oncall:   s.is_oncall,
+        }
+      })
+      created++
+    }
+    // Navigate to next week
+    currentDate = new Date(nextWs)
+    await renderView()
+    toast(`${created} shift${created !== 1 ? 's' : ''} copied to next week${skipped ? ` (${skipped} skipped — already exist)` : ''}`, 'success', 4000)
+  } catch (err) {
+    toast('Copy failed: ' + err.message, 'error')
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Copy week' }
+  }
+}
+
+// ── Mark day off / empty cell context menu ─────────────────────────────────────
+async function markDayOff(date, userId) {
+  const uid = userId || (canManage() ? null : cfg.user.id) || cfg.user.id
+  try {
+    await api('/api/shifts', {
+      method: 'POST',
+      body: { user_id: uid, date, is_off: true, note_color: '#6b7280' }
+    })
+    toast('Marked as off', 'success')
+    renderView()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function showEmptyCellMenu(e, date) {
+  dismissContextMenu()
+  const menu = document.createElement('div')
+  menu.id = 'shiftContextMenu'
+  menu.className = 'cal-context-menu'
+  menu.style.top  = e.clientY + 'px'
+  menu.style.left = e.clientX + 'px'
+
+  const singleUserId = getCalendarContextUserId()
+
+  menu.innerHTML = `
+    <button class="ctx-item" onclick="dismissContextMenu();openCreateModal('${date}')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+      Add shift
+    </button>
+    <button class="ctx-item" onclick="dismissContextMenu();markDayOff('${date}','${singleUserId}')">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+      Mark as off
+    </button>`
+  document.body.appendChild(menu)
+  const r = menu.getBoundingClientRect()
+  if (r.right  > window.innerWidth)  menu.style.left = (e.clientX - r.width)  + 'px'
+  if (r.bottom > window.innerHeight) menu.style.top  = (e.clientY - r.height) + 'px'
+}
+
+init()
+</script>
+<style>
+/* ── Skeleton loading screen ──────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.cal-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+.cal-skeleton-cell {
+  background: var(--bg);
+  min-height: 90px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-skeleton-date,
+.cal-skeleton-chip {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3,var(--border)) 50%, var(--bg-2) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.cal-skeleton-date { width: 24px; height: 18px; }
+.cal-skeleton-chip { width: 80%; height: 20px; }
+
+/* ── Mobile FAB (Copy Week) ──────────────────────────────────────────────────── */
+.copy-week-fab {
+  display: none;
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  z-index: 200;
+  transition: transform .15s, box-shadow .15s;
+}
+.copy-week-fab:active { transform: scale(.93); box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+@media (min-width: 641px) { .copy-week-fab { display: none !important; } }
+
+/* ── Mobile: larger shift chip tap targets ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .cal-shift-chip {
+    min-height: 28px;
+    padding: 4px 7px;
+    font-size: 11px;
+    touch-action: manipulation;
+  }
+  .cal-more-badge {
+    min-height: 24px;
+    touch-action: manipulation;
+  }
+}
+
+/* ── Shift Details Side Panel ─────────────────────────────────────────────────── */
+.shift-panel {
+  --shift-panel-width: 380px;
+  --shift-panel-gap: 14px;
+  position: absolute;
+  top: 0;
+  left: auto;
+  right: 0;
+  width: var(--shift-panel-width);
+  max-width: var(--shift-panel-width);
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: -8px 0 32px rgba(0,0,0,.12);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(16px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .25s cubic-bezier(.32,1,.23,1);
+}
+body.shift-panel-left:not(.shift-panel-open) .shift-panel {
+  left: 0;
+  right: auto;
+  box-shadow: 8px 0 32px rgba(0,0,0,.12);
+  transform: translateX(-16px);
+}
+.shift-panel.open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.cal-main {
+  margin-left: 0;
+  margin-right: 0;
+}
+.shift-panel-close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 15px;
+  padding: 0;
+}
+@media (min-width: 641px) {
+  body.shift-panel-open .cal-wrapper {
+    display: flex;
+    flex-direction: row;
+    gap: var(--shift-panel-gap, 14px);
+    align-items: stretch;
+  }
+  body.shift-panel-open .cal-main {
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  body.shift-panel-open .shift-panel {
+    position: relative;
+    order: 2;
+    inset: auto;
+    height: auto;
+    max-height: none;
+    flex: 0 0 var(--shift-panel-width, 380px);
+    margin: 0;
+    box-shadow: -8px 0 32px rgba(0,0,0,.12);
+  }
+  body.shift-panel-left.shift-panel-open .shift-panel {
+    order: 1;
+    box-shadow: 8px 0 32px rgba(0,0,0,.12);
+  }
+  body.shift-panel-left.shift-panel-open .cal-main { order: 2; }
+  body.shift-panel-left.shift-panel-open .shift-panel,
+  body.shift-panel-left.shift-panel-open .cal-main {
+    min-width: 0;
+  }
+}
+.shift-panel-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 499;
+  background: rgba(0,0,0,.3);
+}
+.shift-panel-backdrop.open { display: block; }
+.shift-panel-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shift-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shift-panel-title { font-size: 16px; font-weight: 700; margin: 0; }
+.shift-panel-body { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.shift-panel-row { display: flex; flex-direction: column; gap: 3px; }
+.shift-panel-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.shift-panel-value { font-size: 14px; font-weight: 500; color: var(--text-1); }
+.shift-panel-section { border-top: 1px solid var(--border); padding-top: 14px; }
+.shift-panel-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-bottom: 8px; }
+.shift-panel-task-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.shift-panel-task-name { font-size: 13px; font-weight: 600; }
+.shift-panel-task-notes { font-size: 12px; color: var(--text-2); line-height: 1.5; white-space: pre-wrap; }
+.shift-panel-task-desc-body {
+  font-size: 13px; color: var(--text-2); line-height: 1.6;
+  padding: 8px 12px;
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px; background: var(--bg-2);
+}
+.shift-panel-task-wrap.has-desc .shift-panel-task-card { border-radius: 8px 8px 0 0; }
+.shift-panel-task-desc-body ul, .shift-panel-task-desc-body ol { margin: 2px 0; padding-left: 20px; }
+.shift-panel-task-desc-body li { margin: 2px 0; }
+.shift-panel-task-desc-body p { margin: 0 0 4px; }
+.shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
+@media (max-width: 640px) {
+  body.shift-panel-open .cal-main {
+    margin-right: 0;
+    margin-left: 0;
+  }
+  .shift-panel {
+    position: fixed;
+    top: calc(var(--safe-top) + var(--topbar-h));
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    border-left: none;
+    border-radius: 14px 14px 0 0;
+    height: auto;
+    max-height: none;
+    transition: transform .25s cubic-bezier(.32,1,.23,1), opacity .2s ease;
+    z-index: 150;
+    box-shadow: none;
+    opacity: 0;
+    transform: translateY(105%);
+    pointer-events: none;
+  }
+  .shift-panel.open {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  body.shift-panel-left .shift-panel {
+    left: 0;
+    right: 0;
+  }
+}
+</style>
+</body>
+</html>

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ForgeShift — My Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-dark-1024.png?v=20260429c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="shortcut icon" type="image/png" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <script>
+    (function(){
+      var t = localStorage.getItem("fs-theme") || "system"
+      if (t === "system") {
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches)
+          document.documentElement.setAttribute("data-theme","dark")
+      } else if (t !== "light") {
+        document.documentElement.setAttribute("data-theme", t)
+      }
+    })()
+  </script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <main class="page-content" style="display:flex;flex-direction:column;align-items:center">
+      <div style="width:100%;max-width:720px">
+      <div class="page-header">
+        <h1 class="page-title">My Profile</h1>
+      </div>
+      <div style="display:grid;gap:20px">
+
+        <!-- Profile Info -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Profile</h3></div>
+          <div class="card-body">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+              <div style="position:relative;flex-shrink:0">
+                <div class="avatar avatar-xl" id="profileAvatar"></div>
+                <label for="avatarInput" style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--surface)" title="Change photo">
+                  <svg viewBox="0 0 20 20" fill="white" width="12" height="12"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                </label>
+                <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+              </div>
+              <div>
+                <div style="font-size:18px;font-weight:800" id="profileName"></div>
+                <div style="font-size:13px;color:var(--text-3)" id="profileEmail"></div>
+                <span class="badge badge-blue" style="margin-top:6px" id="profileRole"></span>
+                <div style="margin-top:8px">
+                  <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" style="font-size:11px;color:var(--red);display:none" onclick="removeAvatar()">Remove photo</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Display name</label>
+              <input type="text" class="form-input" id="editName">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Accent colour</label>
+              <div id="profileColourPicker"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save changes</button>
+          </div>
+        </div>
+
+        <!-- Email Address -->
+        <div class="card" id="emailCard">
+          <div class="card-header"><h3 class="card-title">Email Address</h3></div>
+          <div class="card-body" id="emailCardBody">Loading…</div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Change Password</h3></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Current password</label>
+              <input type="password" class="form-input" id="curPw" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label class="form-label">New password</label>
+              <div style="position:relative">
+                <input type="password" class="form-input" id="newPw" placeholder="••••••••" style="padding-right:40px" oninput="updatePasswordIndicator(pwIndicator, this.value)">
+                <button type="button" onclick="(function(){var i=document.getElementById('newPw');i.type=i.type==='text'?'password':'text'})()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px" title="Show/hide">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+              <div id="pwIndicatorWrap" style="margin-top:8px"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm new password</label>
+              <input type="password" class="form-input" id="newPw2" placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="changePassword()">Update password</button>
+          </div>
+        </div>
+
+        <!-- iCal Feed -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Calendar Subscription</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
+              Subscribe to your shift rota in any calendar app (Google Calendar, Apple Calendar, Outlook) via iCal.
+            </p>
+            <div id="icalContent">Loading…</div>
+            <div id="icalPreview" style="margin-top:16px"></div>
+          </div>
+        </div>
+
+        <!-- Active Sessions -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Active Sessions</h3></div>
+          <div class="card-body">
+            <div id="sessionsContent">Loading…</div>
+            <button class="btn btn-danger btn-sm" style="margin-top:12px" onclick="signOutEverywhere()">Sign out all devices</button>
+          </div>
+        </div>
+
+        <!-- Login History -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Login History</h3></div>
+          <div class="card-body">
+            <div id="loginHistoryContent">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Export My Data -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Export My Data</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
+              Download a JSON file containing all your account data, shifts you have been assigned, and calendar feed tokens.
+            </p>
+            <a href="/api/auth/export" class="btn btn-secondary btn-sm" download style="display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              Download my data
+            </a>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="border-color:rgba(220,38,38,.3)">
+          <div class="card-header" style="border-bottom-color:rgba(220,38,38,.2)">
+            <h3 class="card-title" style="color:var(--red)">Danger Zone</h3>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:4px">
+              Permanently delete your account and all associated data. This cannot be undone.
+            </p>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:16px">
+              <strong>Note:</strong> As an admin, deleting your account will only work if at least one other admin exists.
+            </p>
+            <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="openDeleteAccountModal()">
+              Delete my account
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /grid -->
+      </div><!-- /max-width wrapper -->
+    </main>
+</div><!-- /app-shell -->
+
+<script src="/js/shell.js"></script>
+<script src="/js/password-policy.js"></script>
+<script>
+'use strict'
+
+let cfg = null
+let profileColour = '#4f46e5'
+let pwIndicator = null
+
+function renderAvatar(u) {
+  const el = document.getElementById('profileAvatar')
+  el.style.background = u.color || '#4f46e5'
+  if (u.avatar) {
+    const img = document.createElement('img')
+    img.src = u.avatar
+    img.alt = u.name || ''
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit'
+    el.textContent = ''
+    el.appendChild(img)
+  } else {
+    el.textContent = u.initials || (u.name || '?').slice(0,2).toUpperCase()
+  }
+  const removeBtn = document.getElementById('removeAvatarBtn')
+  if (removeBtn) removeBtn.style.display = u.avatar ? 'inline-flex' : 'none'
+}
+
+async function init() {
+  cfg = await loadConfig()
+  if (!cfg) return
+  renderShell(cfg, 'profile')
+  if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy)
+
+  pwIndicator = document.getElementById('pwIndicatorWrap')
+
+  const u = cfg.user
+  renderAvatar(u)
+  document.getElementById('profileName').textContent = u.name
+  document.getElementById('profileEmail').textContent = u.email
+  const roleLabels = { admin: 'Admin', manager: 'Manager', shift_lead: 'Shift Lead', member: 'Member' }
+  document.getElementById('profileRole').textContent = roleLabels[u.role] || u.role
+  document.getElementById('editName').value = u.name
+
+  profileColour = u.color || '#4f46e5'
+  const picker = document.getElementById('profileColourPicker')
+  renderColourPicker(picker, profileColour, v => { profileColour = v })
+
+  renderEmailCard(u, cfg.smtpEnabled)
+  loadIcal()
+
+  // Show feedback toasts for email change flow
+  const params = new URLSearchParams(window.location.search)
+  if (params.has('emailChanged')) {
+    toast('Email address updated successfully. Please sign in again.', 'success')
+    history.replaceState(null, '', '/profile.html')
+  } else if (params.has('emailChangeFailed')) {
+    const reason = params.get('reason')
+    toast(reason === 'taken' ? 'That email address is already in use.' : 'Email verification link is invalid or expired.', 'error')
+    history.replaceState(null, '', '/profile.html')
+  }
+}
+
+async function uploadAvatar(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 4 * 1024 * 1024) { toast('Image must be under 4 MB', 'error'); return }
+  const fd = new FormData()
+  fd.append('avatar', file)
+  try {
+    const r = await fetch('/api/users/me/avatar', { method: 'POST', body: fd })
+    const d = await r.json()
+    if (!r.ok) throw new Error(d.error || 'Upload failed')
+    cfg.user.avatar = d.avatar
+    renderAvatar(cfg.user)
+    _config = null
+    toast('Photo updated', 'success')
+  } catch (err) { toast(err.message, 'error') }
+  input.value = ''
+}
+
+async function removeAvatar() {
+  if (!confirm('Remove your profile photo?')) return
+  try {
+    const r = await fetch('/api/users/me/avatar', { method: 'DELETE' })
+    if (!r.ok) throw new Error('Failed to remove photo')
+    cfg.user.avatar = null
+    renderAvatar(cfg.user)
+    _config = null
+    toast('Photo removed', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function renderEmailCard(u, smtpEnabled) {
+  const body = document.getElementById('emailCardBody')
+  if (!smtpEnabled) {
+    body.innerHTML = `
+      <p style="font-size:13px;color:var(--text-2);margin:0 0 8px">
+        <strong>Current email:</strong> ${u.email}
+      </p>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0;color:var(--text-3)"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+        <span style="font-size:13px;color:var(--text-2)">To update your email address, please contact your administrator.</span>
+      </div>`
+    return
+  }
+  body.innerHTML = `
+    <p style="font-size:13px;color:var(--text-2);margin:0 0 16px">
+      <strong>Current email:</strong> ${u.email}
+    </p>
+    <div class="form-group">
+      <label class="form-label">New email address</label>
+      <input type="email" class="form-input" id="newEmailInput" placeholder="name@example.com" autocomplete="email">
+      <p class="form-hint">A verification link will be sent to the new address. Your email won't change until you click it.</p>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="requestEmailChange()">Send verification email</button>`
+}
+
+async function requestEmailChange() {
+  const input = document.getElementById('newEmailInput')
+  const newEmail = input?.value.trim()
+  if (!newEmail) { toast('Please enter a new email address', 'error'); return }
+  try {
+    await api('/api/auth/email-change/request', { method: 'POST', body: { newEmail } })
+    toast('Verification email sent — check your inbox', 'success')
+    if (input) input.value = ''
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function saveProfile() {
+  const name = document.getElementById('editName').value.trim()
+  if (!name) { toast('Name is required', 'error'); return }
+  try {
+    const r = await api('/api/auth/profile', { method: 'PATCH', body: { name, color: profileColour } })
+    cfg.user.name     = r.user.name
+    cfg.user.initials = r.user.initials
+    cfg.user.color    = r.user.color
+    renderAvatar(cfg.user)
+    document.getElementById('profileName').textContent = r.user.name
+    toast('Profile saved', 'success')
+    _config = null
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function changePassword() {
+  const cur  = document.getElementById('curPw').value
+  const npw  = document.getElementById('newPw').value
+  const npw2 = document.getElementById('newPw2').value
+  if (!cur || !npw)       { toast('All fields are required', 'error'); return }
+  if (npw !== npw2)       { toast('Passwords do not match', 'error'); return }
+  const v = validatePasswordClient(npw)
+  if (!v.ok)              { toast(v.errors[0], 'error'); return }
+  try {
+    await api('/api/auth/profile', { method: 'PATCH', body: { currentPassword: cur, newPassword: npw } })
+    toast('Password updated', 'success')
+    document.getElementById('curPw').value  = ''
+    document.getElementById('newPw').value  = ''
+    document.getElementById('newPw2').value = ''
+    if (pwIndicator) pwIndicator.innerHTML = ''
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function loadIcal() {
+  try {
+    const data = await api('/api/ical/token')
+    const el = document.getElementById('icalContent')
+    el.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Feed URL</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" value="${data.feedUrl}" readonly id="icalUrl" style="font-size:11px;font-family:var(--mono)">
+          <button class="btn btn-secondary btn-sm" onclick="copyIcal()">Copy</button>
+        </div>
+        <p class="form-hint">Paste this URL into your calendar app to subscribe to your shifts.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${data.feedUrl}" class="btn btn-secondary btn-sm" download>⬇ Download .ics</a>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="regenerateIcal()">Regenerate token</button>
+      </div>`
+    loadIcalPreview()
+  } catch (err) {
+    document.getElementById('icalContent').textContent = 'Failed to load iCal token'
+  }
+}
+
+async function loadIcalPreview() {
+  const el = document.getElementById('icalPreview')
+  if (!el || !cfg?.user?.id) return
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const future = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const shifts = await api(`/api/shifts?start=${today}&end=${future}&user_id=${cfg.user.id}`)
+    const upcoming = shifts.slice(0, 5)
+    if (!upcoming.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-3);margin:0">No upcoming shifts in the next 60 days.</p>'
+      return
+    }
+    const rows = upcoming.map(s => {
+      const d = new Date(s.date + 'T12:00:00')
+      const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+      const timeStr = s.is_off ? 'Day off' : (s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day')
+      const loc = s.location_name ? `<span style="color:var(--text-3)">${s.location_name}</span>` : ''
+      return `<div style="display:flex;gap:12px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:500;min-width:110px">${dateStr}</span>
+        <span style="font-size:13px">${timeStr}</span>
+        ${loc}
+      </div>`
+    }).join('')
+    el.innerHTML = `<p style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px">Upcoming shifts</p>${rows}`
+  } catch {}
+}
+
+function copyIcal() {
+  const url = document.getElementById('icalUrl').value
+  navigator.clipboard.writeText(url).then(() => toast('URL copied!', 'success'))
+}
+
+async function regenerateIcal() {
+  if (!confirm('Regenerate iCal token? Your current subscription URL will stop working.')) return
+  try {
+    await api('/api/ical/token', { method: 'DELETE' })
+    await loadIcal()
+    toast('Token regenerated', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins  = Math.floor(diff / 60000)
+  if (mins < 2)   return 'Just now'
+  if (mins < 60)  return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days  = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+async function loadSessions() {
+  const el = document.getElementById('sessionsContent')
+  try {
+    const data = await api('/api/auth/sessions')
+    if (!data.sessions.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-3);margin:0">No active sessions found. Re-login to register your device.</p>'
+      return
+    }
+    el.innerHTML = data.sessions.map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px">
+            ${s.label}
+            ${s.isCurrent ? '<span class="badge badge-green" style="font-size:10px">Current</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">
+            ${s.ip ? s.ip + ' · ' : ''}Last active ${timeAgo(s.lastUsedAt)}
+            <span title="${new Date(s.createdAt).toLocaleString()}" style="cursor:default"> · Since ${new Date(s.createdAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);flex-shrink:0" onclick="revokeSession('${s.id}',${s.isCurrent})">Revoke</button>
+      </div>`).join('')
+  } catch (err) {
+    el.textContent = 'Failed to load sessions'
+  }
+}
+
+async function revokeSession(id, isCurrent) {
+  if (!confirm(isCurrent ? 'Revoke this session? You will be signed out.' : 'Revoke this session?')) return
+  try {
+    const data = await api(`/api/auth/sessions/${id}`, { method: 'DELETE' })
+    if (data.logout) { window.location.href = '/login.html'; return }
+    toast('Session revoked', 'success')
+    loadSessions()
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function loadLoginHistory() {
+  const el = document.getElementById('loginHistoryContent')
+  try {
+    const data = await api('/api/auth/login-history')
+    if (!data.history.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-3);margin:0">No login history yet.</p>'
+      return
+    }
+    el.innerHTML = data.history.map((h, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px">
+            ${h.label}
+            ${i === 0 ? '<span class="badge badge-blue" style="font-size:10px">Most recent</span>' : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">
+            ${h.ip ? h.ip + ' · ' : ''}
+            <span title="${new Date(h.createdAt).toLocaleString()}">${timeAgo(h.createdAt)}</span>
+            &nbsp;·&nbsp;${new Date(h.createdAt).toLocaleString()}
+          </div>
+        </div>
+      </div>`).join('')
+  } catch (err) {
+    el.textContent = 'Failed to load login history'
+  }
+}
+
+async function signOutEverywhere() {
+  if (!confirm('This will invalidate all active sessions across every device and browser, including this one. Continue?')) return
+  try {
+    await api('/api/auth/revoke-all', { method: 'POST' })
+    window.location.href = '/login.html'
+  } catch (err) { toast(err.message, 'error') }
+}
+
+function openDeleteAccountModal() {
+  const existing = document.getElementById('deleteAccountModal')
+  if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'deleteAccountModal'
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--red)">Delete My Account</h3>
+        <button class="modal-close" onclick="document.getElementById('deleteAccountModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="padding:12px 14px;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);border-radius:var(--r-md);font-size:13px;color:var(--red);margin-bottom:16px;line-height:1.5">
+          <strong>This action is permanent and cannot be undone.</strong> Your account, all shifts, and calendar tokens will be deleted immediately.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm your password</label>
+          <input type="password" class="form-input" id="deleteAccountPw" placeholder="Enter your password to confirm" autocomplete="current-password">
+        </div>
+        <div id="deleteAccountErr" style="display:none;color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('deleteAccountModal').remove()">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="doDeleteAccount()">Delete my account</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  setTimeout(() => document.getElementById('deleteAccountPw')?.focus(), 50)
+}
+
+async function doDeleteAccount() {
+  const pw  = document.getElementById('deleteAccountPw').value
+  const err = document.getElementById('deleteAccountErr')
+  if (!pw) { err.style.display = 'block'; err.textContent = 'Password is required.'; return }
+  err.style.display = 'none'
+  try {
+    await api('/api/auth/account', { method: 'DELETE', body: { password: pw } })
+    window.location.href = '/login.html'
+  } catch (e) { err.style.display = 'block'; err.textContent = e.message }
+}
+
+init().then(() => initCollapsibleSections())
+loadSessions()
+loadLoginHistory()
+</script>
+</body>
+</html>

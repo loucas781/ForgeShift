@@ -1,0 +1,33 @@
+{
+  "name": "forgeshift",
+  "version": "0.0.56",
+  "description": "Self-hosted shift rota management — vanilla HTML/CSS/JS + Node.js/Express + SQLite",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "NODE_ENV=development nodemon server/index.js",
+    "dev:win": "set NODE_ENV=development && nodemon server/index.js",
+    "setup": "node server/db/migrate.js",
+    "bump-version": "node scripts/bump-version.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "otplib": "^12.0.1",
+    "better-sqlite3": "^9.4.3",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.18.3",
+    "express-rate-limit": "^7.2.0",
+    "ical-generator": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.9",
+    "uuid": "^9.0.0",
+    "@simplewebauthn/server": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
