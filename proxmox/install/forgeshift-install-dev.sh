@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ForgeShift — LXC In-Container Install Script
+# ForgeShift — LXC In-Container Install Script (Developer)
 # Called by the host script via: pct exec <ctid> -- bash /tmp/forgeshift-install.sh <env>
 # Do NOT run this directly on your workstation.
 
@@ -13,9 +13,9 @@ msg_ok()    { echo -e "  ✓   ${GN}${1}${CL}"; }
 msg_error() { echo -e "  ✖   ${RD}${1}${CL}"; exit 1; }
 
 # ── Environment ────────────────────────────────────────────────────────────────
-APP_ENV="${1:-staging}"
-if [[ "$APP_ENV" != "staging" && "$APP_ENV" != "main" && "$APP_ENV" != "production" ]]; then
-  echo "Usage: $0 [staging|main]"; exit 1
+APP_ENV="${1:-development}"
+if [[ "$APP_ENV" != "development" && "$APP_ENV" != "staging" && "$APP_ENV" != "main" && "$APP_ENV" != "production" ]]; then
+  echo "Usage: $0 [development|staging|main]"; exit 1
 fi
 [[ "$APP_ENV" == "main" ]] && APP_ENV="production"
 COOKIE_SECURE="false"
@@ -50,6 +50,7 @@ msg_info "Cloning ForgeShift"
 REPO_URL="https://github.com/loucas781/ForgeShift.git"
 CLONE_BRANCH="main"
 [[ "$APP_ENV" == "staging" ]] && CLONE_BRANCH="staging"
+[[ "$APP_ENV" == "development" ]] && CLONE_BRANCH="develop"
 rm -rf /opt/forgeshift
 git clone --branch "$CLONE_BRANCH" --single-branch --quiet "$REPO_URL" /opt/forgeshift 2>/dev/null \
   || git clone --quiet "$REPO_URL" /opt/forgeshift 2>/dev/null \
@@ -149,13 +150,16 @@ else
 fi
 
 # ── 10. Update helper script ───────────────────────────────────────────────────
-cat > /opt/forgeshift/update.sh << 'UPDATEEOF'
+cat > /opt/forgeshift/update-dev.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e
 cd /opt/forgeshift
 
 # Detect environment from whichever .env.* file exists
-if [[ -f .env.staging ]]; then
+if [[ -f .env.development ]]; then
+  APP_ENV=development
+  TARGET_BRANCH=develop
+elif [[ -f .env.staging ]]; then
   APP_ENV=staging
   TARGET_BRANCH=staging
 else
@@ -178,10 +182,11 @@ HOME=/root NODE_ENV=${APP_ENV} node server/db/migrate.js
 systemctl restart forgeshift
 echo "✓ ForgeShift updated to $(cat .version 2>/dev/null || echo 'unknown')"
 UPDATEEOF
-chmod +x /opt/forgeshift/update.sh
+chmod +x /opt/forgeshift/update-dev.sh
 
 echo ""
 msg_ok "ForgeShift installation complete — running at http://localhost:3000"
 echo ""
 echo "  💡  Visit http://$(hostname -I | awk '{print $1}'):3000/signup.html to create the first admin account."
+echo "  💡  Developer update helper: /opt/forgeshift/update-dev.sh"
 echo ""

@@ -1,117 +1,134 @@
 # ForgeShift
 
-Self-hosted **shift rota management** — vanilla HTML/CSS/JS + Node.js/Express + SQLite.
+ForgeShift is a self-hosted shift and task scheduling platform for teams.
 
-## Features
+It provides a calendar-first workflow for rotas, reusable templates, task lists, role-based administration, and release visibility from GitHub Releases.
 
-- 📅 **Calendar** — month and week views, click any day to add or edit shifts
-- 📍 **Locations** — assign locations per shift, configurable colour coding
-- 📋 **Templates** — reusable weekly shift patterns, apply to any team member for any week
-- 🎨 **Colour-coded notes** — per-day notes with a colour tint applied to the calendar cell
-- 👥 **User management** — admin creates, deactivates, resets passwords and deletes accounts
-- 🔐 **Auth** — JWT cookies, HMAC-SHA256 pepper + bcrypt (12 rounds), transparent pepper rotation
-- 📲 **iCal export** — subscribe to your rota in Google Calendar, Apple Calendar or Outlook
-- 🌙 **Themes** — light, dark, OLED black — system-level, persisted per browser
-- 📱 **Mobile responsive** — scales across desktop, tablet and phone
-- 🚀 **Environments** — develop / staging / production with version badge in the UI
-- 🔄 **Auto-versioning** — GitHub Actions increments build counter on every push
+## Core Features
 
----
+- Calendar views: month and week layout with day/shift detail panels
+- Shift management: create, edit, and assign shifts by user, date, time, and location
+- Task lists: attach reusable task lists to days/shifts with color indicators
+- Templates: apply repeatable weekly patterns to speed up rota planning
+- Team and role controls: Member, Shift Lead, Manager, Administrator
+- Security controls: password hashing + peppering, 2FA support, reset flows, audit log
+- Build visibility: environment badge, version display, and in-app Updates page
+- Mobile-ready UI: responsive layouts for phone, tablet, and desktop
 
-## Proxmox LXC Install
+## Environment Channels
 
-Run this **on your Proxmox host** (not inside a container):
+ForgeShift supports two deployment channels for normal installs:
 
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeShift/develop/proxmox/ct/forgeshift.sh)"
-```
+- `staging` = pre-release validation channel (`-rc` versions)
+- `main` = production channel (stable releases)
 
-The script will:
-1. Present a `whiptail` TUI — choose default or advanced settings (CPU, RAM, disk, network, environment)
-2. Download a Debian 12 template automatically if one isn't already present
-3. Create and start the LXC container
-4. Push the in-container install script and run it — installs Node.js 20, clones the repo, writes `.env`, runs migrations, and starts the `forgeshift` systemd service
-5. Print the app URL and generated root password when complete
+`develop` remains a developer-only branch/workflow and is intentionally excluded from installer choices.
 
-**After install:** visit `http://<container-ip>:3000/signup.html` — the first account created automatically becomes admin.
+## Tech Stack
 
----
+- Frontend: Vanilla HTML/CSS/JavaScript
+- Backend: Node.js + Express
+- Database: SQLite
+- Auth/session: JWT cookies
+- Deployment target: Linux VM/LXC (Proxmox scripts included)
 
-## Updating ForgeShift
-
-Once installed, an `update.sh` script is placed at `/opt/forgeshift/update.sh` inside the container. To update to the latest version, run from your **Proxmox host**:
+## Quick Start (Local)
 
 ```bash
-pct exec <CTID> -- bash /opt/forgeshift/update.sh
+git clone https://github.com/loucas781/ForgeShift.git
+cd ForgeShift
+cp .env.example .env.staging
+# edit .env.staging values (JWT_SECRET, PASSWORD_PEPPER, APP_URL, etc.)
+npm install
+NODE_ENV=staging node server/index.js
 ```
 
-Replace `<CTID>` with your container ID (e.g. `100`). The update script will:
-1. Pull the latest code from `origin/develop`
-2. Run `npm install` to pick up any new dependencies
-3. Run database migrations (additive only — no data loss)
-4. Restart the `forgeshift` systemd service
+Open:
 
-You can also run it directly if you have a shell inside the container:
+- `http://localhost:3000/signup.html` for first-time admin creation
+- `http://localhost:3000` for the app
+
+## Proxmox One-Command Install
+
+Run on the Proxmox host:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeShift/main/proxmox/ct/forgeshift.sh)"
+```
+
+The installer will:
+
+1. Create a Debian 12 LXC
+2. Install Node.js + dependencies
+3. Clone the correct branch (`staging` or `main`)
+4. Generate `.env.<environment>`
+5. Run DB migrations
+6. Start `forgeshift` as a `systemd` service
+
+## Developer Proxmox Install (3 Channels)
+
+Developer-only installer (from `develop` branch), with `development`, `staging`, and `main` options:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeShift/develop/proxmox/ct/forgeshift-dev.sh)"
+```
+
+This flow installs a developer update helper:
+
+- `/opt/forgeshift/update-dev.sh`
+
+## Updating an Installed Instance
+
+Inside the container:
 
 ```bash
 bash /opt/forgeshift/update.sh
 ```
 
----
+Update behavior:
 
-## Quick Start (local dev)
+- `staging` environments update from `origin/staging`
+- `main` environments update from `origin/main`
 
-```bash
-git clone https://github.com/loucas781/ForgeShift.git
-cd ForgeShift
-cp .env.example .env.development
-# Edit .env.development — fill in JWT_SECRET and PASSWORD_PEPPER
-npm install
-node server/index.js
-# Open http://localhost:3000/signup.html to create the first admin account
-```
+## Build & Release Visibility (In-App Updates Page)
 
----
+The Settings → Updates page reads GitHub Releases for `GITHUB_REPO`.
 
-## GitHub Actions — Versioning
+- `staging` builds compare against published **pre-releases**
+- `main` builds compare against published **releases**
 
-Enable in repo **Settings → Actions → General → Read and write permissions**.
-
-| Branch | Behaviour |
-|---|---|
-| `develop` | Increments build counter on every push — e.g. `0.0.1-dev.42` |
-| `staging` | Bumps patch + `-rc` suffix on PR merge and creates the Git tag — e.g. `0.0.2-rc` |
-| `main` | Bumps minor, clean version, and creates the Git tag — e.g. `0.1.0` |
-
-The version is displayed in the topbar env badge (`development v0.0.1-dev.42`), on the login page footer, and in Settings → Build Info.
-
-The Settings → Updates page checks published GitHub Releases for this repository. Production builds only compare against full releases, staging builds only compare against GitHub prereleases, and development builds are shown as unreleased builds rather than updateable releases. Publish releases/prereleases manually from GitHub when you want users to see them as available updates.
-
----
+Only published GitHub releases are shown as available updates.
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `JWT_SECRET` | JWT signing secret — generate: `openssl rand -hex 48` |
-| `PASSWORD_PEPPER` | HMAC pepper mixed into every password hash — generate: `openssl rand -hex 32` |
-| `DATABASE_PATH` | SQLite file path (default: `./data/forgeshift.db`) |
-| `GITHUB_REPO` | GitHub repo used by the Updates page, in `owner/repo` format |
-| `GITHUB_TOKEN` | Optional GitHub token to reduce rate-limit risk when checking releases |
-| `PORT` | HTTP server port (default: `3000`) |
-| `APP_URL` | Public-facing URL — used in iCal feed links |
-| `COOKIE_SECURE` | Set `true` when running behind HTTPS |
-| `TRUST_PROXY` | Set `true` when behind a reverse proxy (nginx, Caddy, NPM) |
-| `COOKIE_MAX_AGE_HOURS` | Session length in hours (default: `72`) |
+See `.env.example` for all options.
 
----
+Important values:
 
-## Security
+- `JWT_SECRET`: signing secret for auth tokens
+- `PASSWORD_PEPPER`: extra secret mixed into password hashing
+- `DATABASE_PATH`: SQLite DB file path
+- `APP_URL`: public app URL for links and feeds
+- `APP_ENV`: deployment channel (`staging` or `production`)
+- `GITHUB_REPO`: release source repo (`owner/repo`)
+- `GITHUB_TOKEN`: optional token for higher GitHub API rate limits
 
-- **Passwords** — HMAC-SHA256 pepper applied before bcrypt (12 rounds); pepper never stored in the database
-- **Pepper rotation** — set `PASSWORD_PEPPER_OLD=<old value>` alongside a new `PASSWORD_PEPPER`; passwords are transparently re-hashed on next successful login
-- **Password reset** — two-step flow: URL token is SHA-256 hashed before DB storage and consumed immediately on validation, exchanged for a short-lived in-memory session key
-- **Rate limiting** — 20 auth attempts per IP per 15 minutes (disabled in development)
-- **Last-admin guard** — cannot delete, demote, or deactivate the only admin account
-- **Audit log** — all sensitive operations (login, user create/delete, password reset, shift changes) written to `audit_log` table; failures never surface to callers
-- **`.env` files** — never committed; only `.env.example` is in the repository
+## Security Notes
+
+- Passwords are hashed with bcrypt and protected with a server-side pepper
+- Sensitive actions are audited
+- Role checks gate admin features
+- `COOKIE_SECURE=true` is recommended behind HTTPS
+- Keep `.env.*` files private and never commit them
+
+## Repository Layout
+
+- `public/` - frontend pages, styles, and client scripts
+- `server/` - API, auth, DB migration, and backend logic
+- `proxmox/ct/` - host-side Proxmox LXC creation script
+- `proxmox/install/` - in-container install/bootstrap script
+- `.github/workflows/` - CI/versioning workflows
+
+## License
+
+MIT (see [`LICENSE`](LICENSE)).
