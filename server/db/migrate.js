@@ -366,8 +366,13 @@ function migrateAdditive() {
   // Expand role CHECK to include manager
   const tableSQL3 = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get()
   if (tableSQL3 && !tableSQL3.sql.includes('manager')) {
+    const userColsBeforeManagerRebuild = db.prepare("PRAGMA table_info(users)").all().map(c => c.name)
+    const hasTokenVersionBeforeManagerRebuild = userColsBeforeManagerRebuild.includes('token_version')
     db.pragma('foreign_keys = OFF')
     try {
+      const userInsertForManagerRebuild = hasTokenVersionBeforeManagerRebuild
+        ? "INSERT INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at, COALESCE(token_version,0) FROM users;"
+        : "INSERT INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at, 0 FROM users;"
       db.exec(`
         BEGIN;
         CREATE TABLE users_new (
@@ -386,7 +391,7 @@ function migrateAdditive() {
           created_at   TEXT NOT NULL DEFAULT (datetime('now')),
           token_version INTEGER NOT NULL DEFAULT 0
         );
-        INSERT INTO users_new SELECT id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, COALESCE(prefs,'{}'), created_at, COALESCE(token_version,0) FROM users;
+        ${userInsertForManagerRebuild}
         DROP TABLE users;
         ALTER TABLE users_new RENAME TO users;
         COMMIT;
@@ -614,4 +619,3 @@ function migrateLocationMembers() {
   `)
   console.log('✓ Location members schema ready')
 }
-
