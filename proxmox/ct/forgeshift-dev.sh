@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# ForgeShift — Proxmox LXC Install Script
+# ForgeShift — Proxmox LXC Install Script (Developer)
 # Run on the Proxmox HOST (not inside a container):
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeShift/main/proxmox/ct/forgeshift.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeShift/develop/proxmox/ct/forgeshift-dev.sh)"
 
 set -euo pipefail
 
@@ -55,8 +55,8 @@ fi
 PVE_VERSION=$(pveversion | grep -oP '(?<=pve-manager/)\S+' || echo "unknown")
 PVE_NODE=$(hostname)
 # ── CHANGE THIS to your GitHub repo URL before first deploy ──────────────────
-GITHUB_RAW="https://raw.githubusercontent.com/loucas781/ForgeShift/main"
-INSTALL_URL="${GITHUB_RAW}/proxmox/install/forgeshift-install.sh"
+GITHUB_RAW="https://raw.githubusercontent.com/loucas781/ForgeShift/develop"
+INSTALL_URL="${GITHUB_RAW}/proxmox/install/forgeshift-install-dev.sh"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 CT_TYPE="1"
@@ -64,7 +64,7 @@ DISK_SIZE="8"
 CORE_COUNT="2"
 RAM_SIZE="1024"
 CT_HOSTNAME="forgeshift"
-APP_ENV="staging"
+APP_ENV="development"
 CT_PASSWORD=""
 BRIDGE="vmbr0"
 NET_TYPE="dhcp"
@@ -172,9 +172,10 @@ if whiptail --backtitle "ForgeShift Install" --title "SETTINGS" --yesno \
     --title "ROOT PASSWORD" 3>&1 1>&2 2>&3) || exit 1
 
   APP_ENV=$(whiptail --backtitle "ForgeShift Install" --title "ENVIRONMENT" \
-    --menu "Select deployment environment:" 12 58 2 \
-    "staging" "Pre-production / RC" \
-    "main"    "Live production release channel" \
+    --menu "Select deployment environment:" 12 58 3 \
+    "development" "Developer channel (origin/develop)" \
+    "staging"     "Pre-production / RC (origin/staging)" \
+    "main"        "Live production release channel (origin/main)" \
     3>&1 1>&2 2>&3) || exit 1
   print_summary "Default Settings"
 else
@@ -211,9 +212,10 @@ else
   fi
 
   APP_ENV=$(whiptail --backtitle "ForgeShift Install" --title "ENVIRONMENT" \
-    --menu "Select deployment environment:" 12 58 2 \
-    "staging" "Pre-production / RC" \
-    "main"    "Live production release channel" \
+    --menu "Select deployment environment:" 12 58 3 \
+    "development" "Developer channel (origin/develop)" \
+    "staging"     "Pre-production / RC (origin/staging)" \
+    "main"        "Live production release channel (origin/main)" \
     3>&1 1>&2 2>&3) || exit 1
 
   print_summary "Advanced Settings"
@@ -355,7 +357,7 @@ echo ""
 echo -e " ${INFO}${YW}Container root password: ${YWB}${CT_PASSWORD:-"(none set)"}${CL}"
 echo -e " ${INFO}${YW}Environment: ${YWB}${APP_ENV}${CL}"
 echo -e " ${INFO}${YW}To update ForgeShift later:${CL}"
-echo -e "${TAB}${TAB}${DGN}pct exec ${CTID} -- bash /opt/forgeshift/update.sh${CL}"
+echo -e "${TAB}${TAB}${DGN}pct exec ${CTID} -- bash /opt/forgeshift/update-dev.sh${CL}"
 echo ""
 echo -e " ${INFO}${YW}First time? Visit the app and sign up — the first account becomes admin.${CL}"
 echo ""
