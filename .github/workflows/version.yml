@@ -63,6 +63,19 @@ jobs:
       - name: Bump version
         id: bump
         run: |
+          semver_max() {
+            local a="$1" b="$2"
+            if [[ "$(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -n1)" == "$a" ]]; then
+              echo "$a"
+            else
+              echo "$b"
+            fi
+          }
+
+          base_version() {
+            echo "$1" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//'
+          }
+
           BRANCH="${{ steps.branch.outputs.name }}"
           BUMP_TYPE="patch"
           EVENT="${{ github.event_name }}"
@@ -87,7 +100,7 @@ jobs:
             CURRENT=$(cat .version | tr -d '[:space:]')
           fi
 
-          BASE=$(echo "$CURRENT" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
+          BASE=$(base_version "$CURRENT")
           MAJOR=$(echo "$BASE" | cut -d. -f1)
           MINOR=$(echo "$BASE" | cut -d. -f2)
           PATCH=$(echo "$BASE" | cut -d. -f3)
@@ -105,7 +118,13 @@ jobs:
             else
               # On normal pushes, production adopts the promoted base version.
               # Example: staging 1.0.12-rc -> main 1.0.12
-              NEW_VERSION="${BASE}"
+              # Cherry-picks often lack reliable source-branch metadata, so
+              # when needed we fall back to the highest base between main/staging.
+              git fetch origin staging 2>/dev/null || true
+              STAGING_CURRENT=$(git show origin/staging:.version 2>/dev/null | tr -d '[:space:]' || echo "")
+              STAGING_BASE=$(base_version "${STAGING_CURRENT:-$BASE}")
+              MAIN_BASE=$(base_version "$(cat .version | tr -d '[:space:]')")
+              NEW_VERSION=$(semver_max "$MAIN_BASE" "$STAGING_BASE")
             fi
           elif [[ "$BRANCH" == "staging" ]]; then
             PATCH=$((PATCH + 1))
