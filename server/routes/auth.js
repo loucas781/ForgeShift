@@ -22,9 +22,17 @@ const COLORS = ['#4f46e5','#059669','#7c3aed','#dc2626','#d97706','#0891b2','#db
 function getInitials(name) {
   return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
-function cookieOpts() {
+function isHttpsRequest(req) {
+  if (!req) return true
+  if (req.secure) return true
+  const xfProto = String(req.headers?.['x-forwarded-proto'] || '').toLowerCase()
+  return xfProto.split(',')[0].trim() === 'https'
+}
+
+function cookieOpts(req) {
   const hours  = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
-  const secure = process.env.COOKIE_SECURE === 'true'
+  const secureByConfig = process.env.COOKIE_SECURE === 'true'
+  const secure = secureByConfig && isHttpsRequest(req)
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', maxAge: hours * 3600000, path: '/' }
 }
 function makeToken(user, sessionId) {
@@ -35,8 +43,9 @@ function makeToken(user, sessionId) {
   )
 }
 
-function twoFaTrustCookieOpts() {
-  const secure = process.env.COOKIE_SECURE === 'true'
+function twoFaTrustCookieOpts(req) {
+  const secureByConfig = process.env.COOKIE_SECURE === 'true'
+  const secure = secureByConfig && isHttpsRequest(req)
   return {
     httpOnly: true,
     secure,
@@ -163,7 +172,7 @@ router.post('/signup', async (req, res) => {
       .run(id, name.trim(), norm, hash, getInitials(name), COLORS[userCount % COLORS.length], role)
     const user = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(id)
     const sessionId = createSession(req, user.id)
-    res.cookie('token', makeToken(user, sessionId), cookieOpts())
+    res.cookie('token', makeToken(user, sessionId), cookieOpts(req))
     audit(user.id, 'user.signup', 'user', user.id, user.name)
     res.json({ ok: true, user })
   } catch (err) { logger.error('signup:', err.message); res.status(500).json({ error: 'Server error' }) }
@@ -187,7 +196,7 @@ router.post('/login', async (req, res) => {
       if (hasValidTrusted2FA(req, user)) {
         const { password: _, ...pubTrusted } = user
         const trustedSessionId = createSession(req, pubTrusted.id)
-        res.cookie('token', makeToken(pubTrusted, trustedSessionId), cookieOpts())
+        res.cookie('token', makeToken(pubTrusted, trustedSessionId), cookieOpts(req))
         const trustedIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
         audit(pubTrusted.id, 'user.login', 'user', pubTrusted.id, pubTrusted.name, {
           ip: trustedIp,
@@ -205,7 +214,7 @@ router.post('/login', async (req, res) => {
     }
     const { password: _, ...pub } = user
     const sessionId = createSession(req, pub.id)
-    res.cookie('token', makeToken(pub, sessionId), cookieOpts())
+    res.cookie('token', makeToken(pub, sessionId), cookieOpts(req))
     const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
     audit(pub.id, 'user.login', 'user', pub.id, pub.name, { ip, ua: req.headers['user-agent'] })
     res.json({ ok: true, user: pub })
@@ -233,9 +242,9 @@ router.post('/2fa/login', async (req, res) => {
     if (!isValid) return res.status(401).json({ error: 'Invalid authentication code.' })
     const { password: _, ...pub } = user
     const sessionId = createSession(req, pub.id)
-    res.cookie('token', makeToken(pub, sessionId), cookieOpts())
+    res.cookie('token', makeToken(pub, sessionId), cookieOpts(req))
     if (rememberDevice) {
-      res.cookie(TWO_FA_TRUST_COOKIE, signTwoFaTrustToken(pub, req), twoFaTrustCookieOpts())
+      res.cookie(TWO_FA_TRUST_COOKIE, signTwoFaTrustToken(pub, req), twoFaTrustCookieOpts(req))
     }
     const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
     audit(pub.id, 'user.login', 'user', pub.id, pub.name, { ip, ua: req.headers['user-agent'] })
@@ -252,7 +261,7 @@ router.post('/logout', (req, res) => {
       if (decoded?.sid) db.prepare('DELETE FROM user_sessions WHERE id = ?').run(decoded.sid)
     }
   } catch {}
-  res.clearCookie('token', clearCookieOpts())
+  res.clearCookie('token', clearCookieOpts(req))
   res.json({ ok: true })
 })
 
@@ -294,7 +303,7 @@ router.patch('/profile', requireAuth, async (req, res) => {
     // Rotate session: delete old, create new so the session list stays accurate
     if (req.user?.sid) db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.user.sid)
     const newSid = createSession(req, updated.id)
-    res.cookie('token', makeToken(updated, newSid), cookieOpts())
+    res.cookie('token', makeToken(updated, newSid), cookieOpts(req))
     audit(user.id, 'user.profile_update', 'user', user.id, updated.name)
     res.json({ ok: true, user: updated })
   } catch (err) { logger.error('profile:', err.message); res.status(500).json({ error: 'Server error' }) }
@@ -545,7 +554,7 @@ router.post('/2fa/disable', requireAuth, (req, res) => {
     const valid = verifyTotpWithGrace(user.totp_secret, code)
     if (!valid) return res.status(400).json({ error: 'Invalid code' })
     db.prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?').run(req.user.id)
-    res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts())
+    res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts(req))
     audit(req.user.id, 'user.2fa_disabled', 'user', req.user.id, req.user.name)
     res.json({ ok: true })
   } catch (err) {
@@ -582,7 +591,7 @@ router.delete('/sessions/:id', requireAuth, (req, res) => {
     if (!sess) return res.status(404).json({ error: 'Session not found' })
     db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.params.id)
     const isCurrent = req.params.id === req.user.sid
-    if (isCurrent) res.clearCookie('token', clearCookieOpts())
+    if (isCurrent) res.clearCookie('token', clearCookieOpts(req))
     res.json({ ok: true, logout: isCurrent })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -616,8 +625,8 @@ router.get('/login-history', requireAuth, (req, res) => {
 // ── POST /api/auth/logout-all — clear cookie and delete all sessions ──────────
 router.post('/logout-all', requireAuth, (req, res) => {
   db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(req.user.id)
-  res.clearCookie('token', clearCookieOpts())
-  res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts())
+  res.clearCookie('token', clearCookieOpts(req))
+  res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts(req))
   audit(req.user.id, 'user.logout_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
 })
@@ -651,8 +660,8 @@ router.get('/export', requireAuth, (req, res) => {
 router.post('/revoke-all', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.user.id)
   db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(req.user.id)
-  res.clearCookie('token', clearCookieOpts())
-  res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts())
+  res.clearCookie('token', clearCookieOpts(req))
+  res.clearCookie(TWO_FA_TRUST_COOKIE, clearCookieOpts(req))
   audit(req.user.id, 'user.revoke_all', 'user', req.user.id, req.user.name)
   res.json({ ok: true })
 })
@@ -677,7 +686,7 @@ router.delete('/account', requireAuth, async (req, res) => {
     db.prepare('DELETE FROM ical_tokens  WHERE user_id = ?').run(uid)
     db.prepare('DELETE FROM users        WHERE id      = ?').run(uid)
     audit(null, 'user.self_deleted', 'user', uid, user.name)
-    res.clearCookie('token', clearCookieOpts())
+    res.clearCookie('token', clearCookieOpts(req))
     res.json({ ok: true })
   } catch (err) {
     logger.error('delete account:', err.message)

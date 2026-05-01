@@ -17,8 +17,15 @@ function getInactivityTimeoutMs() {
   return _inactivityCache
 }
 
-function clearCookieOpts() {
-  const secure = process.env.COOKIE_SECURE === 'true'
+function isHttpsRequest(req) {
+  if (!req) return true
+  if (req.secure) return true
+  const xfProto = String(req.headers?.['x-forwarded-proto'] || '').toLowerCase()
+  return xfProto.split(',')[0].trim() === 'https'
+}
+
+function clearCookieOpts(req) {
+  const secure = process.env.COOKIE_SECURE === 'true' && isHttpsRequest(req)
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
 }
 
@@ -33,7 +40,7 @@ function requireAuth(req, res, next) {
     // Validate token_version to support "sign out all devices"
     const row = db.prepare('SELECT token_version FROM users WHERE id = ?').get(req.user.id)
     if (!row || (row.token_version || 0) !== (req.user.tv || 0)) {
-      res.clearCookie('token', clearCookieOpts())
+      res.clearCookie('token', clearCookieOpts(req))
       if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
       return res.redirect('/login.html')
     }
@@ -42,7 +49,7 @@ function requireAuth(req, res, next) {
       const sess = db.prepare('SELECT id, last_used_at FROM user_sessions WHERE id = ? AND user_id = ?')
         .get(req.user.sid, req.user.id)
       if (!sess) {
-        res.clearCookie('token', clearCookieOpts())
+        res.clearCookie('token', clearCookieOpts(req))
         if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
         return res.redirect('/login.html')
       }
@@ -51,7 +58,7 @@ function requireAuth(req, res, next) {
       const inactivityMs = getInactivityTimeoutMs()
       if (inactivityMs > 0 && Date.now() - lastUsed > inactivityMs) {
         db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.user.sid)
-        res.clearCookie('token', clearCookieOpts())
+        res.clearCookie('token', clearCookieOpts(req))
         if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Signed out due to inactivity', code: 'INACTIVITY_TIMEOUT' })
         return res.redirect('/login.html?reason=inactivity')
       }
@@ -62,7 +69,7 @@ function requireAuth(req, res, next) {
     }
     next()
   } catch (err) {
-    res.clearCookie('token', clearCookieOpts())
+    res.clearCookie('token', clearCookieOpts(req))
     if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session expired' })
     return res.redirect('/login.html')
   }
@@ -72,7 +79,7 @@ function optionalAuth(req, res, next) {
   const token = req.cookies?.token
   if (token) {
     try { req.user = jwt.verify(token, process.env.JWT_SECRET) }
-    catch { res.clearCookie('token', clearCookieOpts()) }
+    catch { res.clearCookie('token', clearCookieOpts(req)) }
   }
   next()
 }
