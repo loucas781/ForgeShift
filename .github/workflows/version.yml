@@ -167,16 +167,23 @@ jobs:
         if: steps.branch.outputs.name != 'develop'
         run: |
           BRANCH="${{ steps.branch.outputs.name }}"
+          EVENT="${{ github.event_name }}"
           NEW_BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
           DOWNSTREAM=""
-          [[ "$BRANCH" == "main" ]]    && DOWNSTREAM="develop"
+          if [[ "$BRANCH" == "main" && "$EVENT" == "workflow_dispatch" ]]; then
+            DOWNSTREAM="staging develop"
+          elif [[ "$BRANCH" == "main" ]]; then
+            DOWNSTREAM="develop"
+          fi
           [[ "$BRANCH" == "staging" ]] && DOWNSTREAM="develop"
 
           for TARGET in $DOWNSTREAM; do
             git fetch origin $TARGET
             git checkout $TARGET
             CURRENT=$(cat .version | tr -d '[:space:]')
-            if echo "$CURRENT" | grep -q '\-dev\.'; then
+            if [[ "$TARGET" == "staging" ]]; then
+              NEW_TARGET_VERSION="${NEW_BASE}-rc"
+            elif echo "$CURRENT" | grep -q '\-dev\.'; then
               DEV_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
               NEW_TARGET_VERSION="${NEW_BASE}-dev.${DEV_NUM}"
             elif echo "$CURRENT" | grep -q '\-rc'; then
