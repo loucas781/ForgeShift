@@ -52,7 +52,14 @@ function popChallenge(key) {
 }
 
 /** Issue a JWT cookie for a user (mirrors auth.js makeToken) */
-function issueSession(res, user) {
+function isHttpsRequest(req) {
+  if (!req) return true
+  if (req.secure) return true
+  const xfProto = String(req.headers?.['x-forwarded-proto'] || '').toLowerCase()
+  return xfProto.split(',')[0].trim() === 'https'
+}
+
+function issueSession(req, res, user) {
   const tv = user.token_version || 0
   const token = jwt.sign(
     { id: user.id, email: user.email, name: user.name, role: user.role, tv },
@@ -60,7 +67,7 @@ function issueSession(res, user) {
     { expiresIn: `${process.env.COOKIE_MAX_AGE_HOURS || 72}h` }
   )
   const maxAge = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72', 10) * 3600 * 1000
-  const secure = process.env.COOKIE_SECURE === 'true'
+  const secure = process.env.COOKIE_SECURE === 'true' && isHttpsRequest(req)
   res.cookie('token', token, {
     httpOnly: true,
     sameSite: secure ? 'strict' : 'lax',
@@ -243,7 +250,7 @@ router.post('/auth-verify', async (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(stored.user_id)
     if (!user) return res.status(401).json({ error: 'Account not found or inactive' })
 
-    issueSession(res, user)
+    issueSession(req, res, user)
     res.json({ ok: true, redirectTo: '/' })
   } catch (err) {
     logger.error('passkey auth-verify error:', err.message)
