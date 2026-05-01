@@ -207,3 +207,7 @@ jobs:
           echo "| Branch | \`${{ steps.branch.outputs.name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Bump type | \`${{ steps.bump.outputs.bump_type }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| New version | \`${{ steps.bump.outputs.new_version }}\` |" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.branch.outputs.name }}" == "main" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> Note: \`staging\` is not synced from \`main\` by design (prevents RC/version rollback)." >> $GITHUB_STEP_SUMMARY
+          fi
