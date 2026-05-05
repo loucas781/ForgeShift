@@ -1811,11 +1811,14 @@ function renderTeamListFiltered() {
         <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
       </div>
       <div class="member-actions">
-        ${isAdmin ? `
+        ${(() => {
+          const safeName = JSON.stringify(u.name)
+          return isAdmin ? `
         <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
-        <button class="btn btn-ghost btn-sm" onclick="getResetLink('${u.id}','${u.name}')">Reset link</button>
-        ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUser('${u.id}','${u.name}')">Delete</button>` : ''}
-        ` : ''}
+        <button class="btn btn-ghost btn-sm" onclick='getResetLink("${u.id}", ${safeName})'>Reset link</button>
+        ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
+        ` : ''
+        })()}
       </div>
     </div>`).join('')
 }

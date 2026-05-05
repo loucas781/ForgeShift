@@ -89,6 +89,13 @@
   </div>
 </div>
 <script>
+  async function readJsonOrText(response) {
+    if (response.status === 204) return {}
+    const text = await response.text()
+    if (!text) return {}
+    try { return JSON.parse(text) } catch { return { error: text } }
+  }
+
   function togglePw(inputId, iconId) {
     const inp = document.getElementById(inputId)
     inp.type = inp.type === 'text' ? 'password' : 'text'
@@ -168,7 +175,8 @@
   async function init() {
     try {
       const r = await fetch('/api/config')
-      const d = await r.json()
+      const d = await readJsonOrText(r)
+      if (!r.ok) throw new Error(d.error || `Config failed (${r.status})`)
       if (d.user) { window.location.href = '/'; return }
       if (d.passwordPolicy) setPasswordPolicy(d.passwordPolicy)
       if (!d.allowSignup) {
@@ -213,7 +221,7 @@
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ name, email, password: pw })
       })
-      const d = await r.json()
+      const d = await readJsonOrText(r)
       if (!r.ok) { err.textContent = d.error || 'Signup failed'; err.classList.add('show'); return }
       window.location.href = '/'
     } catch {
