@@ -144,6 +144,18 @@ function createSession(req, userId) {
   return id
 }
 
+function getPublicOrigin(req) {
+  const configured = String(process.env.APP_URL || '').trim().replace(/\/+$/, '')
+  const forwardedHost = String(req.headers?.['x-forwarded-host'] || '').split(',')[0].trim()
+  const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim()
+  const host = forwardedHost || String(req.headers?.host || '').trim()
+  const proto = forwardedProto || req.protocol || (req.secure ? 'https' : 'http')
+
+  if (host) return `${proto}://${host}`
+  if (configured) return configured
+  return `http://localhost:${process.env.PORT || 3000}`
+}
+
 // ── POST /api/auth/signup ──────────────────────────────────────────────────────
 router.post('/signup', async (req, res) => {
   try {
@@ -338,7 +350,7 @@ router.post('/email-change/request', requireAuth, async (req, res) => {
     db.prepare('INSERT INTO email_change_tokens (id, user_id, new_email, token, expires_at) VALUES (?,?,?,?,?)')
       .run(uuidv4(), user.id, norm, tokenHash, expires)
 
-    const origin    = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`
+    const origin    = getPublicOrigin(req)
     const verifyUrl = `${origin}/api/auth/email-change/confirm?token=${rawToken}`
     await emailSvc.sendEmailChangeVerification({ to: norm, name: user.name, verifyUrl })
 
@@ -400,7 +412,7 @@ router.post('/forgot-password', async (req, res) => {
     const smtp = emailSvc.getSmtpConfig()
     let emailSent = false
     if (smtp.enabled) {
-      const origin   = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`
+      const origin   = getPublicOrigin(req)
       const resetUrl = `${origin}/reset-password.html?token=${rawToken}`
       const result   = await emailSvc.sendPasswordReset({ to: emailAddr.toLowerCase().trim(), name: user.name, resetUrl })
       emailSent = result.ok
@@ -424,7 +436,7 @@ router.get('/admin/reset-link/:userId', requireAuth, async (req, res) => {
     const expires   = new Date(Date.now() + 15 * 60 * 1000).toISOString()
     db.prepare('INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES (?,?,?,?)')
       .run(uuidv4(), user.id, tokenHash, expires)
-    const origin   = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`
+    const origin   = getPublicOrigin(req)
     const resetUrl = `${origin}/reset-password.html?token=${rawToken}`
     audit(req.user.id, 'user.admin_reset_link', 'user', user.id, user.name)
     res.json({ ok: true, resetUrl, expiresIn: '15 minutes' })
@@ -494,7 +506,7 @@ router.post('/invite', requireAuth, async (req, res) => {
     const smtp = emailSvc.getSmtpConfig()
     let emailSent = false
     if (smtp.enabled) {
-      const origin = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`
+      const origin = getPublicOrigin(req)
       const result = await emailSvc.sendAdminInvite({ to: norm, name: name.trim(), tempPassword, loginUrl: origin + '/login.html' })
       emailSent = result.ok
     }
