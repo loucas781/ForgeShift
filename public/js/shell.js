@@ -75,6 +75,14 @@ function safeLocalStorageSet(key, value) {
   try { localStorage.setItem(key, value) } catch {}
 }
 
+function fetchWithTimeout(path, opts = {}, timeoutMs = 12000) {
+  if (typeof AbortController !== 'function') return fetch(path, opts)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const request = { ...opts, signal: controller.signal }
+  return fetch(path, request).finally(() => clearTimeout(timer))
+}
+
 // ── Config ─────────────────────────────────────────────────────────────────────
 let _config = null
 
@@ -118,7 +126,7 @@ function _applyAppIconTheme(theme) {
 
 async function loadConfig() {
   if (_config) return _config
-  const r = await fetch('/api/config')
+  const r = await fetchWithTimeout('/api/config')
   _config = await r.json()
   if (!_config.user) { window.location.href = '/login.html'; return null }
   return _config
@@ -544,7 +552,7 @@ async function doLogout() {
   document.addEventListener('DOMContentLoaded', async () => {
     events.forEach(e => document.addEventListener(e, onActivity, { passive: true }))
     try {
-      const r = await fetch('/api/config')
+      const r = await fetchWithTimeout('/api/config')
       if (!r.ok) return
       const data = await r.json()
       if (!data.user) return  // not authenticated
@@ -559,7 +567,7 @@ async function doLogout() {
 
 // ── API helpers ────────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
-  const r = await fetch(path, {
+  const r = await fetchWithTimeout(path, {
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,

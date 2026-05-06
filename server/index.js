@@ -137,9 +137,6 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
   res.type('application/json').sendFile(path.join(__dirname, '../public/.well-known/apple-app-site-association'))
 })
 
-// Serve static files
-app.use(express.static(path.join(__dirname, '../public'), { index: false }))
-
 // ── Health check ───────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   try {
@@ -499,6 +496,10 @@ app.get('/calendar.html',        requireAuth, (req, res) => sendPage(res, 'calen
 app.get('/templates.html',       requireAuth, (req, res) => sendPage(res, 'templates.html'))
 app.get('/profile.html',         requireAuth, (req, res) => sendPage(res, 'profile.html'))
 app.get('/settings.html',        requireAuth, (req, res) => sendPage(res, 'settings.html'))
+
+// Serve static assets after explicit page routes so HTML requests always use
+// the handlers above, which apply auth and no-store cache headers.
+app.use(express.static(path.join(__dirname, '../public'), { index: false }))
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
