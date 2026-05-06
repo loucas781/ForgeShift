@@ -1,5 +1,5 @@
 'use strict'
-const CACHE = 'forgeshift-v5'
+const CACHE = 'forgeshift-v6'
 const STATIC = [
   '/css/main.css',
   '/js/shell.js',
@@ -27,10 +27,12 @@ self.addEventListener('activate', e =>
 self.addEventListener('fetch', e => {
   // Always network for API calls and SSE
   if (e.request.url.includes('/api/')) return
-  // Network-first for document navigations (prevents stale login/settings pages)
+  const reqUrl = new URL(e.request.url)
+
+  // Network-first for all document navigations so live HTML always wins.
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: 'no-store' })
         .then(res => {
           if (res.ok) {
             const clone = res.clone()
@@ -42,17 +44,21 @@ self.addEventListener('fetch', e => {
     )
     return
   }
-  // Network-first for auth entry pages to avoid stale login/signup issues
-  const reqUrl = new URL(e.request.url)
-  if (
-    reqUrl.pathname === '/login.html' ||
-    reqUrl.pathname === '/signup.html' ||
-    reqUrl.pathname === '/forgot-password.html' ||
-    reqUrl.pathname === '/reset-password.html' ||
-    reqUrl.pathname === '/settings.html'
-  ) {
+
+  // Network-first for same-origin app code/assets so updates roll out quickly.
+  const sameOrigin = reqUrl.origin === self.location.origin
+  const networkFirstAsset =
+    sameOrigin &&
+    e.request.method === 'GET' &&
+    (
+      reqUrl.pathname.endsWith('.html') ||
+      reqUrl.pathname.endsWith('.js') ||
+      reqUrl.pathname.endsWith('.css') ||
+      reqUrl.pathname.endsWith('.json')
+    )
+  if (networkFirstAsset) {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: 'no-store' })
         .then(res => {
           if (res.ok) {
             const clone = res.clone()
