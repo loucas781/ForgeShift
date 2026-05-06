@@ -22,7 +22,8 @@
   <script>
     // Apply theme immediately to avoid flash
     (function(){
-      var t = localStorage.getItem('fs-theme') || 'system'
+      var t = 'system'
+      try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
       if (t === 'system') {
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme','dark')
       } else if (t !== 'light') {
@@ -978,7 +979,8 @@ async function loadOrgs() { try { orgs = await api('/api/organisations') } catch
 // ── Appearance panel ───────────────────────────────────────────────────────────
 async function renderAppearancePanel() {
   const el = document.getElementById('panel-appearance')
-  const currentTheme = localStorage.getItem('fs-theme') || 'system'
+  let currentTheme = 'system'
+  try { currentTheme = localStorage.getItem('fs-theme') || 'system' } catch {}
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Appearance</h2>
     <div class="card section-card">
@@ -1019,7 +1021,7 @@ function pickTheme(theme) {
     } else {
       document.documentElement.setAttribute('data-theme', theme)
     }
-    localStorage.setItem('fs-theme', theme)
+    try { localStorage.setItem('fs-theme', theme) } catch {}
   }
   syncAboutIcon()
   // Update UI
@@ -1557,7 +1559,7 @@ async function renderTeamPanel() {
               </select>
             </div>
             <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
-            <button class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
+            <button type="button" class="btn btn-primary" id="inviteSubmitBtn" onclick="doInviteInline()">Create Account</button>
           </div>
         </div>` : ''}
 
@@ -1814,9 +1816,9 @@ function renderTeamListFiltered() {
         ${(() => {
           const safeName = JSON.stringify(u.name)
           return isAdmin ? `
-        <button class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
-        <button class="btn btn-ghost btn-sm" onclick='getResetLink("${u.id}", ${safeName})'>Reset link</button>
-        ${u.id !== cfg.user.id ? `<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
+        <button type="button" class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick='getResetLink("${u.id}", ${safeName})'>Reset link</button>
+        ${u.id !== cfg.user.id ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
         ` : ''
         })()}
       </div>
@@ -2384,8 +2386,8 @@ async function getResetLink(id, name) {
         </div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-secondary" id="reset-link-close">Close</button>
-        <button class="btn btn-primary" id="reset-link-copy" style="display:none">
+        <button type="button" class="btn btn-secondary" id="reset-link-close">Close</button>
+        <button type="button" class="btn btn-primary" id="reset-link-copy" style="display:none">
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           Copy Link
         </button>
