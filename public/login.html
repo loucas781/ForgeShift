@@ -88,6 +88,10 @@
 </div>
 
 <script>
+  function getStoredTheme() {
+    try { return localStorage.getItem('fs-theme') || 'system' } catch { return 'system' }
+  }
+
   // Remember login details toggle
   function onRememberChange(cb) {
     const knob = document.getElementById('rememberKnob')
@@ -96,8 +100,10 @@
     knob.style.transform = cb.checked ? 'translateX(16px)' : 'translateX(0)'
     warning.style.display = cb.checked ? 'flex' : 'none'
     if (!cb.checked) {
-      localStorage.removeItem('fs-saved-email')
-      localStorage.removeItem('fs-saved-password')
+      try {
+        localStorage.removeItem('fs-saved-email')
+        localStorage.removeItem('fs-saved-password')
+      } catch {}
     }
   }
 
@@ -138,14 +144,12 @@
     runtimeIcon.setAttribute('href', href)
   }
 
-  let t = 'system'
-  try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
+  let t = getStoredTheme()
   applyAuthThemeAndIcons(t);
   (function() {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const onThemeChange = () => {
-        let liveTheme = 'system'
-        try { liveTheme = localStorage.getItem('fs-theme') || 'system' } catch {}
+        const liveTheme = getStoredTheme()
         if (liveTheme === 'system') applyAuthThemeAndIcons('system')
       }
       if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
@@ -192,8 +196,10 @@
       if (d.appEnv === 'development') {
         document.getElementById('rememberRow').style.display = 'none'
         document.getElementById('rememberWarning').style.display = 'none'
-        localStorage.removeItem('fs-saved-email')
-        localStorage.removeItem('fs-saved-password')
+        try {
+          localStorage.removeItem('fs-saved-email')
+          localStorage.removeItem('fs-saved-password')
+        } catch {}
       }
       // Update forgot-password link hint based on SMTP
       const fpLink = document.getElementById('forgotPwLink')
@@ -294,11 +300,15 @@
       const d = await readJsonOrText(r)
       if (!r.ok) { err.textContent = d.error || `Login failed (${r.status})`; err.classList.add('show'); return }
       if (document.getElementById('rememberToggle').checked) {
-        localStorage.setItem('fs-saved-email', email)
-        localStorage.setItem('fs-saved-password', password)
+        try {
+          localStorage.setItem('fs-saved-email', email)
+          localStorage.setItem('fs-saved-password', password)
+        } catch {}
       } else {
-        localStorage.removeItem('fs-saved-email')
-        localStorage.removeItem('fs-saved-password')
+        try {
+          localStorage.removeItem('fs-saved-email')
+          localStorage.removeItem('fs-saved-password')
+        } catch {}
       }
       if (d.requiresTOTP) {
         _pendingToken = d.pendingToken

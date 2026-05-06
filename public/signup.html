@@ -17,7 +17,8 @@
   <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
   <script>
     (function(){
-      var t = localStorage.getItem('fs-theme') || 'system'
+      var t = 'system'
+      try { t = localStorage.getItem('fs-theme') || 'system' } catch {}
       if (t === 'system') { if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme','dark') }
       else if (t !== 'light') document.documentElement.setAttribute('data-theme', t)
     })()
@@ -89,6 +90,10 @@
   </div>
 </div>
 <script>
+  function getStoredTheme() {
+    try { return localStorage.getItem('fs-theme') || 'system' } catch { return 'system' }
+  }
+
   async function readJsonOrText(response) {
     if (response.status === 204) return {}
     const text = await response.text()
@@ -132,12 +137,12 @@
 
   // Attach live indicator
   ;(function setupAuthThemeWatcher() {
-    const theme = localStorage.getItem('fs-theme') || 'system'
+    const theme = getStoredTheme()
     applyAuthThemeAndIcons(theme)
     (function() {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const onThemeChange = () => {
-        const liveTheme = localStorage.getItem('fs-theme') || 'system'
+        const liveTheme = getStoredTheme()
         if (liveTheme === 'system') applyAuthThemeAndIcons('system')
       }
       if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onThemeChange)
