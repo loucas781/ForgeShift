@@ -62,6 +62,19 @@ function initCollapsibleSections(containerSelector) {
 }
 'use strict'
 
+function safeLocalStorageGet(key, fallback = null) {
+  try {
+    const value = localStorage.getItem(key)
+    return value == null ? fallback : value
+  } catch {
+    return fallback
+  }
+}
+
+function safeLocalStorageSet(key, value) {
+  try { localStorage.setItem(key, value) } catch {}
+}
+
 // ── Config ─────────────────────────────────────────────────────────────────────
 let _config = null
 
@@ -113,7 +126,7 @@ async function loadConfig() {
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 function applyTheme(theme) {
-  localStorage.setItem('fs-theme', theme)
+  safeLocalStorageSet('fs-theme', theme)
   if (theme === 'system') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
@@ -127,13 +140,13 @@ function applyTheme(theme) {
 }
 
 function getTheme() {
-  return localStorage.getItem('fs-theme') || 'system'
+  return safeLocalStorageGet('fs-theme', 'system') || 'system'
 }
 
 // Apply theme immediately (called inline on every page — no flash)
 ;(function() {
   _syncStandaloneClass()
-  const t = localStorage.getItem('fs-theme') || 'system'
+  const t = getTheme()
   if (t === 'system') {
     if (window.matchMedia('(prefers-color-scheme: dark)').matches)
       document.documentElement.setAttribute('data-theme', 'dark')
@@ -145,7 +158,7 @@ function getTheme() {
   _applyAppIconTheme(t)
   // Watch for OS-level changes when in system mode
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if ((localStorage.getItem('fs-theme') || 'system') === 'system') {
+    if (getTheme() === 'system') {
       document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '')
       if (!e.matches) document.documentElement.removeAttribute('data-theme')
       _applyAppIconTheme('system')
