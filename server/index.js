@@ -482,16 +482,23 @@ app.post('/api/config/email/test', requireAuth, async (req, res) => {
 })
 
 // ── Page routing ──────────────────────────────────────────────────────────────
-app.get('/login.html',           (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))
-app.get('/signup.html',          (req, res) => res.sendFile(path.join(__dirname, '../public/signup.html')))
-app.get('/forgot-password.html', (req, res) => res.sendFile(path.join(__dirname, '../public/forgot-password.html')))
-app.get('/reset-password.html',  (req, res) => res.sendFile(path.join(__dirname, '../public/reset-password.html')))
+function sendPage(res, file) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+  res.sendFile(path.join(__dirname, '../public', file))
+}
 
-app.get(['/', '/index.html'],    requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')))
-app.get('/calendar.html',        requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/calendar.html')))
-app.get('/templates.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/templates.html')))
-app.get('/profile.html',         requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/profile.html')))
-app.get('/settings.html',        requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/settings.html')))
+app.get('/login.html',           (req, res) => sendPage(res, 'login.html'))
+app.get('/signup.html',          (req, res) => sendPage(res, 'signup.html'))
+app.get('/forgot-password.html', (req, res) => sendPage(res, 'forgot-password.html'))
+app.get('/reset-password.html',  (req, res) => sendPage(res, 'reset-password.html'))
+
+app.get(['/', '/index.html'],    requireAuth, (req, res) => sendPage(res, 'index.html'))
+app.get('/calendar.html',        requireAuth, (req, res) => sendPage(res, 'calendar.html'))
+app.get('/templates.html',       requireAuth, (req, res) => sendPage(res, 'templates.html'))
+app.get('/profile.html',         requireAuth, (req, res) => sendPage(res, 'profile.html'))
+app.get('/settings.html',        requireAuth, (req, res) => sendPage(res, 'settings.html'))
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
