@@ -146,13 +146,14 @@ function createSession(req, userId) {
 
 function getPublicOrigin(req) {
   const configured = String(process.env.APP_URL || '').trim().replace(/\/+$/, '')
+  if (configured) return configured
+
   const forwardedHost = String(req.headers?.['x-forwarded-host'] || '').split(',')[0].trim()
   const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim()
   const host = forwardedHost || String(req.headers?.host || '').trim()
   const proto = forwardedProto || req.protocol || (req.secure ? 'https' : 'http')
 
   if (host) return `${proto}://${host}`
-  if (configured) return configured
   return `http://localhost:${process.env.PORT || 3000}`
 }
 
