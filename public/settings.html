@@ -556,6 +556,7 @@ let cfg = null, users = [], locations = [], orgs = []
 let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
 let euPwIndicator = null
 let isAdmin = false, isManager = false, isShiftLead = false
+let resetLinkDelegatedBound = false
 
 async function init() {
   cfg = await loadConfig()
@@ -567,6 +568,7 @@ async function init() {
   isAdmin = cfg.user.role === 'admin'
   isManager = cfg.user.role === 'manager'
   isShiftLead = cfg.user.role === 'shift_lead'
+  bindResetLinkDelegatedHandler()
 
   const ALL_TABS = [
     { id: 'appearance', label: 'Appearance', roles: ['admin','manager','shift_lead','member'],
@@ -1825,7 +1827,6 @@ function renderTeamListFiltered() {
           data-user-id="${u.id}"
           data-user-name="${encName}"
           data-user-email="${encEmail}"
-          onclick="openResetLinkFromButton(this)"
         >Reset link</button>
         ${u.id !== cfg.user.id ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
         ` : ''
@@ -1833,6 +1834,19 @@ function renderTeamListFiltered() {
       </div>
     </div>`).join('')
 
+}
+
+function bindResetLinkDelegatedHandler() {
+  if (resetLinkDelegatedBound) return
+  document.addEventListener('click', (event) => {
+    const btn = event.target && event.target.closest
+      ? event.target.closest('.js-reset-link')
+      : null
+    if (!btn) return
+    event.preventDefault()
+    openResetLinkFromButton(btn)
+  })
+  resetLinkDelegatedBound = true
 }
 
 function openResetLinkFromButton(btn) {
