@@ -145,7 +145,8 @@ function createSession(req, userId) {
 }
 
 function getPublicOrigin(req) {
-  const configured = String(process.env.APP_URL || '').trim().replace(/\/+$/, '')
+  const overrides = loadOverrides()
+  const configured = String(overrides.APP_URL || process.env.APP_URL || '').trim().replace(/\/+$/, '')
   if (configured) return configured
 
   const forwardedHost = String(req.headers?.['x-forwarded-host'] || '').split(',')[0].trim()
