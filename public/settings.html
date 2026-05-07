@@ -1825,6 +1825,7 @@ function renderTeamListFiltered() {
           data-user-id="${u.id}"
           data-user-name="${encName}"
           data-user-email="${encEmail}"
+          onclick="openResetLinkFromButton(this)"
         >Reset link</button>
         ${u.id !== cfg.user.id ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
         ` : ''
@@ -1832,14 +1833,14 @@ function renderTeamListFiltered() {
       </div>
     </div>`).join('')
 
-  el.querySelectorAll('.js-reset-link').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const userId = btn.getAttribute('data-user-id') || ''
-      const userName = decodeURIComponent(btn.getAttribute('data-user-name') || '')
-      const userEmail = decodeURIComponent(btn.getAttribute('data-user-email') || '')
-      getResetLink(userId, userName, userEmail)
-    })
-  })
+}
+
+function openResetLinkFromButton(btn) {
+  if (!btn) return
+  const userId = btn.getAttribute('data-user-id') || ''
+  const userName = decodeURIComponent(btn.getAttribute('data-user-name') || '')
+  const userEmail = decodeURIComponent(btn.getAttribute('data-user-email') || '')
+  getResetLink(userId, userName, userEmail)
 }
 
 async function loadSettingsTeams() {
