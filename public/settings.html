@@ -2431,6 +2431,7 @@ async function getResetLink(id, name, email) {
       </div>
     </div>`
   document.body.appendChild(modal)
+  modal.classList.add('open')
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
   document.getElementById('reset-link-close').addEventListener('click', () => modal.remove())
   try {
