@@ -1817,7 +1817,7 @@ function renderTeamListFiltered() {
           const safeName = JSON.stringify(u.name)
           return isAdmin ? `
         <button type="button" class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick='getResetLink("${u.id}", ${safeName})'>Reset link</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick='getResetLink("${u.id}", ${safeName}, ${JSON.stringify(u.email || "")})'>Reset link</button>
         ${u.id !== cfg.user.id ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
         ` : ''
         })()}
@@ -2367,7 +2367,7 @@ async function saveEditUser() {
   } catch (err) { toast(err.message, 'error') }
 }
 
-async function getResetLink(id, name) {
+async function getResetLink(id, name, email) {
 
   const existing = document.getElementById('reset-link-modal')
   if (existing) existing.remove()
@@ -2378,15 +2378,20 @@ async function getResetLink(id, name) {
   modal.innerHTML = `
     <div style="background:var(--surface);border-radius:var(--r-xl);padding:24px;width:100%;max-width:440px;box-shadow:0 24px 80px rgba(9,30,66,.3)">
       <div style="font-size:16px;font-weight:700;margin-bottom:4px">Password Reset Link</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">Generating a secure reset link for <strong>${escHtml(name)}</strong>. The link expires in <strong>15 minutes</strong>.</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+        Generate a secure reset link for <strong>${escHtml(name)}</strong> (${escHtml(email || 'No email')}).<br>
+        This link expires in <strong>15 minutes</strong> and can only be used once.
+      </div>
       <div id="reset-link-result" style="margin:14px 0;font-size:13px;color:var(--text-2)">
         <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
           <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
           Generating…
         </div>
       </div>
+      <div id="reset-link-email-msg" style="display:none;margin-top:10px;font-size:12px;padding:10px 12px;border-radius:var(--r-md)"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" class="btn btn-secondary" id="reset-link-close">Close</button>
+        <button type="button" class="btn btn-secondary" id="reset-link-send" style="display:none">Send to user</button>
         <button type="button" class="btn btn-primary" id="reset-link-copy" style="display:none">
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           Copy Link
@@ -2397,6 +2402,7 @@ async function getResetLink(id, name) {
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
   document.getElementById('reset-link-close').addEventListener('click', () => modal.remove())
   try {
+    const appCfg = await api('/api/config')
     const r = await api(`/api/auth/admin/reset-link/${id}`)
     const resultEl = document.getElementById('reset-link-result')
     resultEl.innerHTML = `
@@ -2412,6 +2418,31 @@ async function getResetLink(id, name) {
         }, 2000)
       })
     })
+
+    const sendBtn = document.getElementById('reset-link-send')
+    const sendMsg = document.getElementById('reset-link-email-msg')
+    if (appCfg && appCfg.smtpEnabled) {
+      sendBtn.style.display = 'flex'
+      sendBtn.addEventListener('click', async () => {
+        sendBtn.disabled = true
+        sendBtn.textContent = 'Sending...'
+        sendMsg.style.display = 'none'
+        try {
+          const sent = await api(`/api/auth/admin/reset-link/${id}/send`, { method: 'POST' })
+          sendMsg.style.display = 'block'
+          sendMsg.style.cssText = 'display:block;margin-top:10px;font-size:12px;padding:10px 12px;border-radius:var(--r-md);background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#065f46'
+          sendMsg.textContent = `Reset email sent to ${sent.sentTo}.`
+          toast('Reset email sent', 'success')
+        } catch (err) {
+          sendMsg.style.display = 'block'
+          sendMsg.style.cssText = 'display:block;margin-top:10px;font-size:12px;padding:10px 12px;border-radius:var(--r-md);background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);color:var(--red)'
+          sendMsg.textContent = err.message || 'Failed to send reset email.'
+        } finally {
+          sendBtn.disabled = false
+          sendBtn.textContent = 'Send to user'
+        }
+      })
+    }
   } catch (err) {
     document.getElementById('reset-link-result').innerHTML = `<span style="color:var(--red)">${escHtml(err.message)}</span>`
   }
@@ -3693,6 +3724,14 @@ async function renderEmailPanel() {
             <label class="form-label">From Address</label>
             <input class="form-input" id="smtpFromAddr" type="email" placeholder="noreply@yourcompany.com">
           </div>
+          <div class="form-group">
+            <label class="form-label">Reply-To (optional)</label>
+            <input class="form-input" id="smtpReplyTo" type="email" placeholder="support@yourcompany.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Test Recipient</label>
+            <input class="form-input" id="smtpTestTo" type="email" placeholder="you@yourcompany.com">
+          </div>
         </div>
         <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="saveSmtp()">Save</button>
@@ -3746,6 +3785,8 @@ async function renderEmailPanel() {
     document.getElementById('smtpPass').value     = cfg.hasPassword ? '••••••••' : ''
     document.getElementById('smtpFromName').value = cfg.smtpFromName
     document.getElementById('smtpFromAddr').value = cfg.smtpFromAddr
+    document.getElementById('smtpReplyTo').value  = cfg.smtpReplyTo || ''
+    document.getElementById('smtpTestTo').value   = cfg.smtpTestTo || ''
 
     const bar = document.getElementById('smtpStatusBar')
     bar.style.display = 'flex'
@@ -3791,6 +3832,8 @@ async function saveSmtp() {
       smtpPass:     pass === '••••••••' ? undefined : pass,
       smtpFromName: document.getElementById('smtpFromName').value.trim(),
       smtpFromAddr: document.getElementById('smtpFromAddr').value.trim(),
+      smtpReplyTo:  document.getElementById('smtpReplyTo').value.trim(),
+      smtpTestTo:   document.getElementById('smtpTestTo').value.trim(),
     }})
     smtpMsg('✓ SMTP configuration saved.', true)
     toast('SMTP saved', 'success')
@@ -3802,7 +3845,10 @@ async function saveSmtp() {
 async function testSmtp() {
   smtpMsg('Sending test email…', true)
   try {
-    const r = await api('/api/config/email/test', { method: 'POST' })
+    const r = await api('/api/config/email/test', { method: 'POST', body: {
+      testTo:  document.getElementById('smtpTestTo').value.trim(),
+      replyTo: document.getElementById('smtpReplyTo').value.trim(),
+    }})
     smtpMsg(`✓ Test email sent to ${r.sentTo}`, true)
     toast('Test email sent!', 'success')
   } catch (err) { smtpMsg(`✗ ${err.message}`, false) }
@@ -3810,7 +3856,15 @@ async function testSmtp() {
 
 async function clearSmtp() {
   if (!confirm('Clear all SMTP configuration? Password reset emails will stop working.')) return
-  await api('/api/config/email', { method: 'PATCH', body: { smtpHost: '', smtpUser: '', smtpPass: '', smtpFromName: '', smtpFromAddr: '' }})
+  await api('/api/config/email', { method: 'PATCH', body: {
+    smtpHost: '',
+    smtpUser: '',
+    smtpPass: '',
+    smtpFromName: '',
+    smtpFromAddr: '',
+    smtpReplyTo: '',
+    smtpTestTo: '',
+  }})
   toast('SMTP configuration cleared', 'success')
   renderEmailPanel()
 }

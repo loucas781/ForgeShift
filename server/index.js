@@ -438,6 +438,8 @@ app.get('/api/config/email', requireAuth, (req, res) => {
     smtpPass:     o.SMTP_PASS      ? '••••••••' : '',
     smtpFromName: o.SMTP_FROM_NAME || '',
     smtpFromAddr: o.SMTP_FROM_ADDR || '',
+    smtpReplyTo:  o.SMTP_REPLY_TO  || '',
+    smtpTestTo:   o.SMTP_TEST_TO   || '',
     hasPassword:  !!(o.SMTP_PASS),
     enabled:      !!(o.SMTP_HOST && o.SMTP_USER),
   })
@@ -447,13 +449,15 @@ app.get('/api/config/email', requireAuth, (req, res) => {
 app.patch('/api/config/email', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const o = loadOverrides()
-  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr } = req.body
+  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, smtpReplyTo, smtpTestTo } = req.body
   if (smtpHost     !== undefined) o.SMTP_HOST      = smtpHost.trim()
   if (smtpPort     !== undefined) o.SMTP_PORT      = String(smtpPort)
   if (smtpSecure   !== undefined) o.SMTP_SECURE    = smtpSecure ? 'true' : 'false'
   if (smtpUser     !== undefined) o.SMTP_USER      = smtpUser.trim()
   if (smtpFromName !== undefined) o.SMTP_FROM_NAME = smtpFromName.trim()
   if (smtpFromAddr !== undefined) o.SMTP_FROM_ADDR = smtpFromAddr.trim()
+  if (smtpReplyTo  !== undefined) o.SMTP_REPLY_TO  = smtpReplyTo.trim()
+  if (smtpTestTo   !== undefined) o.SMTP_TEST_TO   = smtpTestTo.trim()
   // Only overwrite password if a real value (not the masked placeholder) is provided
   if (smtpPass !== undefined && smtpPass !== '••••••••' && smtpPass !== '') o.SMTP_PASS = smtpPass
   if (smtpPass === '') delete o.SMTP_PASS
@@ -468,14 +472,22 @@ app.post('/api/config/email/test', requireAuth, async (req, res) => {
   if (!result.ok) return res.status(400).json({ error: result.error })
   const db   = require('./db/connection')
   const me   = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.user.id)
+  const o    = loadOverrides()
+  const to   = String(req.body?.testTo || o.SMTP_TEST_TO || me.email || '').trim()
+  const replyTo = String(req.body?.replyTo || o.SMTP_REPLY_TO || '').trim()
+  if (!to) return res.status(400).json({ error: 'Test recipient email is required.' })
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'Please enter a valid test recipient email.' })
+  if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return res.status(400).json({ error: 'Please enter a valid reply-to email.' })
   const appName = process.env.APP_NAME || 'ForgeShift'
-  await emailSvc.sendMail({
-    to: me.email,
+  const sent = await emailSvc.sendMail({
+    to,
+    replyTo,
     subject: `${appName} SMTP test — it works!`,
     html: `<p>Hi ${me.name},</p><p>Your ${appName} SMTP configuration is working correctly.</p>`,
     text: `Hi ${me.name}, your ${appName} SMTP configuration is working correctly.`,
   })
-  res.json({ ok: true, sentTo: me.email })
+  if (!sent.ok) return res.status(400).json({ error: sent.error || 'Failed to send test email.' })
+  res.json({ ok: true, sentTo: to, replyTo: replyTo || null })
 })
 
 // ── Page routing ──────────────────────────────────────────────────────────────
