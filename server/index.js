@@ -431,6 +431,7 @@ app.get('/api/config/email', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const o = loadOverrides()
   res.json({
+    publicAppUrl: o.APP_URL || process.env.APP_URL || '',
     smtpHost:     o.SMTP_HOST      || '',
     smtpPort:     o.SMTP_PORT      || '587',
     smtpSecure:   o.SMTP_SECURE    === 'true',
@@ -450,7 +451,18 @@ app.get('/api/config/email', requireAuth, (req, res) => {
 app.patch('/api/config/email', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const o = loadOverrides()
-  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, smtpReplyTo, smtpTestSubject, smtpTestMessage } = req.body
+  const { publicAppUrl, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, smtpReplyTo, smtpTestSubject, smtpTestMessage } = req.body
+  if (publicAppUrl !== undefined) {
+    const cleaned = String(publicAppUrl).trim().replace(/\/+$/, '')
+    if (cleaned) {
+      let parsed
+      try { parsed = new URL(cleaned) } catch { return res.status(400).json({ error: 'Public App URL must be a valid URL.' }) }
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return res.status(400).json({ error: 'Public App URL must start with http:// or https://.' })
+      }
+    }
+    o.APP_URL = cleaned
+  }
   if (smtpHost     !== undefined) o.SMTP_HOST      = smtpHost.trim()
   if (smtpPort     !== undefined) o.SMTP_PORT      = String(smtpPort)
   if (smtpSecure   !== undefined) o.SMTP_SECURE    = smtpSecure ? 'true' : 'false'
