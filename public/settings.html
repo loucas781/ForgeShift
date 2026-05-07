@@ -1815,14 +1815,31 @@ function renderTeamListFiltered() {
       <div class="member-actions">
         ${(() => {
           const safeName = JSON.stringify(u.name)
+          const encName = encodeURIComponent(u.name || '')
+          const encEmail = encodeURIComponent(u.email || '')
           return isAdmin ? `
         <button type="button" class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick='getResetLink("${u.id}", ${safeName}, ${JSON.stringify(u.email || "")})'>Reset link</button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm js-reset-link"
+          data-user-id="${u.id}"
+          data-user-name="${encName}"
+          data-user-email="${encEmail}"
+        >Reset link</button>
         ${u.id !== cfg.user.id ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteUser("${u.id}", ${safeName})'>Delete</button>` : ''}
         ` : ''
         })()}
       </div>
     </div>`).join('')
+
+  el.querySelectorAll('.js-reset-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const userId = btn.getAttribute('data-user-id') || ''
+      const userName = decodeURIComponent(btn.getAttribute('data-user-name') || '')
+      const userEmail = decodeURIComponent(btn.getAttribute('data-user-email') || '')
+      getResetLink(userId, userName, userEmail)
+    })
+  })
 }
 
 async function loadSettingsTeams() {
@@ -3729,8 +3746,12 @@ async function renderEmailPanel() {
             <input class="form-input" id="smtpReplyTo" type="email" placeholder="support@yourcompany.com">
           </div>
           <div class="form-group">
-            <label class="form-label">Test Recipient</label>
-            <input class="form-input" id="smtpTestTo" type="email" placeholder="you@yourcompany.com">
+            <label class="form-label">Test Email Subject</label>
+            <input class="form-input" id="smtpTestSubject" placeholder="ForgeShift SMTP test — it works!">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">Test Email Message</label>
+            <textarea class="form-input" id="smtpTestMessage" rows="4" placeholder="Hi, your SMTP configuration is working correctly." style="resize:vertical"></textarea>
           </div>
         </div>
         <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">
@@ -3786,7 +3807,8 @@ async function renderEmailPanel() {
     document.getElementById('smtpFromName').value = cfg.smtpFromName
     document.getElementById('smtpFromAddr').value = cfg.smtpFromAddr
     document.getElementById('smtpReplyTo').value  = cfg.smtpReplyTo || ''
-    document.getElementById('smtpTestTo').value   = cfg.smtpTestTo || ''
+    document.getElementById('smtpTestSubject').value = cfg.smtpTestSubject || ''
+    document.getElementById('smtpTestMessage').value = cfg.smtpTestMessage || ''
 
     const bar = document.getElementById('smtpStatusBar')
     bar.style.display = 'flex'
@@ -3833,7 +3855,8 @@ async function saveSmtp() {
       smtpFromName: document.getElementById('smtpFromName').value.trim(),
       smtpFromAddr: document.getElementById('smtpFromAddr').value.trim(),
       smtpReplyTo:  document.getElementById('smtpReplyTo').value.trim(),
-      smtpTestTo:   document.getElementById('smtpTestTo').value.trim(),
+      smtpTestSubject: document.getElementById('smtpTestSubject').value.trim(),
+      smtpTestMessage: document.getElementById('smtpTestMessage').value.trim(),
     }})
     smtpMsg('✓ SMTP configuration saved.', true)
     toast('SMTP saved', 'success')
@@ -3846,8 +3869,9 @@ async function testSmtp() {
   smtpMsg('Sending test email…', true)
   try {
     const r = await api('/api/config/email/test', { method: 'POST', body: {
-      testTo:  document.getElementById('smtpTestTo').value.trim(),
       replyTo: document.getElementById('smtpReplyTo').value.trim(),
+      subject: document.getElementById('smtpTestSubject').value.trim(),
+      message: document.getElementById('smtpTestMessage').value.trim(),
     }})
     smtpMsg(`✓ Test email sent to ${r.sentTo}`, true)
     toast('Test email sent!', 'success')
@@ -3863,7 +3887,8 @@ async function clearSmtp() {
     smtpFromName: '',
     smtpFromAddr: '',
     smtpReplyTo: '',
-    smtpTestTo: '',
+    smtpTestSubject: '',
+    smtpTestMessage: '',
   }})
   toast('SMTP configuration cleared', 'success')
   renderEmailPanel()
