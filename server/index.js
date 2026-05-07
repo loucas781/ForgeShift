@@ -439,7 +439,8 @@ app.get('/api/config/email', requireAuth, (req, res) => {
     smtpFromName: o.SMTP_FROM_NAME || '',
     smtpFromAddr: o.SMTP_FROM_ADDR || '',
     smtpReplyTo:  o.SMTP_REPLY_TO  || '',
-    smtpTestTo:   o.SMTP_TEST_TO   || '',
+    smtpTestSubject: o.SMTP_TEST_SUBJECT || '',
+    smtpTestMessage: o.SMTP_TEST_MESSAGE || '',
     hasPassword:  !!(o.SMTP_PASS),
     enabled:      !!(o.SMTP_HOST && o.SMTP_USER),
   })
@@ -449,7 +450,7 @@ app.get('/api/config/email', requireAuth, (req, res) => {
 app.patch('/api/config/email', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const o = loadOverrides()
-  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, smtpReplyTo, smtpTestTo } = req.body
+  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, smtpReplyTo, smtpTestSubject, smtpTestMessage } = req.body
   if (smtpHost     !== undefined) o.SMTP_HOST      = smtpHost.trim()
   if (smtpPort     !== undefined) o.SMTP_PORT      = String(smtpPort)
   if (smtpSecure   !== undefined) o.SMTP_SECURE    = smtpSecure ? 'true' : 'false'
@@ -457,7 +458,8 @@ app.patch('/api/config/email', requireAuth, (req, res) => {
   if (smtpFromName !== undefined) o.SMTP_FROM_NAME = smtpFromName.trim()
   if (smtpFromAddr !== undefined) o.SMTP_FROM_ADDR = smtpFromAddr.trim()
   if (smtpReplyTo  !== undefined) o.SMTP_REPLY_TO  = smtpReplyTo.trim()
-  if (smtpTestTo   !== undefined) o.SMTP_TEST_TO   = smtpTestTo.trim()
+  if (smtpTestSubject !== undefined) o.SMTP_TEST_SUBJECT = String(smtpTestSubject).trim()
+  if (smtpTestMessage !== undefined) o.SMTP_TEST_MESSAGE = String(smtpTestMessage).trim()
   // Only overwrite password if a real value (not the masked placeholder) is provided
   if (smtpPass !== undefined && smtpPass !== '••••••••' && smtpPass !== '') o.SMTP_PASS = smtpPass
   if (smtpPass === '') delete o.SMTP_PASS
@@ -473,18 +475,20 @@ app.post('/api/config/email/test', requireAuth, async (req, res) => {
   const db   = require('./db/connection')
   const me   = db.prepare('SELECT name, email FROM users WHERE id = ?').get(req.user.id)
   const o    = loadOverrides()
-  const to   = String(req.body?.testTo || o.SMTP_TEST_TO || me.email || '').trim()
+  const to   = String(me.email || '').trim()
   const replyTo = String(req.body?.replyTo || o.SMTP_REPLY_TO || '').trim()
-  if (!to) return res.status(400).json({ error: 'Test recipient email is required.' })
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'Please enter a valid test recipient email.' })
+  const subject = String(req.body?.subject || o.SMTP_TEST_SUBJECT || `${process.env.APP_NAME || 'ForgeShift'} SMTP test — it works!`).trim()
+  const message = String(req.body?.message || o.SMTP_TEST_MESSAGE || `Hi ${me.name}, your ${(process.env.APP_NAME || 'ForgeShift')} SMTP configuration is working correctly.`).trim()
+  if (!to) return res.status(400).json({ error: 'Your admin account must have an email address.' })
   if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return res.status(400).json({ error: 'Please enter a valid reply-to email.' })
-  const appName = process.env.APP_NAME || 'ForgeShift'
+  if (!subject) return res.status(400).json({ error: 'Test email subject is required.' })
+  if (!message) return res.status(400).json({ error: 'Test email message is required.' })
   const sent = await emailSvc.sendMail({
     to,
     replyTo,
-    subject: `${appName} SMTP test — it works!`,
-    html: `<p>Hi ${me.name},</p><p>Your ${appName} SMTP configuration is working correctly.</p>`,
-    text: `Hi ${me.name}, your ${appName} SMTP configuration is working correctly.`,
+    subject,
+    html: `<p>${message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`,
+    text: message,
   })
   if (!sent.ok) return res.status(400).json({ error: sent.error || 'Failed to send test email.' })
   res.json({ ok: true, sentTo: to, replyTo: replyTo || null })
