@@ -15,6 +15,7 @@ function getSmtpConfig() {
     pass:     o.SMTP_PASS      || '',
     fromName: o.SMTP_FROM_NAME || process.env.APP_NAME || 'ForgeShift',
     fromAddr: o.SMTP_FROM_ADDR || o.SMTP_USER || '',
+    replyTo:  o.SMTP_REPLY_TO  || '',
     enabled:  !!(o.SMTP_HOST && o.SMTP_USER),
   }
 }
@@ -30,12 +31,15 @@ async function createTransport() {
   })
 }
 
-async function sendMail({ to, subject, html, text }) {
+async function sendMail({ to, subject, html, text, replyTo }) {
   try {
     const transport = await createTransport()
     if (!transport) return { ok: false, error: 'SMTP not configured' }
     const cfg = getSmtpConfig()
-    await transport.sendMail({ from: `"${cfg.fromName}" <${cfg.fromAddr}>`, to, subject, html, text })
+    const mail = { from: `"${cfg.fromName}" <${cfg.fromAddr}>`, to, subject, html, text }
+    const resolvedReplyTo = String(replyTo || cfg.replyTo || '').trim()
+    if (resolvedReplyTo) mail.replyTo = resolvedReplyTo
+    await transport.sendMail(mail)
     return { ok: true }
   } catch (err) {
     logger.error('[email] send error:', err.message)
@@ -79,16 +83,33 @@ function baseTemplate(title, bodyHtml, appName = 'ForgeShift') {
 async function sendPasswordReset({ to, name, resetUrl }) {
   const appName = getSmtpConfig().fromName
   const html = baseTemplate('Reset your password', `
-    <h2 style="margin:0 0 8px;font-size:22px;color:#111827">Reset your password</h2>
-    <p style="color:#6b7280;font-size:14px;margin:0 0 24px">Hi ${name}, a password reset was requested for your ${appName} account.</p>
-    <table cellpadding="0" cellspacing="0" style="margin-bottom:24px">
-      <tr><td style="background:#4f46e5;border-radius:6px;padding:12px 28px">
-        <a href="${resetUrl}" style="color:#fff;font-size:14px;font-weight:600;text-decoration:none">Reset Password</a>
-      </td></tr>
+    <div style="margin-bottom:18px">
+      <h2 style="margin:0 0 8px;font-size:24px;line-height:1.25;color:#111827;letter-spacing:-.02em">Reset your password</h2>
+      <p style="color:#4b5563;font-size:15px;line-height:1.55;margin:0">Hi ${name}, we received a request to reset your ${appName} password.</p>
+    </div>
+
+    <div style="margin:0 0 24px;padding:14px 16px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;color:#3730a3;font-size:13px;line-height:1.5">
+      For your security, this link expires in <strong>15 minutes</strong> and can only be used once.
+    </div>
+
+    <table cellpadding="0" cellspacing="0" style="margin:0 0 24px">
+      <tr>
+        <td style="background:#4f46e5;border-radius:8px;padding:0">
+          <a href="${resetUrl}" style="display:inline-block;padding:13px 26px;color:#ffffff;font-size:15px;font-weight:700;letter-spacing:.01em;text-decoration:none">
+            Reset Password
+          </a>
+        </td>
+      </tr>
     </table>
-    <p style="color:#6b7280;font-size:13px;margin:0 0 8px">Or copy this link into your browser:</p>
-    <p style="color:#4f46e5;font-size:12px;word-break:break-all;margin:0 0 24px">${resetUrl}</p>
-    <p style="color:#6b7280;font-size:12px;margin:0;border-top:1px solid #e5e7eb;padding-top:16px">This link expires in <strong>15 minutes</strong>.</p>
+
+    <div style="margin:0 0 22px;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb">
+      <p style="margin:0 0 8px;color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Manual link</p>
+      <p style="margin:0;color:#4f46e5;font-size:12px;line-height:1.5;word-break:break-all">${resetUrl}</p>
+    </div>
+
+    <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.55;border-top:1px solid #e5e7eb;padding-top:16px">
+      If you didn't request a password reset, you can safely ignore this email.
+    </p>
   `, appName)
   return sendMail({ to, subject: `Reset your ${appName} password`, html,
     text: `Hi ${name},\n\nReset your password here:\n${resetUrl}\n\nThis link expires in 15 minutes.\n\n— ${appName}` })

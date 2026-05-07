@@ -443,6 +443,37 @@ router.get('/admin/reset-link/:userId', requireAuth, async (req, res) => {
   } catch (err) { logger.error('admin reset-link:', err.message); res.status(500).json({ error: 'Server error' }) }
 })
 
+// ── POST /api/auth/admin/reset-link/:userId/send ─────────────────────────────
+// Admin-only. Generates a one-time reset URL and emails it directly to the user.
+router.post('/admin/reset-link/:userId/send', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  try {
+    const smtp = emailSvc.getSmtpConfig()
+    if (!smtp.enabled) return res.status(400).json({ error: 'SMTP is not configured.' })
+
+    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(req.params.userId)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(user.id)
+    const rawToken  = crypto.randomBytes(32).toString('hex')
+    const tokenHash = hashToken(rawToken)
+    const expires   = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    db.prepare('INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES (?,?,?,?)')
+      .run(uuidv4(), user.id, tokenHash, expires)
+
+    const origin   = getPublicOrigin(req)
+    const resetUrl = `${origin}/reset-password.html?token=${rawToken}`
+    const sent = await emailSvc.sendPasswordReset({ to: user.email, name: user.name, resetUrl })
+    if (!sent.ok) return res.status(400).json({ error: sent.error || 'Failed to send reset email.' })
+
+    audit(req.user.id, 'user.admin_reset_link', 'user', user.id, user.name, { delivery: 'email' })
+    res.json({ ok: true, sentTo: user.email })
+  } catch (err) {
+    logger.error('admin reset-link/send:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 // ── GET /api/auth/reset-password/validate ─────────────────────────────────────
 // Validates + immediately consumes the URL token. Issues a 5-min session key.
 router.get('/reset-password/validate', async (req, res) => {
