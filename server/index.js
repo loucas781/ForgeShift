@@ -441,7 +441,7 @@ app.use('/api/backup',           requireAuth, blockApiDuringMaintenance, require
 app.use('/api/tasks',            requireAuth, blockApiDuringMaintenance, require('./routes/tasks'))
 app.use('/api/task-list-groups', requireAuth, blockApiDuringMaintenance, require('./routes/task-list-groups'))
 app.use('/api/holidays',         requireAuth, blockApiDuringMaintenance, require('./routes/holidays'))
-app.use('/api/passkeys',         requireAuth, blockApiDuringMaintenance, require('./routes/passkeys'))
+app.use('/api/passkeys',         require('./routes/passkeys'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {
