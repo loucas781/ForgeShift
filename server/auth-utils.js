@@ -13,11 +13,78 @@
 
 const crypto = require('crypto')
 const bcrypt = require('bcryptjs')
+const db     = require('./db/connection')
 
 const BCRYPT_ROUNDS = 12
 
-function getPepper()    { return process.env.PASSWORD_PEPPER     || '' }
-function getOldPepper() { return process.env.PASSWORD_PEPPER_OLD || null }
+let cachedPepper = null
+let cachedOldPeppers = null
+
+function readStoredPepper() {
+  try {
+    const row = db.prepare("SELECT value FROM app_preferences WHERE key = 'security_password_pepper'").get()
+    return row?.value ? String(row.value) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredPepper(pepper) {
+  try {
+    db.prepare(`
+      INSERT INTO app_preferences (key, value, updated_at)
+      VALUES ('security_password_pepper', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+    `).run(pepper)
+  } catch {
+    // Ignore write failures and continue using in-memory/env fallback.
+  }
+}
+
+function parseOldPeppers(raw) {
+  return String(raw || '')
+    .split(',')
+    .map(p => p.trim())
+    .filter(Boolean)
+}
+
+function getPepper() {
+  if (cachedPepper !== null) return cachedPepper
+
+  const stored = readStoredPepper()
+  if (stored) {
+    cachedPepper = stored
+    return cachedPepper
+  }
+
+  const envPepper = String(process.env.PASSWORD_PEPPER || '').trim()
+  if (envPepper) {
+    writeStoredPepper(envPepper)
+    cachedPepper = envPepper
+    return cachedPepper
+  }
+
+  // Last-resort bootstrap for misconfigured instances.
+  const generated = crypto.randomBytes(32).toString('hex')
+  writeStoredPepper(generated)
+  cachedPepper = generated
+  return cachedPepper
+}
+
+function getOldPeppers() {
+  if (cachedOldPeppers !== null) return cachedOldPeppers
+
+  const active = getPepper()
+  const envCurrent = String(process.env.PASSWORD_PEPPER || '').trim()
+  const envOld = parseOldPeppers(process.env.PASSWORD_PEPPER_OLD)
+
+  cachedOldPeppers = [envCurrent, ...envOld]
+    .filter(Boolean)
+    .filter((pepper, idx, arr) => arr.indexOf(pepper) === idx)
+    .filter(pepper => pepper !== active)
+
+  return cachedOldPeppers
+}
 
 function applyPepper(password, pepper) {
   if (!pepper) return password
@@ -33,10 +100,12 @@ async function comparePassword(password, storedHash) {
   const peppered = applyPepper(password, getPepper())
   if (await bcrypt.compare(peppered, storedHash)) return { ok: true, needsRehash: false }
 
-  const oldPepper = getOldPepper()
-  if (oldPepper) {
+  const oldPeppers = getOldPeppers()
+  for (const oldPepper of oldPeppers) {
     const oldPeppered = applyPepper(password, oldPepper)
-    if (await bcrypt.compare(oldPeppered, storedHash)) return { ok: true, needsRehash: true }
+    if (await bcrypt.compare(oldPeppered, storedHash)) {
+      return { ok: true, needsRehash: true }
+    }
   }
 
   return { ok: false, needsRehash: false }

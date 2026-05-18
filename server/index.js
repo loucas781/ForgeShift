@@ -29,6 +29,11 @@ function saveOverrides(data) {
 const _overrides = loadOverrides()
 Object.entries(_overrides).forEach(([k, v]) => { process.env[k] = String(v) })
 
+function isMaintenanceModeEnabled() {
+  const overrides = loadOverrides()
+  return String(overrides.MAINTENANCE_MODE || 'false') === 'true'
+}
+
 // ─── Version ──────────────────────────────────────────────────────────────────
 const versionFile = path.join(__dirname, '../.version')
 const rawVersion  = fs.existsSync(versionFile)
@@ -171,6 +176,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     platform:       process.platform,
     user,
     allowSignup:        (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
+    maintenanceMode:    (overrides.MAINTENANCE_MODE ?? 'false') === 'true',
     cookieSecure:       process.env.COOKIE_SECURE === 'true',
     trustProxy:         process.env.TRUST_PROXY   === 'true',
     passwordPolicy:     getPasswordPolicy(overrides),
@@ -236,6 +242,7 @@ app.patch('/api/config', requireAuth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const overrides = loadOverrides()
   if (typeof req.body.allowSignup === 'boolean')  overrides.ALLOW_SIGNUP   = req.body.allowSignup  ? 'true' : 'false'
+  if (typeof req.body.maintenanceMode === 'boolean') overrides.MAINTENANCE_MODE = req.body.maintenanceMode ? 'true' : 'false'
   if (typeof req.body.cookieSecure === 'boolean') {
     overrides.COOKIE_SECURE = req.body.cookieSecure ? 'true' : 'false'
     process.env.COOKIE_SECURE = overrides.COOKIE_SECURE
@@ -260,6 +267,7 @@ app.patch('/api/config', requireAuth, (req, res) => {
   res.json({
     ok: true,
     allowSignup:       overrides.ALLOW_SIGNUP   !== 'false',
+    maintenanceMode:   overrides.MAINTENANCE_MODE === 'true',
     cookieSecure:      process.env.COOKIE_SECURE === 'true',
     trustProxy:        process.env.TRUST_PROXY   === 'true',
     inactivityTimeout: overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
@@ -411,20 +419,29 @@ app.get('/api/sse', requireAuth, (req, res) => {
 })
 
 // ── API Routes ─────────────────────────────────────────────────────────────────
+function blockApiDuringMaintenance(req, res, next) {
+  if (!isMaintenanceModeEnabled()) return next()
+  if (req.user?.role === 'admin') return next()
+  return res.status(503).json({
+    error: 'Maintenance mode is enabled. Access is currently limited to administrators.',
+    maintenanceMode: true,
+  })
+}
+
 app.use('/api/auth',             require('./routes/auth'))
-app.use('/api/users',            require('./routes/users'))
-app.use('/api/shifts',           require('./routes/shifts'))
-app.use('/api/templates',        require('./routes/templates'))
-app.use('/api/template-groups',  require('./routes/template-groups'))
-app.use('/api/locations',        require('./routes/locations'))
-app.use('/api/teams',            require('./routes/teams'))
-app.use('/api/organisations',    require('./routes/organisations'))
-app.use('/api/ical',             require('./routes/ical'))
-app.use('/api/backup',           require('./routes/backup'))
-app.use('/api/tasks',            require('./routes/tasks'))
-app.use('/api/task-list-groups', require('./routes/task-list-groups'))
-app.use('/api/holidays',         require('./routes/holidays'))
-app.use('/api/passkeys',         require('./routes/passkeys'))
+app.use('/api/users',            requireAuth, blockApiDuringMaintenance, require('./routes/users'))
+app.use('/api/shifts',           requireAuth, blockApiDuringMaintenance, require('./routes/shifts'))
+app.use('/api/templates',        requireAuth, blockApiDuringMaintenance, require('./routes/templates'))
+app.use('/api/template-groups',  requireAuth, blockApiDuringMaintenance, require('./routes/template-groups'))
+app.use('/api/locations',        requireAuth, blockApiDuringMaintenance, require('./routes/locations'))
+app.use('/api/teams',            requireAuth, blockApiDuringMaintenance, require('./routes/teams'))
+app.use('/api/organisations',    requireAuth, blockApiDuringMaintenance, require('./routes/organisations'))
+app.use('/api/ical',             requireAuth, blockApiDuringMaintenance, require('./routes/ical'))
+app.use('/api/backup',           requireAuth, blockApiDuringMaintenance, require('./routes/backup'))
+app.use('/api/tasks',            requireAuth, blockApiDuringMaintenance, require('./routes/tasks'))
+app.use('/api/task-list-groups', requireAuth, blockApiDuringMaintenance, require('./routes/task-list-groups'))
+app.use('/api/holidays',         requireAuth, blockApiDuringMaintenance, require('./routes/holidays'))
+app.use('/api/passkeys',         requireAuth, blockApiDuringMaintenance, require('./routes/passkeys'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {
@@ -514,16 +531,30 @@ function sendPage(res, file) {
   res.sendFile(path.join(__dirname, '../public', file))
 }
 
+function sendMaintenancePage(res) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+  res.status(503).sendFile(path.join(__dirname, '../public', 'maintenance.html'))
+}
+
+function requirePageAccess(req, res, next) {
+  if (isMaintenanceModeEnabled() && req.user?.role !== 'admin') {
+    return sendMaintenancePage(res)
+  }
+  next()
+}
+
 app.get('/login.html',           (req, res) => sendPage(res, 'login.html'))
 app.get('/signup.html',          (req, res) => sendPage(res, 'signup.html'))
 app.get('/forgot-password.html', (req, res) => sendPage(res, 'forgot-password.html'))
 app.get('/reset-password.html',  (req, res) => sendPage(res, 'reset-password.html'))
 
-app.get(['/', '/index.html'],    requireAuth, (req, res) => sendPage(res, 'index.html'))
-app.get('/calendar.html',        requireAuth, (req, res) => sendPage(res, 'calendar.html'))
-app.get('/templates.html',       requireAuth, (req, res) => sendPage(res, 'templates.html'))
-app.get('/profile.html',         requireAuth, (req, res) => sendPage(res, 'profile.html'))
-app.get('/settings.html',        requireAuth, (req, res) => sendPage(res, 'settings.html'))
+app.get(['/', '/index.html'],    requireAuth, requirePageAccess, (req, res) => sendPage(res, 'index.html'))
+app.get('/calendar.html',        requireAuth, requirePageAccess, (req, res) => sendPage(res, 'calendar.html'))
+app.get('/templates.html',       requireAuth, requirePageAccess, (req, res) => sendPage(res, 'templates.html'))
+app.get('/profile.html',         requireAuth, requirePageAccess, (req, res) => sendPage(res, 'profile.html'))
+app.get('/settings.html',        requireAuth, requirePageAccess, (req, res) => sendPage(res, 'settings.html'))
 
 // Serve static assets after explicit page routes so HTML requests always use
 // the handlers above, which apply auth and no-store cache headers.
