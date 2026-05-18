@@ -5,6 +5,7 @@ const crypto = require('crypto')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const logger = require('../utils/logger')
+const { loadOverrides } = require('../utils/overrides')
 
 // ── GET /api/ical/token — get or create feed token for current user ───────────
 router.get('/token', requireAuth, (req, res) => {
@@ -14,13 +15,20 @@ router.get('/token', requireAuth, (req, res) => {
     db.prepare('INSERT INTO ical_tokens (id, user_id, token) VALUES (?,?,?)').run(uuidv4(), req.user.id, token)
     row = db.prepare('SELECT * FROM ical_tokens WHERE user_id = ?').get(req.user.id)
   }
-  // Derive base URL from the incoming request when behind a trusted reverse proxy,
-  // so the feed URL reflects the public HTTPS domain rather than the internal LAN address.
-  let base = process.env.APP_URL || 'http://localhost:3000'
-  if (process.env.TRUST_PROXY === 'true') {
-    const proto = req.headers['x-forwarded-proto'] || req.protocol
-    const host  = req.headers['x-forwarded-host']  || req.headers['host']
-    if (host) base = `${proto}://${host}`
+  // Build a public origin that matches reset-link behavior:
+  // 1) explicit APP_URL override (from Settings) wins
+  // 2) then forwarded host/proto from reverse proxy
+  // 3) then request host/protocol fallback
+  // 4) then localhost fallback
+  const overrides = loadOverrides()
+  const configured = String(overrides.APP_URL || process.env.APP_URL || '').trim().replace(/\/+$/, '')
+  let base = configured
+  if (!base) {
+    const forwardedHost = String(req.headers?.['x-forwarded-host'] || '').split(',')[0].trim()
+    const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim()
+    const host = forwardedHost || String(req.headers?.host || '').trim()
+    const proto = forwardedProto || req.protocol || (req.secure ? 'https' : 'http')
+    base = host ? `${proto}://${host}` : `http://localhost:${process.env.PORT || 3000}`
   }
   res.json({ token: row.token, feedUrl: `${base}/api/ical/feed/${row.token}.ics` })
 })
