@@ -436,7 +436,7 @@ app.use('/api/template-groups',  requireAuth, blockApiDuringMaintenance, require
 app.use('/api/locations',        requireAuth, blockApiDuringMaintenance, require('./routes/locations'))
 app.use('/api/teams',            requireAuth, blockApiDuringMaintenance, require('./routes/teams'))
 app.use('/api/organisations',    requireAuth, blockApiDuringMaintenance, require('./routes/organisations'))
-app.use('/api/ical',             requireAuth, blockApiDuringMaintenance, require('./routes/ical'))
+app.use('/api/ical',             require('./routes/ical'))
 app.use('/api/backup',           requireAuth, blockApiDuringMaintenance, require('./routes/backup'))
 app.use('/api/tasks',            requireAuth, blockApiDuringMaintenance, require('./routes/tasks'))
 app.use('/api/task-list-groups', requireAuth, blockApiDuringMaintenance, require('./routes/task-list-groups'))
