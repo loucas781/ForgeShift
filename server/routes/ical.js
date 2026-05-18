@@ -7,8 +7,51 @@ const { requireAuth } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
 
+function blockTokenDuringMaintenance(req, res, next) {
+  const overrides = loadOverrides()
+  if (String(overrides.MAINTENANCE_MODE || 'false') !== 'true') return next()
+  if (req.user?.role === 'admin') return next()
+  return res.status(503).json({
+    error: 'Maintenance mode is enabled. Access is currently limited to administrators.',
+    maintenanceMode: true,
+  })
+}
+
+function escapeIcalText(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\r?\n/g, '\\n')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+}
+
+function foldIcalLine(line) {
+  const max = 75
+  let out = ''
+  let current = ''
+  for (const char of String(line)) {
+    const next = current + char
+    if (Buffer.byteLength(next, 'utf8') > max) {
+      out += current + '\r\n '
+      current = char
+    } else {
+      current = next
+    }
+  }
+  return out + current
+}
+
+function sendIcal(res, lines, filename) {
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.send(lines.map(foldIcalLine).join('\r\n') + '\r\n')
+}
+
 // ── GET /api/ical/token — get or create feed token for current user ───────────
-router.get('/token', requireAuth, (req, res) => {
+router.get('/token', requireAuth, blockTokenDuringMaintenance, (req, res) => {
   let row = db.prepare('SELECT * FROM ical_tokens WHERE user_id = ?').get(req.user.id)
   if (!row) {
     const token = crypto.randomBytes(32).toString('hex')
@@ -34,7 +77,7 @@ router.get('/token', requireAuth, (req, res) => {
 })
 
 // ── DELETE /api/ical/token — regenerate token ─────────────────────────────────
-router.delete('/token', requireAuth, (req, res) => {
+router.delete('/token', requireAuth, blockTokenDuringMaintenance, (req, res) => {
   db.prepare('DELETE FROM ical_tokens WHERE user_id = ?').run(req.user.id)
   res.json({ ok: true })
 })
@@ -68,6 +111,10 @@ function addDaysToDateStr(dateStr, days) {
   const mm = String(dt.getMonth() + 1).padStart(2, '0')
   const dd = String(dt.getDate()).padStart(2, '0')
   return `${yy}-${mm}-${dd}`
+}
+
+function fmtUtcDT(date = new Date()) {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 }
 
 // Build a correct VTIMEZONE block for Europe/London.
@@ -126,13 +173,14 @@ router.get('/feed/:token', (req, res) => {
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       `PRODID:-//ForgeShift//NONSGML ${appName}//EN`,
-      `X-WR-CALNAME:${appName} - ${user.name}`,
+      `X-WR-CALNAME:${escapeIcalText(`${appName} - ${user.name}`)}`,
       'X-WR-TIMEZONE:Europe/London',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       ...buildVTimezone(),
     ]
 
+    const generatedAt = fmtUtcDT()
     for (const shift of shifts) {
       const isAllDay = !shift.start_time
 
@@ -174,22 +222,20 @@ router.get('/feed/:token', (req, res) => {
       if (shift.notes) desc.push(`Notes: ${shift.notes}`)
 
       cal.push('BEGIN:VEVENT')
-      cal.push(`UID:forgeshift-shift-${shift.id}@forgeshift`)
-      cal.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}Z`)
+      cal.push(`UID:forgeshift-shift-${escapeIcalText(shift.id)}@forgeshift`)
+      cal.push(`DTSTAMP:${generatedAt}`)
       cal.push(startProp)
-      cal.push(endProp)
-      cal.push(`SUMMARY:${summary}`)
-      if (desc.length) cal.push(`DESCRIPTION:${desc.join('\\n')}`)
-      if (shift.location_name) cal.push(`LOCATION:${shift.location_address || shift.location_name}`)
+      if (dtEnd !== dtStart) cal.push(endProp)
+      cal.push(`SUMMARY:${escapeIcalText(summary)}`)
+      if (desc.length) cal.push(`DESCRIPTION:${escapeIcalText(desc.join('\n'))}`)
+      if (shift.location_name) cal.push(`LOCATION:${escapeIcalText(shift.location_address || shift.location_name)}`)
       cal.push('END:VEVENT')
     }
 
     cal.push('END:VCALENDAR')
 
-    res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
-    res.setHeader('Content-Disposition', `attachment; filename="forgeshift-${user.name.replace(/\s+/g,'-').toLowerCase()}.ics"`)
-    res.setHeader('Cache-Control', 'no-cache, no-store')
-    res.send(cal.join('\r\n'))
+    const filenameName = user.name.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'calendar'
+    sendIcal(res, cal, `forgeshift-${filenameName}.ics`)
   } catch (err) {
     logger.error('ical feed:', err.message)
     res.status(500).end()
