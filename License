@@ -1,4 +1,4 @@
-PROPRIETARY SOFTWARE LICENCE
+FORGESHIFT WEB SOURCE-AVAILABLE SELF-HOSTING LICENCE
 
 Copyright (c) 2026 Louis Birch
 
@@ -6,23 +6,27 @@ All rights reserved.
 
 This software, including all source code, assets, documentation, designs, branding, and related materials, is the exclusive property of Louis Birch unless otherwise stated.
 
-No permission is granted to copy, modify, merge, publish, distribute, sublicense, sell, resell, lease, host, reverse engineer, decompile, or create derivative works from this software, in whole or in part, without prior written permission from the copyright holder.
+Permission is granted to use and self-host this software for personal use or internal business use only, subject to the terms of this licence.
 
-Access to this repository, source code, or application does not grant any ownership rights, licence rights, or usage rights except where explicitly authorised in writing by the copyright holder.
+You may deploy and operate this software on your own infrastructure for your own personal or internal organisational use.
+
+You may not copy, modify, merge, publish, distribute, sublicense, sell, resell, lease, rebrand, or create derivative works from this software, in whole or in part, without prior written permission from the copyright holder, except where required for ordinary installation, configuration, or self-hosted operation.
+
+You may not provide this software, or any modified version of it, as a hosted service, SaaS product, managed service, commercial platform, or competing product without prior written permission from the copyright holder.
 
 You may not use this software or any part of it to create, support, or operate a competing product, service, application, or platform.
 
-No permission is granted to host, deploy, operate, resell, or provide this software as a hosted service, SaaS product, or competing platform without prior written permission from the copyright holder.
-
 You may not remove, alter, or obscure any copyright, trademark, branding, or ownership notices included in this software.
 
-This software is provided “as is”, without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, non-infringement, availability, accuracy, or reliability.
+Access to this repository, source code, or application does not grant any ownership rights, copyright rights, trademark rights, or other intellectual property rights except the limited right to self-host and use the software as expressly permitted by this licence.
 
-The copyright holder shall not be liable for any claim, damages, losses, liabilities, costs, or expenses arising from the use of, misuse of, inability to use, or reliance on this software.
+This software is provided “as is”, without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, non-infringement, availability, accuracy, security, or reliability.
 
-Any unauthorised use, copying, modification, distribution, or commercial exploitation of this software is strictly prohibited and may result in legal action.
+The copyright holder shall not be liable for any claim, damages, losses, liabilities, costs, or expenses arising from the use of, misuse of, inability to use, hosting of, deployment of, or reliance on this software.
 
-For licensing enquiries or permission requests, contact:
+Any unauthorised copying, modification, redistribution, resale, rebranding, sublicensing, commercial exploitation, or provision of this software as a hosted service or competing platform is strictly prohibited and may result in legal action.
+
+For licensing enquiries, commercial use, redistribution permission, or hosted-service permission, contact:
 
 Louis Birch
 louis.birch@hotmail.com
