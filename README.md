@@ -129,6 +129,12 @@ Important values:
 - `proxmox/install/` - in-container install/bootstrap script
 - `.github/workflows/` - CI/versioning workflows
 
-## License
+## Licence
 
-MIT (see [`LICENSE`](LICENSE)).
+ForgeShift Web is source-available proprietary software.
+
+You may self-host and use this software for personal or internal business purposes only.
+
+You may not copy, modify, redistribute, resell, rebrand, sublicense, or create derivative works from this project without prior written permission from the copyright holder, except where required for ordinary installation, configuration, or self-hosted operation.
+
+You may not provide this software, or any modified version of it, as a hosted service, SaaS product, managed service, commercial platform, or competing product without prior written permission.
