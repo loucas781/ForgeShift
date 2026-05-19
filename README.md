@@ -129,6 +129,12 @@ Important values:
 - `proxmox/install/` - in-container install/bootstrap script
 - `.github/workflows/` - CI/versioning workflows
 
-## License
+## Licence
 
-MIT (see [`LICENSE`](LICENSE)).
+This project is proprietary software. All rights are reserved.
+
+You may not copy, modify, distribute, sublicense, sell, resell, host, deploy, operate, reverse engineer, decompile, or create derivative works from this project without prior written permission from the copyright holder.
+
+You may not use this project, its source code, assets, branding, or related materials to create, support, host, operate, or provide a competing application, hosted service, SaaS product, or platform.
+
+Access to this repository does not grant any licence, ownership rights, or usage rights except where explicitly authorised in writing.
