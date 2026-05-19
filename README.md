@@ -131,10 +131,10 @@ Important values:
 
 ## Licence
 
-This project is proprietary software. All rights are reserved.
+ForgeShift Web is source-available proprietary software.
 
-You may not copy, modify, distribute, sublicense, sell, resell, host, deploy, operate, reverse engineer, decompile, or create derivative works from this project without prior written permission from the copyright holder.
+You may self-host and use this software for personal or internal business purposes only.
 
-You may not use this project, its source code, assets, branding, or related materials to create, support, host, operate, or provide a competing application, hosted service, SaaS product, or platform.
+You may not copy, modify, redistribute, resell, rebrand, sublicense, or create derivative works from this project without prior written permission from the copyright holder, except where required for ordinary installation, configuration, or self-hosted operation.
 
-Access to this repository does not grant any licence, ownership rights, or usage rights except where explicitly authorised in writing.
+You may not provide this software, or any modified version of it, as a hosted service, SaaS product, managed service, commercial platform, or competing product without prior written permission.
