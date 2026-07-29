@@ -2,6 +2,7 @@
 
 ## 2026-07-29
 
+- Modernised every custom Settings dialog with contextual headers, clearer hierarchy, theme-safe form surfaces, responsive actions and accessible dialog labelling; refined Location and Task List editors into responsive field grids and brought the legacy password-reset popup into the shared dialog system.
 - Fixed Organisation Edit and Delete actions failing when their inline button markup embedded an organisation name, and made both actions resolve the current organisation safely by ID.
 - Modernised popup menus across Calendar, Templates, Settings, and Profile with a consistent theme-safe backdrop, elevated dialog shell, clearer headers, roomier controls, and pinned responsive actions; rebuilt the template editor as grouped details and responsive day cards so it no longer relies on a sprawling horizontal scroller.
 - Restored the complete non-scrolling Month view while keeping busy dates contained through viewport-fitted week rows, compact mobile indicators, and day-panel overflow actions.
