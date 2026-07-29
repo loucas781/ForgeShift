@@ -43,42 +43,68 @@
 
 <!-- Template Modal -->
 <div class="modal-overlay" id="tmplModal">
-  <div class="modal" style="max-width:min(96vw,980px)">
-    <div class="modal-header">
-      <h3 class="modal-title" id="tmplModalTitle">New Template</h3>
-      <button class="modal-close" onclick="closeTmplModal()">✕</button>
+  <div class="modal modal--template" role="dialog" aria-modal="true" aria-labelledby="tmplModalTitle" aria-describedby="tmplModalSubtitle">
+    <div class="modal-header editor-modal-header">
+      <div class="editor-modal-heading">
+        <div class="editor-modal-mark editor-modal-mark--template" aria-hidden="true">T</div>
+        <div>
+          <span class="editor-modal-kicker">Template builder</span>
+          <h3 class="modal-title" id="tmplModalTitle">New Template</h3>
+          <p class="editor-modal-subtitle" id="tmplModalSubtitle">Build a reusable schedule, then configure only the days you need.</p>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeTmplModal()" aria-label="Close template editor">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Template name</label>
-        <input type="text" class="form-input" id="tmplName" placeholder="e.g. Standard Week">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Description (optional)</label>
-        <input type="text" class="form-input" id="tmplDesc" placeholder="Describe this template…">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Template type</label>
-        <select class="form-select" id="tmplType" onchange="onTemplateTypeChange(this.value)">
-          <option value="weekly">Weekly rota</option>
-          <option value="pattern">Flexible pattern</option>
-        </select>
-      </div>
-      <div class="form-group" id="tmplCycleLengthRow" style="display:none">
-        <label class="form-label">Pattern length (days)</label>
-        <input type="number" class="form-input" id="tmplCycleLength" min="1" max="42" value="7" onchange="onPatternLengthChange(this.value)">
-      </div>
-      <div class="form-group" id="tmplGroupRow">
-        <label class="form-label">Organisation</label>
-        <select class="form-select" id="tmplGroup">
-          <option value="">— None (visible to all) —</option>
-        </select>
-      </div>
-      <h4 style="margin:16px 0 12px;font-size:13px" id="dayEditorHeading">Configure each day</h4>
-      <div id="copyDayBar" style="display:none;margin-bottom:10px"></div>
-      <div class="day-editor-wrap"><div class="day-editor-grid" id="dayEditorGrid"></div></div>
+    <div class="modal-body editor-modal-body template-editor-body">
+      <section class="template-editor-section" aria-labelledby="templateDetailsHeading">
+        <div class="template-editor-section-heading">
+          <div>
+            <span class="editor-modal-kicker">Template details</span>
+            <h4 id="templateDetailsHeading">Name and visibility</h4>
+          </div>
+          <p>Give the schedule a clear name and choose who can use it.</p>
+        </div>
+        <div class="template-details-grid">
+          <div class="form-group">
+            <label class="form-label" for="tmplName">Template name</label>
+            <input type="text" class="form-input" id="tmplName" placeholder="e.g. Standard Week">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tmplType">Template type</label>
+            <select class="form-select" id="tmplType" onchange="onTemplateTypeChange(this.value)">
+              <option value="weekly">Weekly rota</option>
+              <option value="pattern">Flexible pattern</option>
+            </select>
+          </div>
+          <div class="form-group template-field--wide">
+            <label class="form-label" for="tmplDesc">Description <span class="form-label-optional">Optional</span></label>
+            <input type="text" class="form-input" id="tmplDesc" placeholder="Describe when this template should be used…">
+          </div>
+          <div class="form-group" id="tmplCycleLengthRow" style="display:none">
+            <label class="form-label" for="tmplCycleLength">Pattern length (days)</label>
+            <input type="number" class="form-input" id="tmplCycleLength" min="1" max="42" value="7" onchange="onPatternLengthChange(this.value)">
+          </div>
+          <div class="form-group" id="tmplGroupRow">
+            <label class="form-label" for="tmplGroup">Organisation</label>
+            <select class="form-select" id="tmplGroup">
+              <option value="">— None (visible to all) —</option>
+            </select>
+          </div>
+        </div>
+      </section>
+      <section class="template-editor-section" aria-labelledby="dayEditorHeading">
+        <div class="template-editor-section-heading template-editor-section-heading--days">
+          <div>
+            <span class="editor-modal-kicker">Schedule</span>
+            <h4 id="dayEditorHeading">Configure each day</h4>
+          </div>
+          <p>Set times, location, notes and colour. Exclude any day that should not create a shift.</p>
+        </div>
+        <div id="copyDayBar" style="display:none"></div>
+        <div class="day-editor-wrap"><div class="day-editor-grid" id="dayEditorGrid"></div></div>
+      </section>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer editor-modal-footer">
       <button class="btn btn-secondary" onclick="closeTmplModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveTmpl()">Save template</button>
     </div>
@@ -87,12 +113,19 @@
 
 <!-- Apply Template Modal -->
 <div class="modal-overlay" id="applyModal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 class="modal-title">Apply Template</h3>
-      <button class="modal-close" onclick="closeApplyModal()">✕</button>
+  <div class="modal modal--apply" role="dialog" aria-modal="true" aria-labelledby="applyModalTitle" aria-describedby="applyModalCopy">
+    <div class="modal-header editor-modal-header">
+      <div class="editor-modal-heading">
+        <div class="editor-modal-mark editor-modal-mark--apply" aria-hidden="true">→</div>
+        <div>
+          <span class="editor-modal-kicker">Apply schedule</span>
+          <h3 class="modal-title" id="applyModalTitle">Apply Template</h3>
+          <p class="editor-modal-subtitle">Choose the people and starting date for this schedule.</p>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeApplyModal()" aria-label="Close apply template">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body editor-modal-body apply-template-body">
       <p style="color:var(--text-3);font-size:13px;margin-bottom:16px" id="applyModalCopy">Apply this template to one or more team members.</p>
       <div class="form-group">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -121,7 +154,7 @@
         </div>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer editor-modal-footer">
       <button class="btn btn-secondary" onclick="closeApplyModal()">Cancel</button>
       <button class="btn btn-primary" id="applyBtn" onclick="doApplyTmpl()">Apply template</button>
     </div>
@@ -549,8 +582,6 @@ function renderDayEditor() {
   const grid = document.getElementById('dayEditorGrid')
   const slotCount = getTemplateSlotCount()
   syncTemplateEditorMode()
-  grid.style.gridTemplateColumns = `repeat(${slotCount}, minmax(130px, 1fr))`
-  grid.style.minWidth = `${Math.max(7, slotCount) * 130}px`
   grid.innerHTML = ''
   for (let i = 0; i < slotCount; i++) {
     const cfg_day = dayConfigs[i] || { note_color: DEFAULT_TEMPLATE_COLOUR, is_off: 0 }
@@ -562,13 +593,13 @@ function renderDayEditor() {
       <div class="day-editor-cell-header" id="dc_hdr_${i}">
         <span class="day-label">${getTemplateDayLabel(i)}</span>
         <div style="display:flex;gap:4px;align-items:center">
-          ${!isExcluded ? `<button class="day-copy-btn" id="dc_copybtn_${i}" title="Copy this day to other days…">
+          ${!isExcluded ? `<button class="day-copy-btn" id="dc_copybtn_${i}" type="button" title="Copy this day to other days…" aria-label="Copy ${getTemplateDayLabel(i)} to other days">
             <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
               <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z"/>
               <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z"/>
             </svg>
           </button>` : ''}
-          <button class="day-exclude-btn${isExcluded ? ' excluded' : ''}" id="dc_excl_${i}" title="${isExcluded ? 'Include this day' : 'Exclude this day (no shift created)'}">
+          <button class="day-exclude-btn${isExcluded ? ' excluded' : ''}" id="dc_excl_${i}" type="button" title="${isExcluded ? 'Include this day' : 'Exclude this day (no shift created)'}" aria-label="${isExcluded ? 'Include' : 'Exclude'} ${getTemplateDayLabel(i)}">
             ${isExcluded
               ? `<svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>`
               : `<svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`}
@@ -576,27 +607,32 @@ function renderDayEditor() {
         </div>
       </div>
       ${isExcluded
-        ? `<div class="day-excluded-body"><span>Not included in template</span></div>`
+        ? `<div class="day-excluded-body"><strong>Not scheduled</strong><span>This day will not create a shift.</span></div>`
         : `<div class="day-editor-cell-body">
         <div class="form-group" style="margin-bottom:8px">
-          <select class="form-select" id="dc_loc_${i}" style="font-size:11px;padding:5px 8px">
+          <label class="form-label" for="dc_loc_${i}">Location</label>
+          <select class="form-select" id="dc_loc_${i}">
             <option value="">No location</option>
             ${locations.map(l=>`<option value="${l.id}"${cfg_day.location_id===l.id?' selected':''}>${l.name}</option>`).join('')}
           </select>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
-          <input type="time" class="form-input" id="dc_start_${i}" value="${cfg_day.start_time||''}" style="font-size:11px;padding:5px 6px" placeholder="Start">
-          <input type="time" class="form-input" id="dc_end_${i}" value="${cfg_day.end_time||''}" style="font-size:11px;padding:5px 6px" placeholder="End">
+        <div class="day-editor-time-grid">
+          <label><span>Start</span><input type="time" class="form-input" id="dc_start_${i}" value="${cfg_day.start_time||''}" aria-label="${getTemplateDayLabel(i)} start time"></label>
+          <label><span>End</span><input type="time" class="form-input" id="dc_end_${i}" value="${cfg_day.end_time||''}" aria-label="${getTemplateDayLabel(i)} end time"></label>
         </div>
-        <textarea class="form-textarea" id="dc_notes_${i}" rows="2" style="font-size:11px;min-height:48px" placeholder="Notes…">${cfg_day.notes||''}</textarea>
-        <div style="margin-top:6px" id="dc_colours_${i}"></div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
-          <label class="toggle" style="width:32px;height:18px">
+        <label class="form-label" for="dc_notes_${i}">Notes <span class="form-label-optional">Optional</span></label>
+        <textarea class="form-textarea" id="dc_notes_${i}" rows="2" placeholder="Notes for this day…">${cfg_day.notes||''}</textarea>
+        <div class="day-editor-colour">
+          <span class="form-label">Colour</span>
+          <div id="dc_colours_${i}"></div>
+        </div>
+        <label class="day-editor-off-row" for="dc_off_${i}">
+          <span class="toggle">
             <input type="checkbox" id="dc_off_${i}"${cfg_day.is_off?' checked':''}>
             <span class="toggle-slider"></span>
-          </label>
-          <span style="font-size:10px;color:var(--text-3)">Day off</span>
-        </div>
+          </span>
+          <span><strong>Day off</strong><small>Keep this day in the template without shift times.</small></span>
+        </label>
       </div>`}
     `
     grid.appendChild(cell)

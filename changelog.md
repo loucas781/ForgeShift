@@ -2,6 +2,8 @@
 
 ## 2026-07-29
 
+- Modernised popup menus across Calendar, Templates, Settings, and Profile with a consistent theme-safe backdrop, elevated dialog shell, clearer headers, roomier controls, and pinned responsive actions; rebuilt the template editor as grouped details and responsive day cards so it no longer relies on a sprawling horizontal scroller.
+- Restored the complete non-scrolling Month view while keeping busy dates contained through viewport-fitted week rows, compact mobile indicators, and day-panel overflow actions.
 - Fixed modern Month view rows collapsing around task, coverage, and shift content, which allowed shift chips to render underneath the following calendar row.
 - Modernised Month, Week, and Agenda calendars across desktop and mobile with a calmer responsive toolbar, card-based month days, clearer current-day and weekend treatments, roomier shift chips, a refined week timeline, streamlined mobile overflow, polished agenda rows, and theme-safe loading/detail surfaces.
 - Centred repeat-day button labels throughout the shift editor so weekday controls remain visually balanced at every responsive width.
