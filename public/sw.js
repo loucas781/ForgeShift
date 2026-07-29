@@ -1,8 +1,9 @@
 'use strict'
-const CACHE = 'forgeshift-v6'
+const CACHE = 'forgeshift-v7'
 const STATIC = [
   '/css/main.css',
   '/js/shell.js',
+  '/js/theme-assets.js',
   '/js/prefs.js',
   '/icons/app-icon-light-1024.png',
   '/icons/app-icon-dark-1024.png',

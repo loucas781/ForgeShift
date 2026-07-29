@@ -15,13 +15,15 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260429c">
   <link rel="icon" type="image/png" href="/favicon.png?v=20260429c" sizes="32x32">
   <link rel="apple-touch-icon" href="/icons/app-icon-light-1024.png?v=20260429c">
+  <meta name="theme-color" content="#4f46e5">
+  <script src="/js/theme-assets.js"></script>
 </head>
 <body>
 <div class="auth-page">
   <div class="auth-shell">
     <aside class="auth-welcome" aria-label="ForgeShift overview">
       <div class="auth-welcome-brand">
-        <img class="auth-logo-img auth-theme-logo" src="/icons/app-icon-light-1024.png?v=20260429c" alt="">
+        <img class="auth-logo-img auth-theme-logo" data-app-logo src="/icons/app-icon-light-1024.png?v=20260429c" alt="">
         <span>ForgeShift</span>
       </div>
       <div class="auth-welcome-content">
@@ -38,7 +40,7 @@
     </aside>
     <main class="auth-card">
     <div class="auth-logo">
-      <img id="authLogoImg" class="auth-logo-img auth-theme-logo" src="/icons/app-icon-light-1024.png?v=20260429c" alt="">
+      <img id="authLogoImg" class="auth-logo-img auth-theme-logo" data-app-logo src="/icons/app-icon-light-1024.png?v=20260429c" alt="">
       <span class="auth-logo-text">ForgeShift</span>
     </div>
     <h1 class="auth-title">Welcome back</h1>
@@ -137,29 +139,23 @@
   })()
 
   function applyAuthThemeAndIcons(theme) {
+    if (window.ForgeShiftThemeAssets) {
+      window.ForgeShiftThemeAssets.apply(theme)
+      return
+    }
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const effectiveTheme = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme
     if (effectiveTheme === 'light') document.documentElement.removeAttribute('data-theme')
     else document.documentElement.setAttribute('data-theme', effectiveTheme)
-    const isDark = effectiveTheme === 'dark' || effectiveTheme === 'oled'
-    const href = isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
-    const appleTouch = document.querySelector('link[rel="apple-touch-icon"]')
-    if (appleTouch) appleTouch.setAttribute('href', href)
-    document.querySelectorAll('.auth-theme-logo').forEach(logo => logo.setAttribute('src', href))
-    let runtimeIcon = document.getElementById('runtimeAppIcon')
-    if (!runtimeIcon) {
-      runtimeIcon = document.createElement('link')
-      runtimeIcon.id = 'runtimeAppIcon'
-      runtimeIcon.rel = 'icon'
-      runtimeIcon.type = 'image/png'
-      document.head.appendChild(runtimeIcon)
-    }
-    runtimeIcon.setAttribute('href', href)
+    const href = effectiveTheme === 'dark' || effectiveTheme === 'oled'
+      ? '/icons/app-icon-dark-1024.png?v=20260429c'
+      : '/icons/app-icon-light-1024.png?v=20260429c'
+    document.querySelectorAll('[data-app-logo]').forEach(logo => logo.setAttribute('src', href))
   }
 
   let t = getStoredTheme()
   applyAuthThemeAndIcons(t);
-  (function() {
+  if (!window.ForgeShiftThemeAssets) (function() {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const onThemeChange = () => {
         const liveTheme = getStoredTheme()

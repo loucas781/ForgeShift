@@ -17,17 +17,7 @@
   <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
   <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <script>
-    (function(){
-      var t = localStorage.getItem("fs-theme") || "system"
-      if (t === "system") {
-        if (window.matchMedia("(prefers-color-scheme: dark)").matches)
-          document.documentElement.setAttribute("data-theme","dark")
-      } else if (t !== "light") {
-        document.documentElement.setAttribute("data-theme", t)
-      }
-    })()
-  </script>
+  <script src="/js/theme-assets.js"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -132,34 +122,41 @@
 
 <!-- Shift Modal -->
 <div class="modal-overlay" id="shiftModal">
-  <div class="modal modal--shift" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal-header">
-      <h3 class="modal-title" id="modalTitle">Shift</h3>
+  <div class="modal modal--shift" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="shiftModalSubtitle">
+    <div class="modal-header editor-modal-header">
+      <div class="editor-modal-heading">
+        <div class="editor-modal-mark" aria-hidden="true">+</div>
+        <div>
+          <span class="editor-modal-kicker">Shift editor</span>
+          <h3 class="modal-title" id="modalTitle">Shift</h3>
+          <p class="editor-modal-subtitle" id="shiftModalSubtitle">Set the assignment, schedule and status in one place.</p>
+        </div>
+      </div>
       <button class="modal-close" onclick="closeModal()" aria-label="Close shift editor">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body editor-modal-body">
       <div class="shift-editor-layout">
       <div class="shift-editor-primary">
       <div class="shift-editor-section" id="shiftAssignmentSection"><h4>Assignment</h4>
       <div id="adminUserField" style="display:none" class="form-group">
-        <label class="form-label">Team member</label>
+        <label class="form-label" for="modalUser">Team member</label>
         <select class="form-select" id="modalUser"></select>
       </div>
       </div>
       <div class="shift-editor-section"><h4>Schedule</h4>
       <div class="form-group">
-        <label class="form-label">Date</label>
+        <label class="form-label" for="modalDate">Date</label>
         <input type="date" class="form-input" id="modalDate">
       </div>
       <div id="repeatDaysWrap" class="form-group" style="display:none">
-        <label class="form-label">Repeat on days</label>
-        <div id="repeatDayBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px"></div>
+        <label class="form-label" id="repeatDaysLabel">Repeat on days</label>
+        <div id="repeatDayBtns" class="repeat-day-picker" role="group" aria-labelledby="repeatDaysLabel"></div>
         <p style="font-size:11px;color:var(--text-3);margin:6px 0 0">Creates the same shift on each selected day within this week.</p>
       </div>
       <div id="modalTemplateQuickWrap" class="form-group" style="display:none">
-        <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)">
+        <div class="shift-template-card">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-            <label class="form-label" style="margin:0">Quick template apply</label>
+            <label class="form-label" for="modalTemplateSelect" style="margin:0">Quick template apply</label>
             <span id="modalTemplateRangeLabel" style="font-size:11px;color:var(--text-3)"></span>
           </div>
           <p style="font-size:12px;color:var(--text-3);margin:0 0 10px">Apply a saved template from this date to the end of the week. Manual shift entry below still works if you prefer.</p>
@@ -179,18 +176,18 @@
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Location</label>
+        <label class="form-label" for="modalLocation">Location</label>
         <select class="form-select" id="modalLocation">
           <option value="">— No location —</option>
         </select>
       </div>
       <div class="modal-grid-2">
         <div class="form-group">
-          <label class="form-label">Start time</label>
+          <label class="form-label" for="modalStart">Start time</label>
           <input type="time" class="form-input" id="modalStart">
         </div>
         <div class="form-group">
-          <label class="form-label">End time</label>
+          <label class="form-label" for="modalEnd">End time</label>
           <input type="time" class="form-input" id="modalEnd">
         </div>
       </div>
@@ -201,7 +198,7 @@
       <div class="shift-editor-secondary">
       <div class="shift-editor-section"><h4>Details</h4>
       <div class="form-group">
-        <label class="form-label">Notes</label>
+        <label class="form-label" for="modalNotes">Notes</label>
         <textarea class="form-textarea" id="modalNotes" placeholder="Add any notes for this day…" rows="3"></textarea>
       </div>
       </div>
@@ -210,25 +207,27 @@
         <label class="form-label">Shift colour <span style="font-weight:400;color:var(--text-3);font-size:11px">(used when no location colour is set)</span></label>
         <div id="modalColourPicker"></div>
       </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:10px">
-        <label class="toggle">
-          <input type="checkbox" id="modalIsOff">
-          <span class="toggle-slider"></span>
+      <div class="shift-status-options">
+        <label class="shift-status-option" for="modalIsOff">
+          <span class="toggle">
+            <input type="checkbox" id="modalIsOff">
+            <span class="toggle-slider"></span>
+          </span>
+          <span><strong>Day off / leave</strong><small>Show this day as unavailable</small></span>
         </label>
-        <span class="form-label" style="margin:0">Day off / leave</span>
-      </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:10px">
-        <label class="toggle">
-          <input type="checkbox" id="modalIsOncall">
-          <span class="toggle-slider"></span>
+        <label class="shift-status-option" for="modalIsOncall">
+          <span class="toggle">
+            <input type="checkbox" id="modalIsOncall">
+            <span class="toggle-slider"></span>
+          </span>
+          <span><strong>On-call</strong><small>Mark this shift as on-call cover</small></span>
         </label>
-        <span class="form-label" style="margin:0">On-call</span>
       </div>
       </div>
       </div>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer editor-modal-footer">
       <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-secondary" id="applyTemplateBtn" style="display:none" onclick="applyTemplateFromModal()">Apply template</button>
@@ -240,27 +239,44 @@
 <!-- Task Assignment Modal -->
 <div class="modal-overlay" id="taskAssignModal">
   <div class="modal modal--task" role="dialog" aria-modal="true" aria-labelledby="taskAssignModalTitle" aria-describedby="taskAssignHelp">
-    <div class="modal-header">
-      <h3 class="modal-title" id="taskAssignModalTitle">Assign Task</h3>
+    <div class="modal-header editor-modal-header">
+      <div class="editor-modal-heading">
+        <div class="editor-modal-mark editor-modal-mark--task" aria-hidden="true">✓</div>
+        <div>
+          <span class="editor-modal-kicker">Task assignment</span>
+          <h3 class="modal-title" id="taskAssignModalTitle">Assign tasks</h3>
+          <p class="editor-modal-subtitle" id="taskAssignHelp">Choose a team member, one or more days, and a task list.</p>
+        </div>
+      </div>
       <button class="modal-close" onclick="closeTaskAssignModal()" aria-label="Close task assignment">✕</button>
     </div>
-    <div class="modal-body">
-      <p id="taskAssignHelp" style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for one or more days this week.</p>
+    <div class="modal-body editor-modal-body">
+      <div class="task-editor-block">
+        <div class="editor-section-heading">
+          <span>1</span>
+          <div><strong>Who and when</strong><small id="taskAssignWeekLabel">Select the person and working days.</small></div>
+        </div>
       <div class="form-group">
-        <label class="form-label">Team member</label>
+        <label class="form-label" for="taUser">Team member</label>
         <select class="form-select" id="taUser"></select>
       </div>
       <div class="form-group">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <label class="form-label" style="margin:0">Days</label>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('weekdays')" style="font-size:11px;padding:2px 8px">Weekdays</button>
-            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('all')" style="font-size:11px;padding:2px 8px">All week</button>
-            <button class="btn btn-ghost btn-sm" onclick="taSelectDays('none')" style="font-size:11px;padding:2px 8px">Clear</button>
+        <div class="task-day-toolbar">
+          <label class="form-label" id="taskDaysLabel" style="margin:0">Days</label>
+          <div class="task-day-actions">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="taSelectDays('weekdays')">Weekdays</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="taSelectDays('all')">All week</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="taSelectDays('none')">Clear</button>
           </div>
         </div>
-        <div id="taDayPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div id="taDayPicker" class="task-day-picker" role="group" aria-labelledby="taskDaysLabel"></div>
       </div>
+      </div>
+      <div class="task-editor-block">
+        <div class="editor-section-heading">
+          <span>2</span>
+          <div><strong>Task list</strong><small>Filter the available lists, then choose one to assign.</small></div>
+        </div>
       <div id="taGroupTabsWrap" style="display:none;margin-bottom:4px">
         <div id="taGroupTabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
       </div>
@@ -268,18 +284,19 @@
         <div id="taLocationTabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Task list</label>
+        <label class="form-label" for="taTaskList">Task list</label>
         <select class="form-select" id="taTaskList">
           <option value="">— Select a task list —</option>
         </select>
       </div>
+      </div>
       <!-- Current assignments for the selected user across this week -->
-      <div id="taCurrentAssignments" style="display:none;margin-top:4px">
+      <div id="taCurrentAssignments" class="task-current-assignments" style="display:none">
         <label class="form-label" style="margin-bottom:6px">Already assigned this week</label>
-        <div id="taAssignmentList" style="display:flex;flex-direction:column;gap:4px"></div>
+        <div id="taAssignmentList" class="task-assignment-list"></div>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer editor-modal-footer">
       <button class="btn btn-secondary" onclick="closeTaskAssignModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveTaskAssignment()">Add assignment</button>
     </div>
@@ -487,6 +504,7 @@ async function init() {
     document.getElementById('tab' + views[nextIndex][0].toUpperCase() + views[nextIndex].slice(1))?.focus()
   })
   document.getElementById('modalDate').addEventListener('change', updateTemplateQuickApplyState)
+  document.getElementById('modalDate').addEventListener('change', updateShiftModalSubtitle)
   document.getElementById('modalUser').addEventListener('change', updateTemplateQuickApplyState)
   document.getElementById('modalTemplateSelect').addEventListener('change', updateTemplateQuickApplyState)
   ;['modalStart', 'modalEnd'].forEach(id => document.getElementById(id).addEventListener('input', updateDurationPreview))
@@ -1830,16 +1848,29 @@ function _initRepeatDayBtns(baseDate) {
     btn.dataset.dayIndex = i
     const isActive = i === activeDayIndex
     btn.className = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-secondary') + ' repeat-day-btn' + (isActive ? ' selected' : '')
+    btn.setAttribute('aria-pressed', String(isActive))
     btn.addEventListener('click', () => {
       const nowSelected = btn.classList.toggle('selected')
       btn.classList.toggle('btn-primary', nowSelected)
       btn.classList.toggle('btn-secondary', !nowSelected)
+      btn.setAttribute('aria-pressed', String(nowSelected))
     })
     container.appendChild(btn)
   })
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
+function updateShiftModalSubtitle() {
+  const subtitle = document.getElementById('shiftModalSubtitle')
+  const dateValue = document.getElementById('modalDate')?.value
+  if (!subtitle || !dateValue) return
+  const date = new Date(dateValue + 'T00:00:00')
+  const dateLabel = date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+  subtitle.textContent = editingShiftId
+    ? `Update the assignment, hours and status for ${dateLabel}.`
+    : `Create a shift for ${dateLabel}, with optional repeat days.`
+}
+
 function openCreateModal(date, returnFocus = null) {
   _previousShiftFocus = returnFocus || document.activeElement
   editingShiftId = null
@@ -1861,6 +1892,7 @@ function openCreateModal(date, returnFocus = null) {
   setupColourPicker()
   _initRepeatDayBtns(date)
   setTemplateQuickApplyVisibility(true, date)
+  updateShiftModalSubtitle()
   document.getElementById('shiftModal').classList.add('open')
   document.getElementById('modalDate').focus()
   updateDurationPreview()
@@ -1887,6 +1919,7 @@ function openEditModal(id, returnFocus = null) {
   const rdw = document.getElementById('repeatDaysWrap')
   if (rdw) rdw.style.display = 'none'
   setTemplateQuickApplyVisibility(false)
+  updateShiftModalSubtitle()
   document.getElementById('shiftModal').classList.add('open')
   updateDurationPreview(); document.getElementById('samePreviousBtn').style.display = 'none'
   document.getElementById('modalDate').focus()
@@ -2049,11 +2082,15 @@ function openTaskAssignModal(dateStr, userId) {
     const d = new Date(monday); d.setDate(d.getDate() + i); return toDateStr(d)
   })
 
-  // Title: week range
+  // Show the selected week without overloading the primary modal heading.
   const we = new Date(monday); we.setDate(we.getDate() + 6)
-  document.getElementById('taskAssignModalTitle').textContent =
-    'Assign Task — ' + monday.getDate() + ' ' + MONTH_NAMES[monday.getMonth()].slice(0,3) +
-    ' – ' + we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3)
+  document.getElementById('taskAssignModalTitle').textContent = 'Assign tasks'
+  const weekLabel = document.getElementById('taskAssignWeekLabel')
+  if (weekLabel) {
+    weekLabel.textContent =
+      monday.getDate() + ' ' + MONTH_NAMES[monday.getMonth()].slice(0,3) +
+      ' – ' + we.getDate() + ' ' + MONTH_NAMES[we.getMonth()].slice(0,3)
+  }
 
   // Populate user select value
   const sel = document.getElementById('taUser')
