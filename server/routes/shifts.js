@@ -14,6 +14,15 @@ const {
   normalizeTemplateType,
 } = require('../utils/template-utils')
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+function isValidDate(value) {
+  if (!ISO_DATE_RE.test(String(value || ''))) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+function isValidTime(value) { return value == null || value === '' || TIME_RE.test(String(value)) }
+
 // ── GET /api/shifts ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
   res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
@@ -48,7 +57,8 @@ router.get('/', requireAuth, (req, res) => {
         params.push(...scope)
       }
     } else {
-      if (!user_id) { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
+      if (user_id && user_id !== req.user.id) return res.status(403).json({ error: 'You can only view your own shifts.' })
+      sql += ' AND s.user_id = ?'; params.push(req.user.id)
     }
 
     sql += ' ORDER BY s.date, u.name'
@@ -93,7 +103,7 @@ router.get('/export/csv', requireAuth, (req, res) => {
     for (const s of rows) {
       const d = new Date(s.date + 'T00:00:00')
       const hours = (s.start_time && s.end_time)
-        ? (() => { const [sh,sm] = s.start_time.split(':').map(Number); const [eh,em] = s.end_time.split(':').map(Number); return (((eh*60+em)-(sh*60+sm))/60).toFixed(2) })()
+        ? (() => { const [sh,sm] = s.start_time.split(':').map(Number); const [eh,em] = s.end_time.split(':').map(Number); let mins = (eh*60+em)-(sh*60+sm); if (mins < 0) mins += 1440; return (mins/60).toFixed(2) })()
         : ''
       const type = s.is_off ? 'Annual Leave' : s.is_oncall ? 'On-call' : 'Shift'
       lines.push([s.date, DAY_NAMES[d.getDay()], esc(s.user_name||''), esc(s.location_name||''),
@@ -134,6 +144,8 @@ router.post('/', requireAuth, (req, res) => {
     const { user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
 
     if (!date) return res.status(400).json({ error: 'Date is required.' })
+    if (!isValidDate(date)) return res.status(400).json({ error: 'Date must be a valid ISO date (YYYY-MM-DD).' })
+    if (!isValidTime(start_time) || !isValidTime(end_time)) return res.status(400).json({ error: 'Times must use HH:MM format.' })
 
     let targetUserId
     if (isAdmin && user_id) {
@@ -203,6 +215,10 @@ router.put('/:id', requireAuth, (req, res) => {
 
     const { date: newDate, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
     const targetDate = newDate || shift.date
+    if (!isValidDate(targetDate)) return res.status(400).json({ error: 'Date must be a valid ISO date (YYYY-MM-DD).' })
+    if (!isValidTime(start_time) || !isValidTime(end_time)) return res.status(400).json({ error: 'Times must use HH:MM format.' })
+    const conflict = db.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ? AND id <> ?').get(shift.user_id, targetDate, req.params.id)
+    if (conflict) return res.status(409).json({ error: 'A shift already exists for this user on this date.' })
     db.prepare(`
       UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now'), updated_by=?
       WHERE id=?

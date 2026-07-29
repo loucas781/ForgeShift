@@ -759,9 +759,19 @@ router.patch('/prefs', requireAuth, (req, res) => {
     try { existing = JSON.parse(row?.prefs || '{}') } catch {}
     // Merge incoming keys — only allow known preference keys
     const ALLOWED = ['weekStartDay', 'defaultView', 'showWeekNumbers', 'holidays', 'defaultShiftStart', 'defaultShiftEnd', 'compactChips', 'shiftPanelSide']
+    const DEFAULT_VIEWS = new Set(['month', 'week', 'agenda'])
+    const normalizeDefaultView = value => {
+      const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+      return DEFAULT_VIEWS.has(normalized) ? normalized : 'month'
+    }
     const incoming = req.body || {}
     for (const k of ALLOWED) {
-      if (k in incoming) existing[k] = incoming[k]
+      if (k in incoming) {
+        existing[k] = k === 'defaultView' ? normalizeDefaultView(incoming[k]) : incoming[k]
+      }
+    }
+    if ('defaultView' in existing && !DEFAULT_VIEWS.has(existing.defaultView)) {
+      existing.defaultView = normalizeDefaultView(existing.defaultView)
     }
     db.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(existing), req.user.id)
     res.json(existing)

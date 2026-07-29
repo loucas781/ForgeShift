@@ -1072,6 +1072,7 @@ async function renderPreferencesPanel() {
           <div style="display:flex;gap:6px">
             <button class="pref-choice-btn${p.defaultView==='month'?' active':''}" id="dv-month" onclick="pickDefaultView('month')">Month</button>
             <button class="pref-choice-btn${p.defaultView==='week'?' active':''}" id="dv-week" onclick="pickDefaultView('week')">Week</button>
+            <button class="pref-choice-btn${p.defaultView==='agenda'?' active':''}" id="dv-agenda" onclick="pickDefaultView('agenda')">Agenda</button>
           </div>
         </div>
 
@@ -1246,9 +1247,11 @@ function pickWeekStart(day) {
 }
 
 function pickDefaultView(v) {
-  document.getElementById('dv-month')?.classList.toggle('active', v === 'month')
-  document.getElementById('dv-week')?.classList.toggle('active', v === 'week')
-  window._pendingDefaultView = v
+  const view = ['month', 'week', 'agenda'].includes(v) ? v : 'month'
+  document.getElementById('dv-month')?.classList.toggle('active', view === 'month')
+  document.getElementById('dv-week')?.classList.toggle('active', view === 'week')
+  document.getElementById('dv-agenda')?.classList.toggle('active', view === 'agenda')
+  window._pendingDefaultView = view
 }
 
 function pickShiftPanelSide(side) {
@@ -1263,9 +1266,12 @@ async function savePrefsPanel() {
   const wsd = window._pendingWeekStart !== undefined
     ? window._pendingWeekStart
     : (document.getElementById('wsd-sun')?.classList.contains('active') ? 0 : 1)
-  const dv = window._pendingDefaultView !== undefined
-    ? window._pendingDefaultView
-    : (document.getElementById('dv-week')?.classList.contains('active') ? 'week' : 'month')
+  const pendingView = window._pendingDefaultView
+  const dv = ['month', 'week', 'agenda'].includes(pendingView)
+    ? pendingView
+    : (document.getElementById('dv-agenda')?.classList.contains('active')
+      ? 'agenda'
+      : (document.getElementById('dv-week')?.classList.contains('active') ? 'week' : 'month'))
 
   const holidays = HOLIDAY_SETS
     .filter(s => document.getElementById('hol-' + s.id)?.checked)
@@ -4678,7 +4684,7 @@ async function renderAboutPanel() {
             ['Backend',   'Node.js · Express'],
             ['Database',  'SQLite (better-sqlite3)'],
             ['Auth',      'Session-based · HMAC-SHA256 pepper'],
-            ['Calendar',  'iCal feed (ical-generator)'],
+            ['Calendar',  'Built-in iCal feed'],
             ['Email',     'Nodemailer (optional SMTP)'],
             ['Deployment','Docker · PM2 · Proxmox LXC'],
           ].map(([k,v]) => `

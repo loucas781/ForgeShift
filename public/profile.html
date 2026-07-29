@@ -338,13 +338,13 @@ async function loadIcal() {
       <div class="form-group">
         <label class="form-label">Feed URL</label>
         <div style="display:flex;gap:8px">
-          <input type="text" class="form-input" value="${data.feedUrl}" readonly id="icalUrl" style="font-size:11px;font-family:var(--mono)">
+          <input type="text" class="form-input" value="${escHtml(data.feedUrl)}" readonly id="icalUrl" style="font-size:11px;font-family:var(--mono)">
           <button class="btn btn-secondary btn-sm" onclick="copyIcal()">Copy</button>
         </div>
         <p class="form-hint">Paste this URL into your calendar app to subscribe to your shifts.</p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a href="${data.feedUrl}" class="btn btn-secondary btn-sm" download>⬇ Download .ics</a>
+        <a href="${escHtml(data.feedUrl)}" class="btn btn-secondary btn-sm" download>⬇ Download .ics</a>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="regenerateIcal()">Regenerate token</button>
       </div>`
     loadIcalPreview()
@@ -369,10 +369,10 @@ async function loadIcalPreview() {
       const d = new Date(s.date + 'T12:00:00')
       const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
       const timeStr = s.is_off ? 'Day off' : (s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day')
-      const loc = s.location_name ? `<span style="color:var(--text-3)">${s.location_name}</span>` : ''
+      const loc = s.location_name ? `<span style="color:var(--text-3)">${escHtml(s.location_name)}</span>` : ''
       return `<div style="display:flex;gap:12px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:13px;font-weight:500;min-width:110px">${dateStr}</span>
-        <span style="font-size:13px">${timeStr}</span>
+        <span style="font-size:13px;font-weight:500;min-width:110px">${escHtml(dateStr)}</span>
+        <span style="font-size:13px">${escHtml(timeStr)}</span>
         ${loc}
       </div>`
     }).join('')

@@ -254,7 +254,10 @@ function renderShell(cfg, activePage) {
   const topbar = document.getElementById('topbar')
   if (!topbar) return
 
-  const envClass = cfg.appEnv || 'development'
+  const envClass = String(cfg.appEnv || 'development').replace(/[^a-z0-9_-]/gi, '') || 'development'
+  const safeVersion = escHtml(cfg.version)
+  const safeName = escHtml(cfg.user?.name)
+  const safeEmail = escHtml(cfg.user?.email)
   const showEnvBadges = envClass !== 'production'
 
   topbar.innerHTML = `
@@ -265,8 +268,8 @@ function renderShell(cfg, activePage) {
       <img id="topbarLogoImg" class="topbar-logo-img" src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'}" alt="ForgeShift">
       <span class="topbar-logo-text">ForgeShift</span>
     </a>
-    ${showEnvBadges ? `<span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>` : ''}
-    <span class="version-badge">v${cfg.version}</span>
+    ${showEnvBadges ? `<span class="env-topbar-badge ${envClass}" title="v${safeVersion}">${escHtml(envClass)}</span>` : ''}
+    <span class="version-badge">v${safeVersion}</span>
     <nav class="topbar-nav">
       <a href="/" class="topbar-nav-btn${activePage==='calendar'?' active':''}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
@@ -332,8 +335,8 @@ function renderShell(cfg, activePage) {
       </button>
       <div class="dropdown-menu" id="userMenu" style="min-width:220px">
         <div class="dropdown-user-header">
-          <div class="dropdown-user-name">${cfg.user.name}</div>
-          <div class="dropdown-user-email">${cfg.user.email || ''}</div>
+          <div class="dropdown-user-name">${safeName}</div>
+          <div class="dropdown-user-email">${safeEmail}</div>
         </div>
         <a href="/profile.html" class="dropdown-item">
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
@@ -364,8 +367,8 @@ function renderShell(cfg, activePage) {
     <div class="mobile-nav-user-header">
       ${avatarEl(cfg.user, 'lg').outerHTML}
       <div style="min-width:0">
-        <div style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cfg.user.name}</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cfg.user.email}</div>
+        <div style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeName}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeEmail}</div>
       </div>
     </div>
     <div class="mobile-nav-sep"></div>

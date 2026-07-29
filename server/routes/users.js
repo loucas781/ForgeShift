@@ -10,6 +10,7 @@ const path    = require('path')
 const multer  = require('multer')
 const logger  = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
+const { getShiftLeadScope } = require('../utils/scope')
 
 // ── Avatar upload storage ──────────────────────────────────────────────────────
 const AVATARS_DIR = path.join(__dirname, '../../public/uploads/avatars')
@@ -33,25 +34,47 @@ function getInitials(name) {
 }
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
+function canViewUser(req, userId) {
+  if (req.user.role === 'admin' || req.user.role === 'manager') return true
+  if (req.user.role === 'shift_lead') return getShiftLeadScope(req.user.id).has(userId)
+  return userId === req.user.id
+}
+
 // ── GET /api/users ────────────────────────────────────────────────────────────
 // Supports optional ?limit=N&offset=N pagination. Without these params returns all users.
 router.get('/', requireAuth, (req, res) => {
   res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
+  const visibleIds = (req.user.role === 'shift_lead') ? getShiftLeadScope(req.user.id) : null
+  const isPrivileged = req.user.role === 'admin' || req.user.role === 'manager'
+  if (!isPrivileged && req.user.role !== 'shift_lead') {
+    const user = db.prepare(
+      'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users WHERE id = ?'
+    ).get(req.user.id)
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit = Math.min(Math.max(parseInt(req.query.limit || '50'), 1), 200)
+      const offset = Math.max(parseInt(req.query.offset || '0'), 0)
+      return res.json({ users: user && offset === 0 ? [user] : [], total: user ? 1 : 0, limit, offset })
+    }
+    return res.json(user ? [user] : [])
+  }
   if (req.query.limit !== undefined || req.query.offset !== undefined) {
     const limit  = Math.min(Math.max(parseInt(req.query.limit  || '50'), 1), 200)
     const offset = Math.max(parseInt(req.query.offset || '0'), 0)
+    const where = visibleIds ? ` WHERE id IN (${[...visibleIds].map(() => '?').join(',')})` : ''
+    const baseParams = visibleIds ? [...visibleIds] : []
     const users  = db.prepare(
-      'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users ORDER BY name LIMIT ? OFFSET ?'
-    ).all(limit, offset)
-    const total = db.prepare('SELECT COUNT(*) as c FROM users').get().c
+      `SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users${where} ORDER BY name LIMIT ? OFFSET ?`
+    ).all(...baseParams, limit, offset)
+    const total = db.prepare(`SELECT COUNT(*) as c FROM users${where}`).get(...baseParams).c
     return res.json({ users, total, limit, offset })
   }
+  const where = visibleIds ? ` WHERE u.id IN (${[...visibleIds].map(() => '?').join(',')})` : ''
   const users = db.prepare(
     `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.is_active, u.created_at,
             tm.team_id
-     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id${where}
      ORDER BY u.name`
-  ).all()
+  ).all(...(visibleIds ? [...visibleIds] : []))
   res.json(users)
 })
 
@@ -66,6 +89,7 @@ router.get('/me', requireAuth, (req, res) => {
 
 // ── GET /api/users/:id/avatar — serve avatar image ───────────────────────────
 router.get('/:id/avatar', requireAuth, (req, res) => {
+  if (!canViewUser(req, req.params.id)) return res.status(403).json({ error: 'Forbidden' })
   const filePath = path.join(AVATARS_DIR, `${req.params.id}.jpg`)
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No avatar' })
   res.sendFile(filePath)
@@ -73,6 +97,7 @@ router.get('/:id/avatar', requireAuth, (req, res) => {
 
 // ── GET /api/users/:id ────────────────────────────────────────────────────────
 router.get('/:id', requireAuth, (req, res) => {
+  if (!canViewUser(req, req.params.id)) return res.status(403).json({ error: 'Forbidden' })
   const user = db.prepare(
     'SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users WHERE id = ?'
   ).get(req.params.id)

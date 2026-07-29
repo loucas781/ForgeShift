@@ -15,14 +15,21 @@ const PREFS_DEFAULTS = {
   compactChips:      false,
   shiftPanelSide:    'right', // 'left' | 'right'
 }
+const PREFS_DEFAULT_VIEWS = ['month', 'week', 'agenda']
 
 let _prefs = null
+
+function mergePrefs(data) {
+  const merged = { ...PREFS_DEFAULTS, ...(data || {}) }
+  if (!PREFS_DEFAULT_VIEWS.includes(merged.defaultView)) merged.defaultView = PREFS_DEFAULTS.defaultView
+  return merged
+}
 
 async function loadPrefs() {
   if (_prefs) return _prefs
   try {
     const data = await api('/api/auth/prefs')
-    _prefs = { ...PREFS_DEFAULTS, ...data }
+    _prefs = mergePrefs(data)
   } catch {
     _prefs = { ...PREFS_DEFAULTS }
   }
@@ -32,7 +39,7 @@ async function loadPrefs() {
 async function savePrefs(updates) {
   try {
     const data = await api('/api/auth/prefs', { method: 'PATCH', body: updates })
-    _prefs = { ...PREFS_DEFAULTS, ...data }
+    _prefs = mergePrefs(data)
     return _prefs
   } catch (err) {
     toast(err.message || 'Failed to save preferences', 'error')

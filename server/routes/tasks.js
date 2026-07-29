@@ -161,7 +161,8 @@ router.get('/assignments', requireAuth, (req, res) => {
         params.push(...scopeIds)
       }
     } else {
-      if (!user_id) { sql += ' AND a.user_id = ?'; params.push(req.user.id) }
+      if (user_id && user_id !== req.user.id) return res.status(403).json({ error: 'You can only view your own task assignments.' })
+      sql += ' AND a.user_id = ?'; params.push(req.user.id)
     }
 
     sql += ' ORDER BY a.date, u.name'

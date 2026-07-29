@@ -391,7 +391,9 @@ const sseClients = new Map()  // userId → Set<res>
 function broadcastShiftEvent(type, shift, actorId) {
   for (const [, clients] of sseClients) {
     for (const res of clients) {
-      try { res.write(`data: ${JSON.stringify({ type, shift, actorId })}\n\n`) } catch {}
+      // Clients only need the event type and actor for cache invalidation. Do
+      // not send shift/user/location/notes data to every connected account.
+      try { res.write(`data: ${JSON.stringify({ type, actorId })}\n\n`) } catch {}
     }
   }
 }
@@ -551,7 +553,7 @@ app.get('/forgot-password.html', (req, res) => sendPage(res, 'forgot-password.ht
 app.get('/reset-password.html',  (req, res) => sendPage(res, 'reset-password.html'))
 
 app.get(['/', '/index.html'],    requireAuth, requirePageAccess, (req, res) => sendPage(res, 'index.html'))
-app.get('/calendar.html',        requireAuth, requirePageAccess, (req, res) => sendPage(res, 'calendar.html'))
+app.get('/calendar.html',        requireAuth, requirePageAccess, (req, res) => sendPage(res, 'index.html'))
 app.get('/templates.html',       requireAuth, requirePageAccess, (req, res) => sendPage(res, 'templates.html'))
 app.get('/profile.html',         requireAuth, requirePageAccess, (req, res) => sendPage(res, 'profile.html'))
 app.get('/settings.html',        requireAuth, requirePageAccess, (req, res) => sendPage(res, 'settings.html'))

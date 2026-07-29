@@ -36,20 +36,34 @@
       <div class="cal-wrapper">
         <div class="cal-main">
         <!-- Toolbar -->
-        <div class="cal-toolbar">
+        <div class="cal-toolbar" role="toolbar" aria-label="Calendar controls">
           <div class="cal-nav">
-            <button class="cal-nav-btn" id="prevBtn" title="Previous">&#8249;</button>
+            <button class="cal-nav-btn" id="prevBtn" title="Previous period" aria-label="Previous period">&#8249;</button>
             <button class="cal-today-btn" onclick="goToday()">Today</button>
-            <button class="cal-nav-btn" id="nextBtn" title="Next">&#8250;</button>
+            <button class="cal-nav-btn" id="nextBtn" title="Next period" aria-label="Next period">&#8250;</button>
           </div>
           <h2 class="cal-title" id="calTitle">Loading…</h2>
-          <div id="userFilterWrap" style="display:none">
-            <select class="cal-user-filter" id="teamFilter" onchange="renderView()">
+          <div class="cal-filter-row" id="calendarFilters" aria-label="Calendar filters">
+            <label class="sr-only" for="teamFilter">Scope</label>
+            <select class="cal-filter-select" id="teamFilter" onchange="onScopeChange()" title="Scope">
               <option value="">My shifts</option>
             </select>
+            <label class="sr-only" for="locationFilter">Location</label>
+            <select class="cal-filter-select" id="locationFilter" onchange="applyCalendarFilters()" title="Location">
+              <option value="">All locations</option>
+            </select>
+            <label class="sr-only" for="typeFilter">Shift type</label>
+            <select class="cal-filter-select" id="typeFilter" onchange="applyCalendarFilters()" title="Shift type">
+              <option value="">All shift types</option><option value="regular">Regular</option><option value="oncall">On-call</option><option value="leave">Leave</option>
+            </select>
+            <label class="sr-only" for="shiftSearch">Search calendar</label>
+            <input class="cal-filter-input" id="shiftSearch" type="search" placeholder="Search shifts…" oninput="applyCalendarFilters()" autocomplete="off">
+            <button class="btn btn-ghost btn-sm cal-clear-filters" id="clearFiltersBtn" type="button" onclick="clearCalendarFilters()" hidden>Clear</button>
           </div>
+          <label class="cal-date-jump" title="Jump to date"><span class="sr-only">Jump to date</span><input id="dateJump" type="date" onchange="jumpToDate(this.value)"></label>
           <div class="cal-toolbar-end">
             <span id="hoursStat" class="cal-hours-stat"></span>
+            <span id="coverageStat" class="cal-coverage-stat" aria-live="polite"></span>
             <button id="copyWeekBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="copyWeekToNext()" title="Copy this week's shifts to next week">
               <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
               Copy week
@@ -65,14 +79,18 @@
             <button class="btn btn-ghost btn-icon" onclick="toggleKbdHelp()" title="Keyboard shortcuts" style="font-size:14px">?</button>
             <div id="liveIndicator" class="cal-live-dot" style="display:none" title="Live updates connected"></div>
           </div>
-          <div class="cal-view-tabs">
-            <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')">
+          <div class="cal-view-tabs" role="tablist" aria-label="Calendar view">
+            <button class="cal-view-tab active" id="tabMonth" onclick="setView('month')" role="tab" aria-selected="true" aria-controls="calGrid" aria-label="Month view">
               <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
               <span>Month</span>
             </button>
-            <button class="cal-view-tab" id="tabWeek" onclick="setView('week')">
+            <button class="cal-view-tab" id="tabWeek" onclick="setView('week')" role="tab" aria-selected="false" aria-controls="calGrid" aria-label="Week view">
               <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
               <span>Week</span>
+            </button>
+            <button class="cal-view-tab" id="tabAgenda" onclick="setView('agenda')" role="tab" aria-selected="false" aria-controls="calGrid" aria-label="Agenda view">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" class="cal-view-tab-icon"><path d="M4 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm4 1a1 1 0 011-1h7a1 1 0 110 2H9a1 1 0 01-1-1zm0 6a1 1 0 011-1h7a1 1 0 110 2H9a1 1 0 01-1-1zm0 6a1 1 0 011-1h7a1 1 0 110 2H9a1 1 0 01-1-1z"/></svg>
+              <span>Agenda</span>
             </button>
           </div>
         </div>
@@ -81,10 +99,10 @@
           <span id="calEmptyBannerMsg"></span>
           <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
         </div>
-        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-grid" id="calGrid" role="tabpanel" tabindex="0"></div>
         </div>
         <!-- Shift Details Side Panel -->
-        <div id="shiftPanel" class="shift-panel" aria-label="Shift details">
+        <div id="shiftPanel" class="shift-panel" role="dialog" aria-labelledby="shiftPanelTitle" tabindex="-1" aria-label="Shift details">
           <div class="shift-panel-header">
             <div class="shift-panel-title-row">
               <h3 class="shift-panel-title" id="shiftPanelTitle">Shift Details</h3>
@@ -107,16 +125,19 @@
 
 <!-- Shift Modal -->
 <div class="modal-overlay" id="shiftModal">
-  <div class="modal modal--shift">
+  <div class="modal modal--shift" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-header">
       <h3 class="modal-title" id="modalTitle">Shift</h3>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close shift editor">✕</button>
     </div>
     <div class="modal-body">
+      <div class="shift-editor-section" id="shiftAssignmentSection"><h4>Assignment</h4>
       <div id="adminUserField" style="display:none" class="form-group">
         <label class="form-label">Team member</label>
         <select class="form-select" id="modalUser"></select>
       </div>
+      </div>
+      <div class="shift-editor-section"><h4>Schedule</h4>
       <div class="form-group">
         <label class="form-label">Date</label>
         <input type="date" class="form-input" id="modalDate">
@@ -164,10 +185,16 @@
           <input type="time" class="form-input" id="modalEnd">
         </div>
       </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="samePreviousBtn" onclick="copyPreviousDayShift()" style="display:none">Same as previous day</button>
+      <div id="durationPreview" class="shift-duration-preview" aria-live="polite"></div>
+      </div>
+      <div class="shift-editor-section"><h4>Details</h4>
       <div class="form-group">
         <label class="form-label">Notes</label>
         <textarea class="form-textarea" id="modalNotes" placeholder="Add any notes for this day…" rows="3"></textarea>
       </div>
+      </div>
+      <div class="shift-editor-section"><h4>Status</h4>
       <div class="form-group">
         <label class="form-label">Shift colour <span style="font-weight:400;color:var(--text-3);font-size:11px">(used when no location colour is set)</span></label>
         <div id="modalColourPicker"></div>
@@ -186,6 +213,7 @@
         </label>
         <span class="form-label" style="margin:0">On-call</span>
       </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
@@ -201,7 +229,7 @@
   <div class="modal">
     <div class="modal-header">
       <h3 class="modal-title" id="taskAssignModalTitle">Assign Task</h3>
-      <button class="modal-close" onclick="closeTaskAssignModal()">✕</button>
+      <button class="modal-close" onclick="closeTaskAssignModal()" aria-label="Close task assignment">✕</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for one or more days this week.</p>
@@ -266,6 +294,7 @@
       <kbd class="kbd-key">T</kbd><span style="color:var(--text-2)">Go to today</span>
       <kbd class="kbd-key">W</kbd><span style="color:var(--text-2)">Switch to week view</span>
       <kbd class="kbd-key">M</kbd><span style="color:var(--text-2)">Switch to month view</span>
+      <kbd class="kbd-key">A</kbd><span style="color:var(--text-2)">Switch to agenda view</span>
       <kbd class="kbd-key">N</kbd><span style="color:var(--text-2)">New shift (today)</span>
       <kbd class="kbd-key">C</kbd><span style="color:var(--text-2)">Copy week → next week (week view)</span>
       <kbd class="kbd-key">P</kbd><span style="color:var(--text-2)">Print rota</span>
@@ -293,9 +322,15 @@ let users = []
 let templates = []
 let taskLists = []
 let taskAssignments = []
+let fetchedShifts = []
+let fetchedTaskAssignments = []
+let _renderToken = 0
+let _lastRenderedState = null
 let editingShiftId = null
 let selectedColour = '#4f46e5'
 let selectedCalendarDate = null
+let _lastShiftPreset = null
+let _previousShiftFocus = null
 const NEUTRAL_CALENDAR_COLOUR = '#6b7280'
 
 function getShiftDisplayColour(shift) {
@@ -331,6 +366,75 @@ let copiedShift = null   // { location_id, start_time, end_time, notes, note_col
 // Holiday map cache: { year: { 'YYYY-MM-DD': [{name, emoji}] } }
 let _holidayCache = {}
 
+function getScopeValue() { return document.getElementById('teamFilter')?.value || '' }
+function getScopeUserIds() {
+  const scope = getScopeValue()
+  if (scope.startsWith('user:')) return new Set([scope.slice(5)])
+  if (scope.startsWith('team:')) {
+    const team = teams.find(t => t.id === scope.slice(5))
+    return new Set((team?.members || []).map(m => m.id))
+  }
+  return null
+}
+function _searchable(value) { return String(value ?? '').toLowerCase() }
+function _matchesSearch(row, search) {
+  if (!search) return true
+  return [_searchable(row.user_name), _searchable(row.location_name), _searchable(row.notes), _searchable(row.date), _searchable(row.start_time), _searchable(row.end_time), _searchable(row.task_list_name), _searchable(row.task_list_description)].some(v => v.includes(search))
+}
+function getFilteredShifts() {
+  const location = document.getElementById('locationFilter')?.value || ''
+  const type = document.getElementById('typeFilter')?.value || ''
+  const search = _searchable(document.getElementById('shiftSearch')?.value).trim()
+  const userIds = getScopeUserIds()
+  return fetchedShifts.filter(s => {
+    if (userIds && !userIds.has(s.user_id)) return false
+    if (location && s.location_id !== location) return false
+    if (type === 'leave' && !s.is_off) return false
+    if (type === 'oncall' && (!s.is_oncall || s.is_off)) return false
+    if (type === 'regular' && (s.is_off || s.is_oncall)) return false
+    return _matchesSearch(s, search)
+  })
+}
+function getFilteredTaskAssignments() {
+  const location = document.getElementById('locationFilter')?.value || ''
+  const userIds = getScopeUserIds()
+  const search = _searchable(document.getElementById('shiftSearch')?.value).trim()
+  return fetchedTaskAssignments.filter(a =>
+    (!userIds || userIds.has(a.user_id)) &&
+    (!location || a.location_id === location) &&
+    _matchesSearch(a, search)
+  )
+}
+function applyCalendarFilters() {
+  shifts = getFilteredShifts(); taskAssignments = getFilteredTaskAssignments()
+  const clear = document.getElementById('clearFiltersBtn')
+  if (clear) clear.hidden = !((document.getElementById('locationFilter')?.value || '') || (document.getElementById('typeFilter')?.value || '') || (document.getElementById('shiftSearch')?.value || '').trim())
+  updateTitle(); renderCurrentView(); updateHoursStat()
+}
+function clearCalendarFilters() {
+  ;['locationFilter', 'typeFilter', 'shiftSearch'].forEach(id => { const el = document.getElementById(id); if (el) el.value = '' })
+  applyCalendarFilters()
+}
+function onScopeChange() { renderView() }
+function jumpToDate(value) { if (!value) return; currentDate = parseLocalDate(value); renderView() }
+function renderCurrentView() {
+  if (view === 'month') renderMonth()
+  else if (view === 'week') renderWeek()
+  else renderAgenda()
+}
+function syncViewTabs() {
+  const panel = document.getElementById('calGrid')
+  if (panel) panel.setAttribute('aria-labelledby', 'tab' + view[0].toUpperCase() + view.slice(1))
+  ;['month', 'week', 'agenda'].forEach(name => {
+    const tab = document.getElementById('tab' + name[0].toUpperCase() + name.slice(1))
+    if (!tab) return
+    const active = view === name
+    tab.classList.toggle('active', active)
+    tab.setAttribute('aria-selected', String(active))
+    tab.tabIndex = active ? 0 : -1
+  })
+}
+
 async function init() {
   cfg = await loadConfig()
   if (!cfg) return
@@ -338,11 +442,13 @@ async function init() {
   prefs = await loadPrefs()
   document.body.classList.toggle('shift-panel-left', (prefs.shiftPanelSide || 'right') === 'left')
 
-  view = prefs.defaultView || 'month'
+  view = ['month', 'week', 'agenda'].includes(prefs.defaultView) ? prefs.defaultView : 'month'
+  syncViewTabs()
 
   if (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') {
-    document.getElementById('userFilterWrap').style.display = 'block'
     document.getElementById('adminUserField').style.display = 'block'
+  } else {
+    document.getElementById('shiftAssignmentSection').style.display = 'none'
   }
 
   // loadUsers must complete before loadTeams — loadTeams filters the users array for shift_leads
@@ -354,9 +460,23 @@ async function init() {
 
   document.getElementById('prevBtn').addEventListener('click', prev)
   document.getElementById('nextBtn').addEventListener('click', next)
+  document.querySelector('.cal-view-tabs')?.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    const views = ['month', 'week', 'agenda']
+    let nextIndex = views.indexOf(view)
+    if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = views.length - 1
+    else nextIndex = (nextIndex + (event.key === 'ArrowRight' ? 1 : -1) + views.length) % views.length
+    event.preventDefault()
+    setView(views[nextIndex])
+    document.getElementById('tab' + views[nextIndex][0].toUpperCase() + views[nextIndex].slice(1))?.focus()
+  })
   document.getElementById('modalDate').addEventListener('change', updateTemplateQuickApplyState)
   document.getElementById('modalUser').addEventListener('change', updateTemplateQuickApplyState)
   document.getElementById('modalTemplateSelect').addEventListener('change', updateTemplateQuickApplyState)
+  ;['modalStart', 'modalEnd'].forEach(id => document.getElementById(id).addEventListener('input', updateDurationPreview))
+  document.getElementById('modalDate').addEventListener('change', updatePreviousDayAction)
+  document.getElementById('modalUser').addEventListener('change', updatePreviousDayAction)
 
   // Context menu: dismiss on outside click
   document.addEventListener('click', () => dismissContextMenu())
@@ -377,6 +497,15 @@ async function loadLocations() {
     selFrag.appendChild(o)
   })
   sel.appendChild(selFrag)
+  const filter = document.getElementById('locationFilter')
+  if (filter) {
+    locations.filter(l => l && l.id).forEach(l => {
+      const option = document.createElement('option')
+      option.value = l.id
+      option.textContent = l.name
+      filter.appendChild(option)
+    })
+  }
 }
 
 async function loadUsers() {
@@ -434,7 +563,17 @@ async function loadTeams() {
   }
 
   const sel = document.getElementById('teamFilter')
+  if (!sel) return
   while (sel.options.length > 1) sel.remove(1)
+  if (cfg.user.role !== 'member') {
+    const all = document.createElement('option'); all.value = 'all'; all.textContent = 'All visible'; sel.appendChild(all)
+    const teamOptions = teams.filter(t => t && t.id && Array.isArray(t.members))
+    if (teamOptions.length) {
+      const group = document.createElement('optgroup'); group.label = 'Teams'
+      teamOptions.forEach(t => { const o = document.createElement('option'); o.value = 'team:' + t.id; o.textContent = t.name; group.appendChild(o) })
+      sel.appendChild(group)
+    }
+  }
   // Individual users group.
   // Admins: all active users.
   // Shift leads: only members of their own teams (the `users` array has already
@@ -602,16 +741,15 @@ function getHolidayMap(year) {
   return _holidayCache[year]
 }
 
-function invalidateHolidayCache(year) {
-  if (year != null) delete _holidayCache[year]
-  else _holidayCache = {}
-}
-
 // ── Data loading ───────────────────────────────────────────────────────────────
 // Returns { start, end } Date objects for the currently visible calendar range.
 function getViewDateRange() {
   const weekStart = prefs?.weekStartDay ?? 1
-  if (view === 'month') {
+  if (view === 'agenda') {
+    const start = parseLocalDate(toDateStr(currentDate))
+    const end = new Date(start); end.setDate(end.getDate() + 6)
+    return { start, end }
+  } else if (view === 'month') {
     const year  = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const first = new Date(year, month, 1)
@@ -631,9 +769,9 @@ function getViewDateRange() {
 async function loadShifts() {
   const { start, end } = getViewDateRange()
   const queryStart = new Date(start)
-  // Week view needs one extra day so overnight shifts from the previous day
-  // can render their after-midnight segment in the visible week.
-  if (view === 'week') queryStart.setDate(queryStart.getDate() - 1)
+  // Week needs the preceding overnight segment; Agenda also uses the previous
+  // day to offer the shift editor's "Same as previous day" action.
+  if (view === 'week' || view === 'agenda') queryStart.setDate(queryStart.getDate() - 1)
   const params = new URLSearchParams({ start: toDateStr(queryStart), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
   const role = cfg.user.role
@@ -641,7 +779,7 @@ async function loadShifts() {
   if (role === 'member') {
     params.set('user_id', cfg.user.id)
   } else if (role === 'admin' || role === 'manager' || role === 'shift_lead') {
-    if (filterVal === '') {
+    if (filterVal === '' ) {
       // No filter selected — show own shifts only
       params.set('user_id', cfg.user.id)
     } else if (filterVal.startsWith('user:')) {
@@ -649,7 +787,7 @@ async function loadShifts() {
       params.set('user_id', filterVal.slice(5))
     }
   }
-  shifts = await api('/api/shifts?' + params)
+  return api('/api/shifts?' + params)
 }
 
 async function loadTaskAssignments() {
@@ -670,10 +808,11 @@ async function loadTaskAssignments() {
       params.set('user_id', filterVal.slice(5))
     }
   }
-  try { taskAssignments = await api('/api/tasks/assignments?' + params) } catch { taskAssignments = [] }
+  try { return await api('/api/tasks/assignments?' + params) } catch { return [] }
 }
 
 async function renderView() {
+  const renderToken = ++_renderToken
   // Show a loading shimmer while data is in flight
   const grid = document.getElementById('calGrid')
   if (grid && !grid.dataset.loaded) {
@@ -681,14 +820,44 @@ async function renderView() {
       Array.from({length: 35}, () => '<div class="cal-skeleton-cell"><div class="cal-skeleton-date"></div><div class="cal-skeleton-chip"></div></div>').join('') +
       '</div></div>'
   }
-  await loadShifts()
-  if (cfg.featureTasks && taskLists.length) await loadTaskAssignments()
+  try {
+    const [nextShifts, nextTaskAssignments] = await Promise.all([
+      loadShifts(),
+      cfg.featureTasks && taskLists.length ? loadTaskAssignments() : Promise.resolve([]),
+    ])
+    if (renderToken !== _renderToken) return
+    fetchedShifts = nextShifts
+    fetchedTaskAssignments = nextTaskAssignments
+    shifts = getFilteredShifts()
+    taskAssignments = getFilteredTaskAssignments()
+  } catch {
+    if (renderToken !== _renderToken) return
+    if (_lastRenderedState) {
+      currentDate = new Date(_lastRenderedState.date)
+      view = _lastRenderedState.view
+      const filter = document.getElementById('teamFilter')
+      if (filter) filter.value = _lastRenderedState.filter
+      updateTitle()
+      syncViewTabs()
+    } else if (grid) {
+      grid.innerHTML = `<div role="alert" style="padding:48px 20px;text-align:center;color:var(--text-2)">
+        <div style="font-weight:700;margin-bottom:8px">Could not load the calendar</div>
+        <div style="font-size:13px;margin-bottom:16px">Check your connection, then try again.</div>
+        <button class="btn btn-secondary btn-sm" onclick="renderView()">Retry</button>
+      </div>`
+    }
+    toast('Could not refresh the calendar. Please try again.', 'error')
+    return
+  }
   if (grid) grid.dataset.loaded = '1'
   updateTitle()
-  if (view === 'month') renderMonth()
-  else renderWeek()
-  document.getElementById('tabMonth').className = 'cal-view-tab' + (view==='month'?' active':'')
-  document.getElementById('tabWeek').className  = 'cal-view-tab' + (view==='week'?' active':'')
+  renderCurrentView()
+  _lastRenderedState = {
+    date: currentDate.getTime(),
+    view,
+    filter: document.getElementById('teamFilter')?.value || '',
+  }
+  syncViewTabs()
   // Update copy indicator
   updatePasteHint()
   // Hours summary
@@ -707,12 +876,18 @@ async function renderView() {
 }
 
 function updateTitle() {
+  const dateJump = document.getElementById('dateJump')
+  if (dateJump) dateJump.value = toDateStr(currentDate)
   const weekStart = prefs?.weekStartDay ?? 1
   const todayNow = new Date()
   let isCurrentPeriod
   if (view === 'month') {
     document.getElementById('calTitle').textContent = MONTH_NAMES[currentDate.getMonth()] + ' ' + currentDate.getFullYear()
     isCurrentPeriod = currentDate.getFullYear() === todayNow.getFullYear() && currentDate.getMonth() === todayNow.getMonth()
+  } else if (view === 'agenda') {
+    const as = parseLocalDate(toDateStr(currentDate)); const ae = new Date(as); ae.setDate(ae.getDate() + 6)
+    document.getElementById('calTitle').textContent = `${as.getDate()} ${MONTH_NAMES[as.getMonth()].slice(0,3)} – ${ae.getDate()} ${MONTH_NAMES[ae.getMonth()].slice(0,3)} ${ae.getFullYear()}`
+    isCurrentPeriod = todayNow >= as && todayNow <= ae
   } else {
     const ws = startOfWeek(currentDate, weekStart)
     const we = new Date(ws); we.setDate(we.getDate() + 6)
@@ -723,6 +898,50 @@ function updateTitle() {
   }
   const todayBtn = document.querySelector('.cal-today-btn')
   if (todayBtn) todayBtn.classList.toggle('cal-today-btn--away', !isCurrentPeriod)
+}
+
+function isMultiStaffScope() {
+  const scope = getScopeValue()
+  return cfg.user.role !== 'member' && scope !== '' && !scope.startsWith('user:')
+}
+
+function getCoverageBreakdown(shiftRows) {
+  const workingShifts = shiftRows.filter(s => !s.is_off)
+  return {
+    hours: calcHours(workingShifts),
+    shifts: workingShifts.length,
+    staff: new Set(workingShifts.map(s => s.user_id)).size,
+    locations: new Set(workingShifts.filter(s => s.location_id).map(s => s.location_id)).size,
+  }
+}
+
+function formatHoursValue(hours) {
+  return hours % 1 === 0 ? String(hours) : hours.toFixed(1)
+}
+
+function getDayCoverageLabel(dayShifts) {
+  const coverage = getCoverageBreakdown(dayShifts)
+  if (!coverage.shifts) return ''
+  const parts = []
+  if (isMultiStaffScope()) parts.push(`${coverage.staff} staff`)
+  if (coverage.hours > 0) parts.push(`${formatHoursValue(coverage.hours)}h`)
+  if (!parts.length) parts.push(`${coverage.shifts} ${coverage.shifts === 1 ? 'shift' : 'shifts'}`)
+  return parts.join(' · ')
+}
+
+function getWeekSegmentCoverageLabel(dayEntries) {
+  const working = dayEntries.filter(entry => !entry.shift.is_off)
+  if (!working.length) return ''
+  const staff = new Set(working.map(entry => entry.shift.user_id)).size
+  const hours = working.reduce((total, entry) => {
+    if (!entry.timed) return total
+    return total + ((entry.segEnd - entry.segStart) / 60)
+  }, 0)
+  const parts = []
+  if (isMultiStaffScope()) parts.push(`${staff} staff`)
+  if (hours > 0) parts.push(`${formatHoursValue(hours)}h`)
+  if (!parts.length) parts.push(`${working.length} ${working.length === 1 ? 'shift' : 'shifts'}`)
+  return parts.join(' · ')
 }
 
 // ── Month render ───────────────────────────────────────────────────────────────
@@ -738,7 +957,6 @@ function renderMonth() {
   const weekStart  = prefs?.weekStartDay ?? 1
   const showWkNums = prefs?.showWeekNumbers ?? false
   const compact    = prefs?.compactChips ?? false
-  const holidays   = getHolidayMap(year)
 
   const startOffset = (first.getDay() - weekStart + 7) % 7
   const totalCells  = Math.ceil((startOffset + last.getDate()) / 7) * 7
@@ -771,7 +989,7 @@ function renderMonth() {
     const isCurrentMonth = d.getMonth() === month
     const isToday        = ds === today
     const dayShifts      = shiftMap[ds] || []
-    const dayHols        = holidays[ds] || []
+    const dayHols        = getHolidayMap(d.getFullYear())[ds] || []
 
     // Week number at start of each row
     if (showWkNums && i % 7 === 0) {
@@ -780,7 +998,6 @@ function renderMonth() {
 
     const dayAssignments = taskMap[ds] || []
     const dayTaskCount = dayAssignments.length
-    const dayShiftCount = dayShifts.length
 
     // Task indicator — compact dots keeps month view clean.
     let taskBannerHtml = ''
@@ -807,11 +1024,16 @@ function renderMonth() {
       (isEmpty && canManage() ? ' can-add' : '') +
       '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
       (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
-    html += '<div class="cal-cell-date">' + d.getDate() + '</div>'
+    html += '<button type="button" class="cal-cell-date" aria-label="Open ' + ds + '" onclick="event.stopPropagation();handleCellClick(\'' + ds + '\')">' + d.getDate() + '</button>'
     // Holiday label(s) — pinned, non-interactive, behind shifts
     if (dayHols.length) {
       const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
-      html += '<div class="cal-holiday-label" title="' + names + '">' + names + '</div>'
+      html += '<div class="cal-holiday-label" title="' + escHtml(names) + '">' + escHtml(names) + '</div>'
+    }
+
+    const coverageLabel = getDayCoverageLabel(dayShifts)
+    if (coverageLabel) {
+      html += '<div class="cal-day-summary" aria-label="Scheduled coverage: ' + escHtml(coverageLabel) + '">' + escHtml(coverageLabel) + '</div>'
     }
 
     // Task banner (first column of week only)
@@ -837,14 +1059,15 @@ function renderMonth() {
       const titleStr = (s.user_name ? s.user_name + ': ' : '') + label + (s.start_time ? ' ' + s.start_time + '–' + s.end_time : '')
       html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
         '" style="background:' + color + '"' +
-        ' title="' + titleStr + '"' +
-        ' onclick="event.stopPropagation();openShiftPanel(\'' + s.id + '\')"' +
-        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + s.id + '\')"' : '') +
-        ' data-shift-id="' + s.id + '"' + '>' +
-        name + label + durBadge + '</div>'
+        ' title="' + escHtml(titleStr) + '"' +
+        ' role="button" tabindex="0" aria-label="' + escHtml(titleStr) + '" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openShiftPanel(\'' + escHtml(s.id) + '\')}"' +
+        ' onclick="event.stopPropagation();openShiftPanel(\'' + escHtml(s.id) + '\')"' +
+        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + escHtml(s.id) + '\')"' : '') +
+        ' data-shift-id="' + escHtml(s.id) + '"' + '>' +
+        escHtml(name) + escHtml(label) + durBadge + '</div>'
     })
     if (overflow > 0) {
-      html += '<div class="cal-more-badge" onclick="event.stopPropagation();openCreateModal(\'' + ds + '\')" title="' + overflow + ' more shift' + (overflow > 1 ? 's' : '') + '">+' + overflow + ' more</div>'
+      html += '<button type="button" class="cal-more-badge" onclick="event.stopPropagation();openDayPanel(\'' + ds + '\')" title="' + overflow + ' more shift' + (overflow > 1 ? 's' : '') + '" aria-label="Show more shifts for ' + ds + '">+' + overflow + ' more</button>'
     }
 
     // Paste hint
@@ -913,14 +1136,11 @@ function renderWeek() {
   const todayStr  = toDateStr(new Date())
   const weekStart = prefs?.weekStartDay ?? 1
   const ws        = startOfWeek(currentDate, weekStart)
-  const year      = ws.getFullYear()
-  const holidays  = getHolidayMap(year)
   const _fv       = document.getElementById('teamFilter')?.value || ''
   const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
 
-  const visibleShiftsWeek = shifts
   const shiftMap = {}
-  visibleShiftsWeek.forEach(s => {
+  shifts.forEach(s => {
     if (!shiftMap[s.date]) shiftMap[s.date] = []
     const startMins = _timeToMins(s.start_time)
     const endMins = _timeToMins(s.end_time)
@@ -972,10 +1192,12 @@ function renderWeek() {
   days.forEach(d => {
     const ds      = toDateStr(d)
     const isToday = ds === todayStr
-    const hols    = holidays[ds] || []
+    const hols    = getHolidayMap(d.getFullYear())[ds] || []
+    const coverageLabel = getWeekSegmentCoverageLabel(shiftMap[ds] || [])
     html += `<div class="cal-week-day-header${isToday ? ' today' : ''}${hols.length ? ' is-holiday' : ''}">
       <div class="day-name">${DAY_ABBR[d.getDay()]}</div>
       <div class="day-num">${d.getDate()}</div>
+      ${coverageLabel ? `<div class="cal-week-day-summary">${escHtml(coverageLabel)}</div>` : ''}
     </div>`
   })
   html += `</div>` // end header-row
@@ -1016,7 +1238,7 @@ function renderWeek() {
   days.forEach(d => {
     const ds        = toDateStr(d)
     const dayShifts = shiftMap[ds] || []
-    const dayHols   = holidays[ds] || []
+    const dayHols   = getHolidayMap(d.getFullYear())[ds] || []
     const hasPaste  = copiedShift && dayShifts.length === 0
 
     html += `<div class="cal-week-day-col${selectedCalendarDate === ds ? ' selected-day' : ''}${dayHols.length ? ' is-holiday' : ''}" onclick="handleCellClick('${ds}')">`
@@ -1030,7 +1252,7 @@ function renderWeek() {
     // Holiday label pinned near top
     if (dayHols.length) {
       const names = dayHols.map(h => h.emoji + ' ' + h.name).join(' · ')
-      html += `<div class="cal-holiday-label week-holiday-label" style="position:absolute;top:4px;left:0;right:0;z-index:3" title="${names}">${names}</div>`
+      html += `<div class="cal-holiday-label week-holiday-label" style="position:absolute;top:4px;left:0;right:0;z-index:3" title="${escHtml(names)}">${escHtml(names)}</div>`
     }
 
     // Paste hint
@@ -1044,9 +1266,10 @@ function renderWeek() {
       const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
-      const clickFn = `openShiftPanel('${s.id}')`
+      const safeId = escHtml(s.id)
+      const clickFn = `openShiftPanel('${safeId}')`
       const ctxAttr = canManage()
-        ? `oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${s.id}')"`
+        ? `oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${safeId}')"`
         : ''
 
       if (entry.timed) {
@@ -1060,10 +1283,10 @@ function renderWeek() {
         const showNotes = s.notes && height >= 52
         html += `<div class="cal-week-shift-card${s.is_oncall ? ' is-oncall' : ''}"
           style="background:${color};top:${top}px;height:${height}px"
-          onclick="event.stopPropagation();${clickFn}" ${ctxAttr}>
-          <div class="shift-loc">${prefix}${label}</div>
-          ${showTime ? `<div class="shift-time">${timeStr}</div>` : ''}
-          ${showNotes ? `<div class="shift-notes">${s.notes.slice(0, 50)}${s.notes.length > 50 ? '…' : ''}</div>` : ''}
+          role="button" tabindex="0" aria-label="${escHtml(`${label}, ${timeStr}`)}" onclick="event.stopPropagation();${clickFn}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${clickFn}}" ${ctxAttr}>
+          <div class="shift-loc">${escHtml(prefix)}${escHtml(label)}</div>
+          ${showTime ? `<div class="shift-time">${escHtml(timeStr)}</div>` : ''}
+          ${showNotes ? `<div class="shift-notes">${escHtml(s.notes.slice(0, 50))}${s.notes.length > 50 ? '…' : ''}</div>` : ''}
           ${canManage() ? '<div class="shift-resize-handle"></div>' : ''}
         </div>`
       } else {
@@ -1071,8 +1294,8 @@ function renderWeek() {
         const topOffset = dayHols.length ? 26 : 4
         html += `<div class="cal-week-allday-chip${s.is_oncall ? ' is-oncall' : ''}"
           style="background:${color};position:absolute;top:${topOffset}px;left:3px;right:3px;z-index:2"
-          onclick="event.stopPropagation();${clickFn}" ${ctxAttr}>
-          ${prefix}${label}
+          role="button" tabindex="0" aria-label="${escHtml(label)}" onclick="event.stopPropagation();${clickFn}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${clickFn}}" ${ctxAttr}>
+          ${escHtml(prefix)}${escHtml(label)}
         </div>`
       }
     })
@@ -1087,6 +1310,33 @@ function renderWeek() {
 
   // ── Draw current-time line ───────────────────────────────────────────────────
   _renderWeekNowLine()
+}
+
+function renderAgenda() {
+  const emptyBanner = document.getElementById('calEmptyBanner')
+  if (emptyBanner) emptyBanner.style.display = 'none'
+  const grid = document.getElementById('calGrid')
+  if (!grid) return
+  const start = parseLocalDate(toDateStr(currentDate))
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d })
+  const shiftMap = shifts.reduce((m, s) => { (m[s.date] ||= []).push(s); return m }, {})
+  const taskMap = taskAssignments.reduce((m, a) => { (m[a.date] ||= []).push(a); return m }, {})
+  let html = '<div class="cal-agenda">'
+  days.forEach(d => {
+    const ds = toDateStr(d); const dayShifts = (shiftMap[ds] || []).slice().sort((a,b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
+    const dayTasks = taskMap[ds] || []; const hols = getHolidayMap(d.getFullYear())[ds] || []
+    const coverageLabel = getDayCoverageLabel(dayShifts)
+    html += `<section class="cal-agenda-day${ds === toDateStr(new Date()) ? ' today' : ''}" aria-labelledby="agenda-${ds}">`
+    html += `<header class="cal-agenda-day-header"><div><h3 id="agenda-${ds}">${escHtml(d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))}</h3>${coverageLabel ? `<span class="cal-agenda-coverage">${escHtml(coverageLabel)}</span>` : ''}${hols.length ? `<span class="cal-agenda-holiday">${escHtml(hols.map(h => h.emoji + ' ' + h.name).join(' · '))}</span>` : ''}</div>${canManage() ? `<button class="btn btn-secondary btn-sm" onclick="openCreateModal('${ds}')" aria-label="Add shift on ${ds}">+ Shift</button>` : ''}</header>`
+    if (dayShifts.length) dayShifts.forEach(s => {
+      const label = s.is_off ? 'Day off' : (s.location_name || 'Shift')
+      const meta = [s.user_name, s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day', s.is_oncall ? 'On-call' : ''].filter(Boolean).join(' · ')
+      html += `<button type="button" class="cal-agenda-shift" onclick="openShiftPanel('${escHtml(s.id)}')" aria-label="${escHtml(`${label}, ${meta}`)}"><span class="cal-agenda-dot" style="background:${getShiftDisplayColour(s)}"></span><span class="cal-agenda-shift-main"><strong>${escHtml(label)}</strong><span>${escHtml(meta)}</span>${s.notes ? `<small>${escHtml(s.notes)}</small>` : ''}</span></button>`
+    }); else html += `<p class="cal-agenda-empty">No shifts scheduled.</p>`
+    if (dayTasks.length) { html += '<div class="cal-agenda-tasks"><strong>Tasks</strong>'; dayTasks.forEach(a => { html += `<div class="cal-agenda-task"><span>${escHtml(a.task_list_name || 'Task')}</span>${a.user_name ? `<small>${escHtml(a.user_name)}</small>` : ''}</div>` }); html += '</div>' }
+    html += '</section>'
+  })
+  grid.innerHTML = html + '</div>'
 }
 
 // ── Current-time indicator for week view ──────────────────────────────────────
@@ -1140,7 +1390,12 @@ function next() {
   renderView()
 }
 function goToday() { currentDate = new Date(); renderView() }
-function setView(v) { view = v; renderView() }
+function setView(v) {
+  if (!['month', 'week', 'agenda'].includes(v)) return
+  view = v
+  syncViewTabs()
+  renderView()
+}
 
 function syncSelectedDayHighlight() {
   document.querySelectorAll('.cal-cell.selected-day').forEach(el => el.classList.remove('selected-day'))
@@ -1570,18 +1825,20 @@ function _initRepeatDayBtns(baseDate) {
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
-function openCreateModal(date) {
+function openCreateModal(date, returnFocus = null) {
+  _previousShiftFocus = returnFocus || document.activeElement
   editingShiftId = null
   selectedColour = '#4f46e5'
   document.getElementById('modalTitle').textContent = 'Add Shift'
   document.getElementById('modalDate').value  = date
   document.getElementById('modalLocation').value = ''
   // Pre-fill default times from prefs
-  document.getElementById('modalStart').value = prefs?.defaultShiftStart || ''
-  document.getElementById('modalEnd').value   = prefs?.defaultShiftEnd   || ''
+  document.getElementById('modalStart').value = _lastShiftPreset?.start_time || prefs?.defaultShiftStart || ''
+  document.getElementById('modalEnd').value   = _lastShiftPreset?.end_time || prefs?.defaultShiftEnd || ''
+  document.getElementById('modalLocation').value = _lastShiftPreset?.location_id || ''
   document.getElementById('modalNotes').value = ''
   document.getElementById('modalIsOff').checked = false
-  document.getElementById('modalIsOncall').checked = false
+  document.getElementById('modalIsOncall').checked = !!_lastShiftPreset?.is_oncall
   document.getElementById('deleteShiftBtn').style.display = 'none'
   if (canManage()) document.getElementById('modalUser').value = getCalendarContextUserId()
   document.getElementById('modalTemplateSelect').value = ''
@@ -1590,11 +1847,15 @@ function openCreateModal(date) {
   _initRepeatDayBtns(date)
   setTemplateQuickApplyVisibility(true, date)
   document.getElementById('shiftModal').classList.add('open')
+  document.getElementById('modalDate').focus()
+  updateDurationPreview()
+  updatePreviousDayAction()
 }
 
-function openEditModal(id) {
+function openEditModal(id, returnFocus = null) {
   const s = shifts.find(x => x.id === id)
   if (!s) return
+  _previousShiftFocus = returnFocus || document.activeElement
   editingShiftId = id
   selectedColour = resolveColourValue(s.note_color, '#4f46e5')
   document.getElementById('modalTitle').textContent = 'Edit Shift'
@@ -1612,6 +1873,8 @@ function openEditModal(id) {
   if (rdw) rdw.style.display = 'none'
   setTemplateQuickApplyVisibility(false)
   document.getElementById('shiftModal').classList.add('open')
+  updateDurationPreview(); document.getElementById('samePreviousBtn').style.display = 'none'
+  document.getElementById('modalDate').focus()
 }
 
 function setupColourPicker() {
@@ -1632,35 +1895,38 @@ function closeModal() {
   const rdw = document.getElementById('repeatDaysWrap')
   if (rdw) rdw.style.display = 'none'
   setTemplateQuickApplyVisibility(false)
+  const restore = _previousShiftFocus; _previousShiftFocus = null
+  if (restore && typeof restore.focus === 'function') setTimeout(() => restore.focus(), 0)
 }
 
-async function saveShift() {
-  const body = {
-    date:        document.getElementById('modalDate').value,
-    location_id: document.getElementById('modalLocation').value || null,
-    start_time:  document.getElementById('modalStart').value || null,
-    end_time:    document.getElementById('modalEnd').value || null,
-    notes:       document.getElementById('modalNotes').value.trim() || null,
-    note_color:  selectedColour,
-    is_off:      document.getElementById('modalIsOff').checked,
-    is_oncall:   document.getElementById('modalIsOncall').checked,
-  }
-  if (canManage()) {
-    body.user_id = getSelectedModalUserId()
-  }
-  try {
-    if (editingShiftId) {
-      await api(`/api/shifts/${editingShiftId}`, { method: 'PUT', body })
-      toast('Shift updated', 'success')
-    } else {
-      await api('/api/shifts', { method: 'POST', body })
-      toast('Shift added', 'success')
-    }
-    closeModal()
-    renderView()
-  } catch (err) {
-    toast(err.message, 'error')
-  }
+function updateDurationPreview() {
+  const el = document.getElementById('durationPreview'); if (!el) return
+  const start = document.getElementById('modalStart')?.value; const end = document.getElementById('modalEnd')?.value
+  const mins = _shiftDurationMins(start, end)
+  el.textContent = mins > 0 ? `Duration: ${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ''}` : ''
+}
+function updatePreviousDayAction() {
+  const btn = document.getElementById('samePreviousBtn'); if (!btn) return
+  const userId = getSelectedModalUserId(); const date = document.getElementById('modalDate')?.value
+  if (!date || !userId || editingShiftId) { btn.style.display = 'none'; return }
+  const previous = _addDaysToDateStr(date, -1)
+  btn.style.display = fetchedShifts.some(s => s.user_id === userId && s.date === previous) ? '' : 'none'
+}
+function copyPreviousDayShift() {
+  const date = document.getElementById('modalDate')?.value; const userId = getSelectedModalUserId()
+  const previous = fetchedShifts.find(s => s.user_id === userId && s.date === _addDaysToDateStr(date, -1)); if (!previous) return
+  document.getElementById('modalLocation').value = previous.location_id || ''
+  document.getElementById('modalStart').value = previous.start_time || ''
+  document.getElementById('modalEnd').value = previous.end_time || ''
+  document.getElementById('modalNotes').value = previous.notes || ''
+  document.getElementById('modalIsOff').checked = !!previous.is_off
+  document.getElementById('modalIsOncall').checked = !!previous.is_oncall
+  selectedColour = resolveColourValue(previous.note_color, '#4f46e5')
+  setupColourPicker()
+  updateDurationPreview()
+}
+function rememberShiftPreset(body) {
+  _lastShiftPreset = { location_id: body.location_id || '', start_time: body.start_time || '', end_time: body.end_time || '', is_oncall: !!body.is_oncall }
 }
 
 async function deleteShift() {
@@ -1679,6 +1945,21 @@ async function deleteShift() {
 
 document.getElementById('shiftModal').addEventListener('click', e => {
   if (e.target === document.getElementById('shiftModal')) closeModal()
+})
+document.getElementById('shiftModal').addEventListener('keydown', event => {
+  if (event.key !== 'Tab') return
+  const focusable = [...event.currentTarget.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && el.getClientRects().length > 0)
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
 })
 
 document.getElementById('taskAssignModal').addEventListener('click', e => {
@@ -1909,20 +2190,79 @@ function calcHours(shiftsArr) {
 function updateHoursStat() {
   const el = document.getElementById('hoursStat')
   if (!el) return
-  const h = calcHours(shifts)
-  const label = view === 'week' ? 'this week' : 'this month'
-  el.textContent = h > 0 ? `${h % 1 === 0 ? h : h.toFixed(1)} hrs ${label}` : ''
+  const period = view === 'month'
+    ? { start: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), end: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0) }
+    : getViewDateRange()
+  const periodShifts = shifts.filter(s => s.date >= toDateStr(period.start) && s.date <= toDateStr(period.end))
+  const summary = getCoverageBreakdown(periodShifts)
+  const h = summary.hours
+  const label = view === 'week' ? 'this week' : view === 'agenda' ? 'next 7 days' : 'this month'
+  el.textContent = h > 0 ? `${formatHoursValue(h)} hrs ${label}` : ''
+  const coverage = document.getElementById('coverageStat')
+  if (!coverage) return
+  if (isMultiStaffScope()) {
+    const shiftLabel = summary.shifts === 1 ? 'shift' : 'shifts'
+    const locationLabel = summary.locations === 1 ? 'location' : 'locations'
+    coverage.textContent = `${summary.staff} staff scheduled · ${summary.shifts} ${shiftLabel} · ${summary.locations} ${locationLabel}`
+  } else {
+    coverage.textContent = summary.shifts ? `${summary.shifts} scheduled ${summary.shifts === 1 ? 'shift' : 'shifts'}` : ''
+  }
 }
 
 // ── CSV Export ─────────────────────────────────────────────────────────────────
 function exportCSV() {
   const { start, end } = getViewDateRange()
-  const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
+  const startDate = toDateStr(start)
+  const endDate = toDateStr(end)
   const filterVal = document.getElementById('teamFilter')?.value || ''
-  if (filterVal.startsWith('user:')) params.set('user_id', filterVal.slice(5))
   // Remember last-used export scope in localStorage
   try { localStorage.setItem('fs-last-export-filter', filterVal) } catch {}
-  window.location.href = '/api/shifts/export/csv?' + params
+
+  const rows = shifts
+    .filter(s => s.date >= startDate && s.date <= endDate)
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.user_name || '').localeCompare(b.user_name || ''))
+  if (!rows.length) {
+    toast('No displayed shifts to export.', 'error')
+    return
+  }
+
+  const csvCell = value => {
+    const raw = String(value ?? '')
+    const withoutLeadingControls = raw.replace(/^[\t\r\n]+/, '')
+    const isDangerous = withoutLeadingControls !== raw || /^\s*[=+\-@]/.test(withoutLeadingControls)
+    const safe = isDangerous ? `'${withoutLeadingControls}` : raw
+    return `"${safe.replace(/"/g, '""')}"`
+  }
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const lines = [['Date', 'Day', 'User', 'Location', 'Start', 'End', 'Hours', 'Notes', 'Type'].map(csvCell).join(',')]
+  rows.forEach(s => {
+    const date = parseLocalDate(s.date)
+    const hours = !s.is_off && s.start_time && s.end_time
+      ? (_shiftDurationMins(s.start_time, s.end_time) / 60).toFixed(2)
+      : ''
+    const type = s.is_off ? 'Annual Leave' : s.is_oncall ? 'On-call' : 'Shift'
+    lines.push([
+      s.date,
+      dayNames[date.getDay()],
+      s.user_name || '',
+      s.location_name || '',
+      s.start_time || '',
+      s.end_time || '',
+      hours,
+      s.notes || '',
+      type,
+    ].map(csvCell).join(','))
+  })
+
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `shifts-${startDate}-to-${endDate}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────────────
@@ -1954,6 +2294,9 @@ document.addEventListener('keydown', e => {
       break
     case 'm': case 'M':
       if (!modalOpen) setView('month')
+      break
+    case 'a': case 'A':
+      if (!modalOpen) setView('agenda')
       break
     case 'n': case 'N':
       if (!modalOpen) openCreateModal(toDateStr(new Date()))
@@ -1987,10 +2330,18 @@ document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
 // ── Shift details side panel ───────────────────────────────────────────────────
 let _shiftPanelId = null
 let _shiftPanelDay = null
+let _shiftPanelReturnFocus = null
+
+function _focusShiftPanel() {
+  const panel = document.getElementById('shiftPanel')
+  if (panel) { panel.focus(); panel.scrollTop = 0 }
+}
 
 function openShiftPanel(shiftId) {
   const s = shifts.find(x => x.id == shiftId)
   if (!s) return
+  const panel = document.getElementById('shiftPanel')
+  if (!panel.classList.contains('open')) _shiftPanelReturnFocus = document.activeElement
   selectedCalendarDate = s.date
   syncSelectedDayHighlight()
   _shiftPanelId = shiftId
@@ -2054,9 +2405,12 @@ function openShiftPanel(shiftId) {
   // Open panel
   document.getElementById('shiftPanel').classList.add('open')
   document.body.classList.add('shift-panel-open')
+  _focusShiftPanel()
 }
 
 function openDayPanel(dateStr) {
+  const panel = document.getElementById('shiftPanel')
+  if (!panel.classList.contains('open')) _shiftPanelReturnFocus = document.activeElement
   selectedCalendarDate = dateStr
   syncSelectedDayHighlight()
   _shiftPanelId = null
@@ -2070,7 +2424,7 @@ function openDayPanel(dateStr) {
   document.getElementById('shiftPanelTitle').textContent = dateLabel
 
   document.getElementById('shiftPanelEditBtn').style.display = 'none'
-  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() && dayShifts.length === 0 ? '' : 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() ? '' : 'none'
 
   const dayTasks = taskAssignments.filter(a => a.date === dateStr)
 
@@ -2082,11 +2436,11 @@ function openDayPanel(dateStr) {
         s.is_oncall ? 'On call' : '',
         (s.start_time && s.end_time) ? `${s.start_time} - ${s.end_time}` : ''
       ].filter(Boolean).join(' • ')
-      return `<div class="shift-panel-task-card" style="cursor:pointer" onclick="openShiftPanel('${s.id}')">` +
+      return `<button type="button" class="shift-panel-task-card" onclick="openShiftPanel('${escHtml(s.id)}')" aria-label="Open ${escHtml(label)} shift">` +
         `<div class="shift-panel-task-name">${escHtml(label)}</div>` +
         (meta ? `<div class="shift-panel-task-notes">${escHtml(meta)}</div>` : '') +
         (s.notes ? `<div class="shift-panel-task-notes">${escHtml(s.notes)}</div>` : '') +
-        `</div>`
+        `</button>`
     }).join('')
     : `<div class="shift-panel-task-notes" style="padding:2px 0 0">No shifts for this day.</div>`
 
@@ -2106,26 +2460,33 @@ function openDayPanel(dateStr) {
 
   document.getElementById('shiftPanel').classList.add('open')
   document.body.classList.add('shift-panel-open')
+  _focusShiftPanel()
 }
 
-function closeShiftPanel() {
+function closeShiftPanel(restoreFocus = true) {
   document.getElementById('shiftPanel').classList.remove('open')
   document.body.classList.remove('shift-panel-open')
   _shiftPanelId = null
   _shiftPanelDay = null
   selectedCalendarDate = null
   syncSelectedDayHighlight()
+  const restore = _shiftPanelReturnFocus
+  _shiftPanelReturnFocus = null
+  if (restoreFocus && restore && typeof restore.focus === 'function') setTimeout(() => restore.focus(), 0)
+  return restore
 }
 
 function shiftPanelEdit() {
   const id = _shiftPanelId
-  closeShiftPanel()
-  if (id) openEditModal(id)
+  const returnFocus = closeShiftPanel(false)
+  if (id) openEditModal(id, returnFocus)
 }
 
 function shiftPanelAddForDay() {
   if (!canManage() || !_shiftPanelDay) return
-  openCreateModal(_shiftPanelDay)
+  const date = _shiftPanelDay
+  const returnFocus = closeShiftPanel(false)
+  openCreateModal(date, returnFocus)
 }
 
 // ── Real-time SSE ──────────────────────────────────────────────────────────────
@@ -2238,6 +2599,7 @@ async function saveShiftForce() {
     await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(async r => { if (!r.ok) { const d = await r.json(); throw new Error(d.error || `HTTP ${r.status}`) }; return r.json() })
     toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+    rememberShiftPreset(body)
     closeModal()
     renderView()
   } catch (err) { toast(err.message, 'error') }
@@ -2297,6 +2659,7 @@ async function saveShift() {
         const addedStr = `${added} shift${added !== 1 ? 's' : ''} added`
         toast(skipped > 0 ? `${addedStr}, ${skipped} skipped (already exist)` : addedStr, 'success')
       }
+      if (added > 0) rememberShiftPreset(baseBody)
       closeModal()
       renderView()
     } else {
@@ -2328,6 +2691,7 @@ async function saveShift() {
         throw new Error(d.error || `HTTP ${r.status}`)
       }
       toast(editingShiftId ? 'Shift updated' : 'Shift added', 'success')
+      rememberShiftPreset(body)
       closeModal()
       renderView()
     }
@@ -2339,18 +2703,22 @@ async function saveShift() {
 }
 
 // ── Drag-and-drop (week view) ──────────────────────────────────────────────────
-let _drag = null  // { shiftId, date, start_time, end_time, durationMins, ghost, colInnerTop, mode }
-let _ddPointerDownHandler = null  // stored reference so we can remove it before re-adding
+let _drag = null  // { shiftId, shift, mode, startMins, durationMins, ghost, card, currentDate }
+let _ddPointerDownHandler = null
+let _ddPointerMoveHandler = null
+let _ddPointerUpHandler = null
+let _ddPointerCancelHandler = null
 
 function _initDragDrop() {
   const grid = document.getElementById('calGrid')
   if (!grid || !canManage() || cfg.featureDragDrop === false) return
 
-  // Remove previous listener to prevent stacking across re-renders
-  if (_ddPointerDownHandler) {
-    grid.removeEventListener('pointerdown', _ddPointerDownHandler)
-    _ddPointerDownHandler = null
-  }
+  // Remove the complete delegated listener bundle before re-attaching it.
+  if (_ddPointerDownHandler) grid.removeEventListener('pointerdown', _ddPointerDownHandler)
+  if (_ddPointerMoveHandler) grid.removeEventListener('pointermove', _ddPointerMoveHandler)
+  if (_ddPointerUpHandler) grid.removeEventListener('pointerup', _ddPointerUpHandler)
+  if (_ddPointerCancelHandler) grid.removeEventListener('pointercancel', _ddPointerCancelHandler)
+  _ddPointerDownHandler = _ddPointerMoveHandler = _ddPointerUpHandler = _ddPointerCancelHandler = null
 
   _ddPointerDownHandler = e => {
     const card = e.target.closest('.cal-week-shift-card')
@@ -2386,23 +2754,18 @@ function _initDragDrop() {
     card.style.opacity = '.35'
     card.classList.add('dragging')
 
-    // Find the col-inner for this card to get its bounding rect
-    const colInner = card.closest('.cal-week-col-inner')
-    const colInnerRect = colInner?.getBoundingClientRect()
-
     _drag = {
       shiftId, shift, mode,
-      startMins, endMins,
+      startMins,
       durationMins: endMins - startMins,
-      ghost, card, colInner, colInnerRect,
-      originX: e.clientX, originY: e.clientY,
+      ghost, card,
       currentDate: shift.date,
     }
   }
 
   grid.addEventListener('pointerdown', _ddPointerDownHandler)
 
-  grid.addEventListener('pointermove', e => {
+  _ddPointerMoveHandler = e => {
     if (!_drag) return
     e.preventDefault()
 
@@ -2437,11 +2800,12 @@ function _initDragDrop() {
         if (dateMatch) _drag.currentDate = dateMatch[1]
       }
     }
-  })
+  }
+  grid.addEventListener('pointermove', _ddPointerMoveHandler)
 
-  grid.addEventListener('pointerup', async e => {
+  _ddPointerUpHandler = async e => {
     if (!_drag) return
-    const { shiftId, shift, mode, startMins, endMins, durationMins, ghost, card, previewStart, previewEnd, currentDate } = _drag
+    const { shiftId, shift, mode, durationMins, ghost, card, previewStart, previewEnd, currentDate } = _drag
     _drag = null
 
     ghost.remove()
@@ -2478,10 +2842,11 @@ function _initDragDrop() {
       }})
       renderView()
     } catch (err) { toast(err.message, 'error'); renderView() }
-  })
+  }
+  grid.addEventListener('pointerup', _ddPointerUpHandler)
 
   // Pointercancel — abort drag
-  grid.addEventListener('pointercancel', () => {
+  _ddPointerCancelHandler = () => {
     if (!_drag) return
     _drag.ghost.remove()
     _drag.card.style.opacity = ''
@@ -2489,7 +2854,8 @@ function _initDragDrop() {
     _drag.card.classList.remove('dragging')
     document.querySelectorAll('.cal-week-day-col.drop-target').forEach(c => c.classList.remove('drop-target'))
     _drag = null
-  })
+  }
+  grid.addEventListener('pointercancel', _ddPointerCancelHandler)
 }
 
 // ── Undo-able delete ───────────────────────────────────────────────────────────
