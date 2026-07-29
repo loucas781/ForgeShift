@@ -2,6 +2,7 @@
 
 ## 2026-07-29
 
+- Fixed Organisation Edit and Delete actions failing when their inline button markup embedded an organisation name, and made both actions resolve the current organisation safely by ID.
 - Modernised popup menus across Calendar, Templates, Settings, and Profile with a consistent theme-safe backdrop, elevated dialog shell, clearer headers, roomier controls, and pinned responsive actions; rebuilt the template editor as grouped details and responsive day cards so it no longer relies on a sprawling horizontal scroller.
 - Restored the complete non-scrolling Month view while keeping busy dates contained through viewport-fitted week rows, compact mobile indicators, and day-panel overflow actions.
 - Fixed modern Month view rows collapsing around task, coverage, and shift content, which allowed shift chips to render underneath the following calendar row.

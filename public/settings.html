@@ -3383,7 +3383,6 @@ function renderOrgsList() {
       o.template_count > 0 ? `${o.template_count} template${o.template_count !== 1 ? 's' : ''}` : null,
       o.team_count > 0 ? `${o.team_count} team${o.team_count !== 1 ? 's' : ''}` : null,
     ].filter(Boolean).join(' · ')
-    const safeName = JSON.stringify(o.name)
     return `<div class="member-row">
       <div class="member-info" style="flex:1;min-width:0">
         <div style="min-width:0">
@@ -3398,8 +3397,8 @@ function renderOrgsList() {
       </div>
       <div class="member-actions">
         <button class="btn btn-ghost btn-sm" onclick="openOrgMembersModal('${o.id}')">Members</button>
-        <button class="btn btn-ghost btn-sm" onclick="openRenameOrgModal('${o.id}', ${safeName})">Edit</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteOrg("${o.id}", ${safeName})'>Delete</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRenameOrgModal('${o.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteOrg('${o.id}')">Delete</button>
       </div>
     </div>`
   }).join('')
@@ -3448,7 +3447,12 @@ async function doCreateOrg() {
   } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
 }
 
-function openRenameOrgModal(id, currentName) {
+function openRenameOrgModal(id) {
+  const org = orgs.find(o => o.id === id)
+  if (!org) {
+    toast('Organisation could not be found', 'error')
+    return
+  }
   const existing = document.getElementById('renameOrgModal')
   if (existing) existing.remove()
   const modal = document.createElement('div')
@@ -3463,7 +3467,7 @@ function openRenameOrgModal(id, currentName) {
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Name</label>
-          <input type="text" class="form-input" id="roName" value="${escHtml(currentName)}">
+          <input type="text" class="form-input" id="roName" value="${escHtml(org.name)}">
         </div>
         <div id="roError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
       </div>
@@ -3489,8 +3493,13 @@ async function doRenameOrg(id) {
   } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
 }
 
-async function deleteOrg(id, name) {
-  if (!confirm(`Delete organisation "${name}"? Linked locations, task lists, and templates will become visible to all users.`)) return
+async function deleteOrg(id) {
+  const org = orgs.find(o => o.id === id)
+  if (!org) {
+    toast('Organisation could not be found', 'error')
+    return
+  }
+  if (!confirm(`Delete organisation "${org.name}"? Linked locations, task lists, and templates will become visible to all users.`)) return
   try {
     await api(`/api/organisations/${id}`, { method: 'DELETE' })
     await loadOrgs(); renderOrgsList()
