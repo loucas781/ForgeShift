@@ -18,46 +18,64 @@
 </head>
 <body>
 <div class="auth-page">
-  <div class="auth-card">
+  <div class="auth-shell">
+    <aside class="auth-welcome" aria-label="ForgeShift overview">
+      <div class="auth-welcome-brand">
+        <img class="auth-logo-img auth-theme-logo" src="/icons/app-icon-light-1024.png?v=20260429c" alt="">
+        <span>ForgeShift</span>
+      </div>
+      <div class="auth-welcome-content">
+        <span class="auth-kicker">Workforce planning, simplified</span>
+        <h2 class="auth-welcome-title">Your rota, without the noise.</h2>
+        <p class="auth-welcome-copy">Keep shifts, tasks, locations and availability clear for everyone on the team.</p>
+        <ul class="auth-highlights">
+          <li>See the whole schedule at a glance</li>
+          <li>Keep day-to-day changes organised</li>
+          <li>Give every role the right level of access</li>
+        </ul>
+      </div>
+      <p class="auth-welcome-foot">Clear schedules. Better handovers. Fewer surprises.</p>
+    </aside>
+    <main class="auth-card">
     <div class="auth-logo">
-      <img id="authLogoImg" class="auth-logo-img" src="/icons/app-icon-light-1024.png?v=20260429c" alt="ForgeShift">
+      <img id="authLogoImg" class="auth-logo-img auth-theme-logo" src="/icons/app-icon-light-1024.png?v=20260429c" alt="">
       <span class="auth-logo-text">ForgeShift</span>
     </div>
     <h1 class="auth-title">Welcome back</h1>
-    <p class="auth-subtitle">Sign in to manage your shift rota</p>
+    <p class="auth-subtitle">Sign in to pick up where you left off.</p>
 
     <div class="auth-error" id="loginError"></div>
 
     <div id="credentialsForm">
       <div class="form-group">
-        <label class="form-label">Email address</label>
+        <label class="form-label" for="email">Email address</label>
         <input type="email" class="form-input" id="email" placeholder="you@example.com" autocomplete="email">
       </div>
       <div class="form-group">
-        <label class="form-label">Password</label>
+        <label class="form-label" for="password">Password</label>
         <input type="password" class="form-input" id="password" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <div id="rememberRow" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="position:relative;flex-shrink:0">
-            <input type="checkbox" id="rememberToggle" style="appearance:none;-webkit-appearance:none;width:36px;height:20px;border-radius:10px;background:var(--border);cursor:pointer;transition:background .2s;display:block" onchange="onRememberChange(this)">
-            <span style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;pointer-events:none;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)" id="rememberKnob"></span>
+      <div id="rememberRow" class="auth-inline-row">
+        <div class="auth-remember">
+          <div class="auth-switch">
+            <input type="checkbox" id="rememberToggle" onchange="onRememberChange(this)">
+            <span class="auth-switch-knob" id="rememberKnob"></span>
           </div>
-          <label for="rememberToggle" style="font-size:13px;font-weight:500;color:var(--text-1);cursor:pointer;line-height:1">Remember login details</label>
+          <label for="rememberToggle" class="auth-remember-label">Remember me</label>
         </div>
-        <a href="/forgot-password.html" id="forgotPwLink" style="font-size:13px;font-weight:400;white-space:nowrap">Forgot password?</a>
+        <a href="/forgot-password.html" id="forgotPwLink">Forgot password?</a>
       </div>
-      <div id="rememberWarning" style="display:none;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(217,119,6,.35);background:rgba(217,119,6,.08)">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <p style="margin:0;font-size:13px;color:#d97706;line-height:1.45">Only enable on private devices you own and trust. Credentials will be saved in your browser.</p>
+      <div id="rememberWarning" class="auth-warning">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <p>Only use this on a private device you own and trust. Credentials are saved in this browser.</p>
       </div>
       <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
     </div>
 
     <div id="totpForm" style="display:none">
-      <p style="font-size:14px;color:var(--text-2);margin-bottom:16px">Enter the 6-digit code from your authenticator app.</p>
+      <p class="auth-subtitle">Enter the 6-digit code from your authenticator app.</p>
       <div class="form-group">
-        <label class="form-label">Authentication code</label>
+        <label class="form-label" for="totpCode">Authentication code</label>
         <input type="text" class="form-input" id="totpCode" placeholder="000000" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
       </div>
       <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text-2);cursor:pointer">
@@ -65,13 +83,11 @@
         Remember this device for 30 days
       </label>
       <button class="btn btn-primary auth-btn" id="totpBtn" onclick="doTOTPLogin()">Verify</button>
-      <button type="button" style="width:100%;margin-top:8px;background:none;border:none;color:var(--text-3);font-size:13px;cursor:pointer;padding:4px 0" onclick="cancelTOTP()">Back to sign in</button>
+      <button type="button" class="auth-secondary-action" onclick="cancelTOTP()">Back to sign in</button>
     </div>
 
-    <div id="passkeyDivider" style="display:none;align-items:center;gap:10px;margin:16px 0">
-      <hr style="flex:1;border:none;border-top:1px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-3)">or</span>
-      <hr style="flex:1;border:none;border-top:1px solid var(--border)">
+    <div id="passkeyDivider" class="auth-passkey-divider">
+      <span>or continue with</span>
     </div>
     <button class="btn btn-secondary auth-btn" id="passkeyBtn" style="display:none" onclick="doPasskeyLogin()">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
@@ -81,9 +97,10 @@
     <div class="auth-link" id="signupLink">
       Don't have an account? <a href="/signup.html">Sign up</a>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-3);white-space:normal;word-break:break-word;overflow:visible;text-overflow:clip" id="versionFooter">
+    <div class="auth-version" id="versionFooter">
       ForgeShift <span style="font-weight:700">v...</span>
     </div>
+    </main>
   </div>
 </div>
 
@@ -94,10 +111,7 @@
 
   // Remember login details toggle
   function onRememberChange(cb) {
-    const knob = document.getElementById('rememberKnob')
     const warning = document.getElementById('rememberWarning')
-    cb.style.background = cb.checked ? '#4f46e5' : 'var(--border)'
-    knob.style.transform = cb.checked ? 'translateX(16px)' : 'translateX(0)'
     warning.style.display = cb.checked ? 'flex' : 'none'
     if (!cb.checked) {
       try {
@@ -131,8 +145,7 @@
     const href = isDark ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
     const appleTouch = document.querySelector('link[rel="apple-touch-icon"]')
     if (appleTouch) appleTouch.setAttribute('href', href)
-    const logo = document.getElementById('authLogoImg')
-    if (logo) logo.setAttribute('src', href)
+    document.querySelectorAll('.auth-theme-logo').forEach(logo => logo.setAttribute('src', href))
     let runtimeIcon = document.getElementById('runtimeAppIcon')
     if (!runtimeIcon) {
       runtimeIcon = document.createElement('link')
@@ -157,7 +170,7 @@
     })()
 
   const footer = document.getElementById('versionFooter')
-  const footerEnvColor = (env) => env === 'staging' ? '#d97706' : env === 'development' ? '#6554c0' : '#0a7c41'
+  const footerEnvColor = (env) => env === 'staging' ? 'var(--orange)' : env === 'development' ? 'var(--brand)' : 'var(--green)'
   const inferEnvFromHost = () => {
     const host = (window.location.hostname || '').toLowerCase()
     return host.includes('staging') ? 'staging' : (host.includes('dev') || host.includes('develop') || host.includes('localhost') || host === '') ? 'development' : 'production'

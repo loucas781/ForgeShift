@@ -44,21 +44,28 @@
           </div>
           <h2 class="cal-title" id="calTitle">Loading…</h2>
           <div class="cal-filter-row" id="calendarFilters" aria-label="Calendar filters">
-            <label class="sr-only" for="teamFilter">Scope</label>
-            <select class="cal-filter-select" id="teamFilter" onchange="onScopeChange()" title="Scope">
-              <option value="">My shifts</option>
-            </select>
-            <label class="sr-only" for="locationFilter">Location</label>
-            <select class="cal-filter-select" id="locationFilter" onchange="applyCalendarFilters()" title="Location">
-              <option value="">All locations</option>
-            </select>
-            <label class="sr-only" for="typeFilter">Shift type</label>
-            <select class="cal-filter-select" id="typeFilter" onchange="applyCalendarFilters()" title="Shift type">
-              <option value="">All shift types</option><option value="regular">Regular</option><option value="oncall">On-call</option><option value="leave">Leave</option>
-            </select>
-            <label class="sr-only" for="shiftSearch">Search calendar</label>
-            <input class="cal-filter-input" id="shiftSearch" type="search" placeholder="Search shifts…" oninput="applyCalendarFilters()" autocomplete="off">
-            <button class="btn btn-ghost btn-sm cal-clear-filters" id="clearFiltersBtn" type="button" onclick="clearCalendarFilters()" hidden>Clear</button>
+            <div class="cal-filter-controls" role="group" aria-label="Filter calendar">
+              <label class="sr-only" for="teamFilter">Scope</label>
+              <select class="cal-filter-select" id="teamFilter" onchange="onScopeChange()" title="Scope">
+                <option value="">My shifts</option>
+              </select>
+              <label class="sr-only" for="locationFilter">Location</label>
+              <select class="cal-filter-select" id="locationFilter" onchange="applyCalendarFilters()" title="Location">
+                <option value="">All locations</option>
+              </select>
+              <label class="sr-only" for="typeFilter">Shift type</label>
+              <select class="cal-filter-select" id="typeFilter" onchange="applyCalendarFilters()" title="Shift type">
+                <option value="">All shift types</option><option value="regular">Regular</option><option value="oncall">On-call</option><option value="leave">Leave</option>
+              </select>
+            </div>
+            <div class="cal-search-tools">
+              <label class="cal-search-field" for="shiftSearch">
+                <span class="cal-search-label">Search</span>
+                <input class="cal-filter-input" id="shiftSearch" type="search" placeholder="Name, location or notes…" oninput="applyCalendarFilters()" autocomplete="off" aria-keyshortcuts="/">
+                <kbd class="cal-search-shortcut" aria-hidden="true">/</kbd>
+              </label>
+              <button class="btn btn-ghost btn-sm cal-clear-filters" id="clearFiltersBtn" type="button" onclick="clearCalendarFilters()" hidden>Clear</button>
+            </div>
           </div>
           <label class="cal-date-jump" title="Jump to date"><span class="sr-only">Jump to date</span><input id="dateJump" type="date" onchange="jumpToDate(this.value)"></label>
           <div class="cal-toolbar-end">
@@ -131,6 +138,8 @@
       <button class="modal-close" onclick="closeModal()" aria-label="Close shift editor">✕</button>
     </div>
     <div class="modal-body">
+      <div class="shift-editor-layout">
+      <div class="shift-editor-primary">
       <div class="shift-editor-section" id="shiftAssignmentSection"><h4>Assignment</h4>
       <div id="adminUserField" style="display:none" class="form-group">
         <label class="form-label">Team member</label>
@@ -162,7 +171,7 @@
               </select>
             </div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-              <input type="checkbox" id="modalTemplateSkipHolidays" checked style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+              <input type="checkbox" id="modalTemplateSkipHolidays" checked style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer;flex-shrink:0">
               <span style="font-size:12px;color:var(--text-2)">Skip bank holidays</span>
             </label>
             <div style="font-size:11px;color:var(--text-3);margin-top:8px">Only the remaining days in that week will be updated. Existing shifts on matching days will be replaced.</div>
@@ -188,6 +197,8 @@
       <button type="button" class="btn btn-ghost btn-sm" id="samePreviousBtn" onclick="copyPreviousDayShift()" style="display:none">Same as previous day</button>
       <div id="durationPreview" class="shift-duration-preview" aria-live="polite"></div>
       </div>
+      </div>
+      <div class="shift-editor-secondary">
       <div class="shift-editor-section"><h4>Details</h4>
       <div class="form-group">
         <label class="form-label">Notes</label>
@@ -214,6 +225,8 @@
         <span class="form-label" style="margin:0">On-call</span>
       </div>
       </div>
+      </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="deleteShiftBtn" style="display:none;margin-right:auto" onclick="deleteShift()">Delete</button>
@@ -226,13 +239,13 @@
 
 <!-- Task Assignment Modal -->
 <div class="modal-overlay" id="taskAssignModal">
-  <div class="modal">
+  <div class="modal modal--task" role="dialog" aria-modal="true" aria-labelledby="taskAssignModalTitle" aria-describedby="taskAssignHelp">
     <div class="modal-header">
       <h3 class="modal-title" id="taskAssignModalTitle">Assign Task</h3>
       <button class="modal-close" onclick="closeTaskAssignModal()" aria-label="Close task assignment">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for one or more days this week.</p>
+      <p id="taskAssignHelp" style="color:var(--text-3);font-size:13px;margin-bottom:16px">Assign a task list to a team member for one or more days this week.</p>
       <div class="form-group">
         <label class="form-label">Team member</label>
         <select class="form-select" id="taUser"></select>
@@ -289,12 +302,13 @@
       <button onclick="toggleKbdHelp()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-3);padding:0;line-height:1">✕</button>
     </div>
     <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px">
-      <kbd class="kbd-key">←</kbd><span style="color:var(--text-2)">Previous week / month</span>
-      <kbd class="kbd-key">→</kbd><span style="color:var(--text-2)">Next week / month</span>
+      <kbd class="kbd-key">←</kbd><span style="color:var(--text-2)">Previous period</span>
+      <kbd class="kbd-key">→</kbd><span style="color:var(--text-2)">Next period</span>
       <kbd class="kbd-key">T</kbd><span style="color:var(--text-2)">Go to today</span>
       <kbd class="kbd-key">W</kbd><span style="color:var(--text-2)">Switch to week view</span>
       <kbd class="kbd-key">M</kbd><span style="color:var(--text-2)">Switch to month view</span>
       <kbd class="kbd-key">A</kbd><span style="color:var(--text-2)">Switch to agenda view</span>
+      <kbd class="kbd-key">/</kbd><span style="color:var(--text-2)">Search the calendar</span>
       <kbd class="kbd-key">N</kbd><span style="color:var(--text-2)">New shift (today)</span>
       <kbd class="kbd-key">C</kbd><span style="color:var(--text-2)">Copy week → next week (week view)</span>
       <kbd class="kbd-key">P</kbd><span style="color:var(--text-2)">Print rota</span>
@@ -331,6 +345,7 @@ let selectedColour = '#4f46e5'
 let selectedCalendarDate = null
 let _lastShiftPreset = null
 let _previousShiftFocus = null
+let _taskModalReturnFocus = null
 const NEUTRAL_CALENDAR_COLOUR = '#6b7280'
 
 function getShiftDisplayColour(shift) {
@@ -1946,7 +1961,8 @@ async function deleteShift() {
 document.getElementById('shiftModal').addEventListener('click', e => {
   if (e.target === document.getElementById('shiftModal')) closeModal()
 })
-document.getElementById('shiftModal').addEventListener('keydown', event => {
+
+function trapModalFocus(event) {
   if (event.key !== 'Tab') return
   const focusable = [...event.currentTarget.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
     .filter(el => !el.disabled && el.getClientRects().length > 0)
@@ -1960,11 +1976,14 @@ document.getElementById('shiftModal').addEventListener('keydown', event => {
     event.preventDefault()
     first.focus()
   }
-})
+}
+
+document.getElementById('shiftModal').addEventListener('keydown', trapModalFocus)
 
 document.getElementById('taskAssignModal').addEventListener('click', e => {
   if (e.target === document.getElementById('taskAssignModal')) closeTaskAssignModal()
 })
+document.getElementById('taskAssignModal').addEventListener('keydown', trapModalFocus)
 
 // ── Popover helpers ────────────────────────────────────────────────────────────
 function decodeData(encoded) {
@@ -2016,6 +2035,9 @@ let _taGroupFilter    = 'all'
 let _taLocationFilter = 'all'
 
 function openTaskAssignModal(dateStr, userId) {
+  const modal = document.getElementById('taskAssignModal')
+  if (!modal.classList.contains('open')) _taskModalReturnFocus = document.activeElement
+
   // Derive the Monday of the week containing dateStr
   const clicked  = new Date(dateStr)
   const dow      = clicked.getDay()
@@ -2057,7 +2079,8 @@ function openTaskAssignModal(dateStr, userId) {
   const saveBtn = document.querySelector('#taskAssignModal .btn-primary')
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Add assignment' }
 
-  document.getElementById('taskAssignModal').classList.add('open')
+  modal.classList.add('open')
+  setTimeout(() => sel?.focus(), 0)
 }
 
 const _DAY_ABBRS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -2067,18 +2090,16 @@ function _buildDayPicker(preselectedDate) {
   container.innerHTML = _taWeekDates.map((ds, i) => {
     const checked = ds === preselectedDate
     const isWeekend = i >= 5  // Sat, Sun
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
-      <input type="checkbox" class="ta-day-cb" data-date="${ds}" ${checked ? 'checked' : ''}
-        style="display:none">
-      <span class="ta-day-pill" data-date="${ds}"
-        style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;
-               border:2px solid ${checked ? 'var(--accent)' : 'var(--border)'};
-               background:${checked ? 'var(--accent)' : 'transparent'};
-               color:${checked ? '#fff' : (isWeekend ? 'var(--text-3)' : 'var(--text-1)')};
-               font-size:11px;font-weight:600;transition:all .15s;cursor:pointer"
+    const date = new Date(ds + 'T00:00:00')
+    const dateLabel = date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+    return `<div class="ta-day-option">
+      <input type="checkbox" class="ta-day-cb" data-date="${ds}" ${checked ? 'checked' : ''} hidden>
+      <button type="button" class="ta-day-pill${isWeekend ? ' is-weekend' : ''}${checked ? ' selected' : ''}"
+        data-date="${ds}" aria-label="${escHtml(dateLabel)}" aria-pressed="${checked}"
         onclick="_toggleDayPill('${ds}')">
-        ${_DAY_ABBRS[i]}<br><span style="font-size:10px;font-weight:400">${new Date(ds + 'T00:00:00').getDate()}</span>
-      </span>
+        <span class="ta-day-pill-day">${_DAY_ABBRS[i]}</span>
+        <span class="ta-day-pill-date">${date.getDate()}</span>
+      </button>
     </div>`
   }).join('')
 }
@@ -2093,11 +2114,8 @@ function _toggleDayPill(ds) {
 function _updateDayPillStyle(cb) {
   const pill = document.querySelector(`.ta-day-pill[data-date="${cb.dataset.date}"]`)
   if (!pill) return
-  const i = _taWeekDates.indexOf(cb.dataset.date)
-  const isWeekend = i >= 5
-  pill.style.border      = `2px solid ${cb.checked ? 'var(--accent)' : 'var(--border)'}`
-  pill.style.background  = cb.checked ? 'var(--accent)' : 'transparent'
-  pill.style.color       = cb.checked ? '#fff' : (isWeekend ? 'var(--text-3)' : 'var(--text-1)')
+  pill.classList.toggle('selected', cb.checked)
+  pill.setAttribute('aria-pressed', String(cb.checked))
 }
 
 function taSelectDays(mode) {
@@ -2138,9 +2156,15 @@ function _renderCurrentAssignments(userId) {
 }
 
 function closeTaskAssignModal() {
+  const modal = document.getElementById('taskAssignModal')
   const sel = document.getElementById('taUser')
   if (sel) sel.onchange = null
-  document.getElementById('taskAssignModal').classList.remove('open')
+  modal.classList.remove('open')
+  const restore = _taskModalReturnFocus
+  _taskModalReturnFocus = null
+  const fallback = document.getElementById('calGrid')
+  const target = restore?.isConnected && restore !== document.body ? restore : fallback
+  if (target && typeof target.focus === 'function') setTimeout(() => target.focus(), 0)
 }
 
 async function removeTaskAssignment(id, dateStr, userId) {
@@ -2297,6 +2321,12 @@ document.addEventListener('keydown', e => {
       break
     case 'a': case 'A':
       if (!modalOpen) setView('agenda')
+      break
+    case '/':
+      if (!modalOpen) {
+        e.preventDefault()
+        document.getElementById('shiftSearch')?.focus()
+      }
       break
     case 'n': case 'N':
       if (!modalOpen) openCreateModal(toDateStr(new Date()))
@@ -2675,7 +2705,7 @@ async function saveShift() {
           const footer = document.querySelector('#shiftModal .modal-footer')
           const warn = document.createElement('div')
           warn.id = 'conflictWarning'
-          warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg,#fef3c7);border:1px solid #fcd34d;border-radius:8px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
+          warn.style.cssText = 'width:100%;padding:10px 14px;background:var(--warning-bg);border:1px solid color-mix(in srgb,var(--orange) 45%,transparent);border-radius:8px;font-size:13px;color:var(--orange);display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px'
           const msgSpan = document.createElement('span')
           msgSpan.appendChild(document.createTextNode('⚠️ ' + (d.error || 'Conflict detected')))
           const forceBtn = document.createElement('button')
@@ -3060,7 +3090,7 @@ init()
   height: 52px;
   border-radius: 50%;
   background: var(--primary);
-  color: #fff;
+  color: var(--brand-text);
   border: none;
   cursor: pointer;
   align-items: center;

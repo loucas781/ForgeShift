@@ -7,7 +7,8 @@
     "start": "node server/index.js",
     "dev": "NODE_ENV=development nodemon server/index.js",
     "dev:win": "set NODE_ENV=development && nodemon server/index.js",
-    "setup": "node server/db/migrate.js"
+    "setup": "node server/db/migrate.js",
+    "check:api-contract": "node scripts/check-api-contract.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
