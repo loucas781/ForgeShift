@@ -17,17 +17,7 @@
   <link rel="manifest" id="appManifest" href="/manifest-light.json?v=20260429c">
   <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <script>
-    (function(){
-      var t = localStorage.getItem("fs-theme") || "system"
-      if (t === "system") {
-        if (window.matchMedia("(prefers-color-scheme: dark)").matches)
-          document.documentElement.setAttribute("data-theme","dark")
-      } else if (t !== "light") {
-        document.documentElement.setAttribute("data-theme", t)
-      }
-    })()
-  </script>
+  <script src="/js/theme-assets.js"></script>
 </head>
 <body>
 <div class="app-shell">

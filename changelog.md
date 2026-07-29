@@ -2,6 +2,8 @@
 
 ## 2026-07-29
 
+- Modernised shift creation, shift editing, and task assignment with contextual headers, card-based sections, clearer scheduling controls, refined status choices, cleaner day pickers, responsive action bars, and more useful date/week context.
+- Centralised theme-aware ForgeShift artwork so topbar, Settings About, authentication pages, every favicon variant, Apple touch icons, browser theme colour, and PWA manifests all stay in sync across Light, Dark, OLED, System, OS-driven, and cross-tab theme changes.
 - Modernised the complete authentication journey with a responsive split-screen presentation, clearer form hierarchy, larger controls, improved recovery states, and a focused mobile layout for sign-in, sign-up, forgot-password, and reset-password screens.
 - Audited Light, Dark, and OLED styling across the web app; defined missing shared colour aliases, added accessible theme-specific brand and status colours, and corrected unreadable success, warning, active-control, and destructive-action treatments.
 - Added an administrator-only API Reference in Settings with a live catalogue of every available endpoint, method and access level, plus search, method filters, mobile-route filtering, and copyable URLs.
