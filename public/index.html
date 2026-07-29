@@ -1076,8 +1076,8 @@ function renderMonth() {
     // Task banner (first column of week only)
     if (taskBannerHtml) html += taskBannerHtml
 
-    // Shift chips — show up to 3, then "+N more"
-    const desktopMaxChips = dayTaskCount > 0 ? 2 : 3
+    // Keep month rows readable: show the most useful entries, then open the day panel for the rest.
+    const desktopMaxChips = dayTaskCount > 0 ? 1 : 2
     const mobileMaxChips  = dayTaskCount > 0 ? 1 : 2
     const chipsToShow = dayShifts.slice(0, desktopMaxChips)
     const desktopOverflow = dayShifts.length - desktopMaxChips

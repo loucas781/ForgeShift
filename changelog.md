@@ -2,6 +2,7 @@
 
 ## 2026-07-29
 
+- Fixed modern Month view rows collapsing around task, coverage, and shift content, which allowed shift chips to render underneath the following calendar row.
 - Modernised Month, Week, and Agenda calendars across desktop and mobile with a calmer responsive toolbar, card-based month days, clearer current-day and weekend treatments, roomier shift chips, a refined week timeline, streamlined mobile overflow, polished agenda rows, and theme-safe loading/detail surfaces.
 - Centred repeat-day button labels throughout the shift editor so weekday controls remain visually balanced at every responsive width.
 - Modernised shift creation, shift editing, and task assignment with contextual headers, card-based sections, clearer scheduling controls, refined status choices, cleaner day pickers, responsive action bars, and more useful date/week context.
