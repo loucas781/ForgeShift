@@ -450,6 +450,8 @@ function clearCalendarFilters() {
 function onScopeChange() { renderView() }
 function jumpToDate(value) { if (!value) return; currentDate = parseLocalDate(value); renderView() }
 function renderCurrentView() {
+  const grid = document.getElementById('calGrid')
+  if (grid) grid.dataset.view = view
   if (view === 'month') renderMonth()
   else if (view === 'week') renderWeek()
   else renderAgenda()
@@ -1010,7 +1012,8 @@ function renderMonth() {
   const allAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const dayAbbrs = Array.from({length:7}, (_,i) => allAbbr[(weekStart + i) % 7])
 
-  let html = '<div class="cal-month' + (compact?' compact-chips':'') + (showWkNums?' has-weeknums':'') + '">'
+  const monthWeeks = totalCells / 7
+  let html = '<div class="cal-month' + (compact?' compact-chips':'') + (showWkNums?' has-weeknums':'') + '" style="--month-weeks:' + monthWeeks + '">'
 
   // Week number header gutter
   if (showWkNums) html += '<div class="cal-wknum-header"></div>'
@@ -1078,7 +1081,7 @@ function renderMonth() {
 
     // Keep month rows readable: show the most useful entries, then open the day panel for the rest.
     const desktopMaxChips = dayTaskCount > 0 ? 1 : 2
-    const mobileMaxChips  = dayTaskCount > 0 ? 1 : 2
+    const mobileMaxChips  = 1
     const chipsToShow = dayShifts.slice(0, desktopMaxChips)
     const desktopOverflow = dayShifts.length - desktopMaxChips
     const mobileOverflow  = dayShifts.length - mobileMaxChips
