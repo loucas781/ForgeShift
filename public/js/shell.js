@@ -95,11 +95,16 @@ function _syncStandaloneClass() {
 }
 
 function _resolvedTheme(theme) {
+  if (window.ForgeShiftThemeAssets) return window.ForgeShiftThemeAssets.resolve(theme)
   if (theme === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   return theme === 'dark' || theme === 'oled' ? 'dark' : 'light'
 }
 
 function _applyAppIconTheme(theme) {
+  if (window.ForgeShiftThemeAssets) {
+    window.ForgeShiftThemeAssets.sync(theme)
+    return
+  }
   const mode = _resolvedTheme(theme)
   const iconHref = mode === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'
   const manifestHref = mode === 'dark' ? '/manifest-dark.json?v=20260429c' : '/manifest-light.json?v=20260429c'
@@ -135,6 +140,10 @@ async function loadConfig() {
 // ── Theme ──────────────────────────────────────────────────────────────────────
 function applyTheme(theme) {
   safeLocalStorageSet('fs-theme', theme)
+  if (window.ForgeShiftThemeAssets) {
+    window.ForgeShiftThemeAssets.apply(theme)
+    return
+  }
   if (theme === 'system') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : '')
@@ -165,13 +174,18 @@ function getTheme() {
   }
   _applyAppIconTheme(t)
   // Watch for OS-level changes when in system mode
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (getTheme() === 'system') {
-      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '')
-      if (!e.matches) document.documentElement.removeAttribute('data-theme')
-      _applyAppIconTheme('system')
+  if (!window.ForgeShiftThemeAssets) {
+    const colourSchemeMq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleColourSchemeChange = e => {
+      if (getTheme() === 'system') {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '')
+        if (!e.matches) document.documentElement.removeAttribute('data-theme')
+        _applyAppIconTheme('system')
+      }
     }
-  })
+    if (colourSchemeMq.addEventListener) colourSchemeMq.addEventListener('change', handleColourSchemeChange)
+    else if (colourSchemeMq.addListener) colourSchemeMq.addListener(handleColourSchemeChange)
+  }
   const standaloneMq = window.matchMedia('(display-mode: standalone)')
   const handleStandaloneChange = () => _syncStandaloneClass()
   if (standaloneMq.addEventListener) standaloneMq.addEventListener('change', handleStandaloneChange)
@@ -262,7 +276,7 @@ function renderShell(cfg, activePage) {
       <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M3 5h14a1 1 0 110 2H3a1 1 0 110-2zm0 4h14a1 1 0 110 2H3a1 1 0 110-2zm0 4h14a1 1 0 110 2H3a1 1 0 110-2z" clip-rule="evenodd"/></svg>
     </button>
     <a href="/" class="topbar-logo">
-      <img id="topbarLogoImg" class="topbar-logo-img" src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'}" alt="ForgeShift">
+      <img id="topbarLogoImg" class="topbar-logo-img" data-app-logo src="${_resolvedTheme(getTheme()) === 'dark' ? '/icons/app-icon-dark-1024.png?v=20260429c' : '/icons/app-icon-light-1024.png?v=20260429c'}" alt="ForgeShift">
       <span class="topbar-logo-text">ForgeShift</span>
     </a>
     ${showEnvBadges ? `<span class="env-topbar-badge ${envClass}" title="v${cfg.version}">${envClass}</span>` : ''}
@@ -717,16 +731,23 @@ function renderColourPicker(container, value, onChange, options = {}) {
   container.className = 'colour-picker'
   container.innerHTML = ''
   swatches.forEach(c => {
-    const sw = document.createElement('div')
+    const sw = document.createElement('button')
+    sw.type = 'button'
     sw.className = `colour-swatch${selectedValue === c.value ? ' selected' : ''}${c.value ? '' : ' is-none'}`
     if (c.value) {
       sw.style.background = c.value
       sw.style.setProperty('--swatch-colour', c.value)
     }
     sw.title = c.label
+    sw.setAttribute('aria-label', c.label)
+    sw.setAttribute('aria-pressed', String(selectedValue === c.value))
     sw.addEventListener('click', () => {
-      container.querySelectorAll('.colour-swatch').forEach(s => s.classList.remove('selected'))
+      container.querySelectorAll('.colour-swatch').forEach(s => {
+        s.classList.remove('selected')
+        s.setAttribute('aria-pressed', 'false')
+      })
       sw.classList.add('selected')
+      sw.setAttribute('aria-pressed', 'true')
       onChange(c.value)
     })
     container.appendChild(sw)
