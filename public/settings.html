@@ -632,6 +632,195 @@
     body .modal-body { padding:22px 26px; }
     body .modal-footer { padding:13px 24px; }
 
+    /* Settings dialog system */
+    body .settings-modal {
+      max-width:640px;
+      border-radius:22px;
+      border-color:color-mix(in srgb, var(--border) 88%, transparent);
+    }
+    body .settings-modal--members { max-width:700px; }
+    body #editUserModal .settings-modal { max-width:720px; }
+    .settings-modal .modal-header {
+      align-items:flex-start;
+      min-height:92px;
+      padding:22px 24px 20px;
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--brand) 9%, var(--surface)) 0%, var(--surface) 58%);
+    }
+    .settings-modal-heading {
+      display:flex;
+      align-items:flex-start;
+      gap:13px;
+      min-width:0;
+    }
+    .settings-modal-mark {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:42px;
+      height:42px;
+      flex:0 0 42px;
+      border:1px solid color-mix(in srgb, var(--brand) 26%, var(--border));
+      border-radius:13px;
+      background:var(--brand-light);
+      color:var(--brand);
+      font-size:14px;
+      font-weight:900;
+      line-height:1;
+    }
+    .settings-modal-heading-copy {
+      min-width:0;
+    }
+    .settings-modal-kicker {
+      display:block;
+      margin:1px 0 3px;
+      color:var(--brand);
+      font-size:9px;
+      font-weight:850;
+      letter-spacing:.1em;
+      line-height:1.2;
+      text-transform:uppercase;
+    }
+    .settings-modal-heading .modal-title {
+      margin:0;
+      overflow-wrap:anywhere;
+      font-size:18px;
+      line-height:1.3;
+    }
+    .settings-modal-subtitle {
+      margin:4px 0 0;
+      color:var(--text-3);
+      font-size:11px;
+      line-height:1.45;
+    }
+    .settings-modal .modal-close {
+      width:38px;
+      height:38px;
+      flex-basis:38px;
+    }
+    .settings-modal .modal-body {
+      padding:22px 24px;
+      background:color-mix(in srgb, var(--surface-2) 52%, var(--surface));
+    }
+    .settings-modal .modal-footer {
+      min-height:70px;
+      padding:14px 24px;
+    }
+    .settings-modal .form-group {
+      min-width:0;
+      margin-bottom:14px;
+    }
+    .settings-modal .form-group:last-child {
+      margin-bottom:0;
+    }
+    .settings-modal .form-label {
+      margin-bottom:6px;
+      color:var(--text-2);
+      font-size:11px;
+      font-weight:750;
+    }
+    .settings-modal .form-input,
+    .settings-modal .form-select,
+    .settings-modal .form-textarea {
+      min-height:44px;
+      border-radius:10px;
+      background:var(--surface);
+    }
+    .settings-modal .form-input:focus,
+    .settings-modal .form-select:focus,
+    .settings-modal .form-textarea:focus {
+      border-color:var(--brand);
+      box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
+    }
+    .settings-modal .modal-footer .btn {
+      min-height:42px;
+      padding-inline:17px;
+      border-radius:10px;
+    }
+    .settings-form-grid {
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px;
+    }
+    .settings-form-grid .form-group {
+      margin:0;
+    }
+    .settings-field-wide {
+      grid-column:1 / -1;
+    }
+    .settings-optional-label {
+      margin-left:5px;
+      color:var(--text-3);
+      font-size:9px;
+      font-weight:650;
+      letter-spacing:.045em;
+      text-transform:uppercase;
+    }
+    .settings-colour-field {
+      padding:13px 14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--surface);
+    }
+    .settings-colour-field .colour-picker {
+      gap:8px;
+    }
+    .settings-colour-field .colour-swatch {
+      width:28px;
+      height:28px;
+    }
+    .settings-modal .tl-desc-toolbar {
+      padding:5px 7px;
+      border-radius:10px 10px 0 0;
+      background:var(--surface);
+    }
+    .settings-modal .tl-desc-toolbar button {
+      min-height:28px;
+      border-radius:6px;
+    }
+    .settings-modal .tl-desc-editor {
+      min-height:104px;
+      padding:10px 12px;
+      border-radius:0 0 10px 10px;
+      background:var(--surface);
+    }
+    .settings-modal [id$="MemberRows"] {
+      display:grid;
+      gap:6px;
+      padding-right:4px;
+    }
+    .settings-modal [id$="MemberRows"] > label {
+      padding:9px 10px !important;
+      border:1px solid var(--border-2) !important;
+      border-radius:10px;
+      background:var(--surface);
+    }
+    .settings-modal [id$="MemberRows"] > label:hover {
+      border-color:color-mix(in srgb, var(--brand) 28%, var(--border)) !important;
+      background:color-mix(in srgb, var(--brand-light) 35%, var(--surface));
+    }
+    .settings-modal--location .settings-modal-mark {
+      border-color:color-mix(in srgb, var(--blue) 28%, var(--border));
+      background:color-mix(in srgb, var(--blue) 10%, var(--surface));
+      color:var(--blue);
+    }
+    .settings-modal--members .settings-modal-mark {
+      border-color:color-mix(in srgb, var(--green) 28%, var(--border));
+      background:var(--green-subtle);
+      color:var(--green);
+    }
+    .settings-modal--danger .modal-header {
+      background:linear-gradient(135deg, color-mix(in srgb, var(--red-light) 58%, var(--surface)) 0%, var(--surface) 62%);
+    }
+    .settings-modal--danger .settings-modal-mark {
+      border-color:color-mix(in srgb, var(--red) 30%, var(--border));
+      background:var(--red-light);
+      color:var(--red);
+    }
+    .settings-modal--danger .settings-modal-kicker {
+      color:var(--red);
+    }
+
     /* API reference */
     .api-overview-grid {
       display:grid;
@@ -773,6 +962,16 @@
       body .modal-header { padding:16px 18px; }
       body .modal-body { padding:18px; }
       body .modal-footer { padding:12px 18px calc(12px + var(--safe-bottom)); }
+      .settings-modal .modal-header { min-height:82px; padding:17px 16px 15px; }
+      .settings-modal-heading { gap:11px; }
+      .settings-modal-mark { width:38px; height:38px; flex-basis:38px; border-radius:11px; }
+      .settings-modal-heading .modal-title { font-size:17px; }
+      .settings-modal-subtitle { font-size:10px; }
+      .settings-modal .modal-body { padding:16px; }
+      .settings-modal .modal-footer { padding:12px 16px calc(12px + var(--safe-bottom)); }
+      .settings-form-grid { grid-template-columns:1fr; gap:12px; }
+      .settings-field-wide { grid-column:auto; }
+      .settings-colour-field .colour-swatch { width:32px; height:32px; }
       .api-toolbar { grid-template-columns:1fr; }
       .api-method-filters { overflow-x:auto; padding-bottom:2px; }
       .api-method-filter { flex:1; }
@@ -879,10 +1078,11 @@
       <h3 class="modal-title" id="taskListModalTitle">Add Task List</h3>
       <button class="modal-close" onclick="closeTaskListModal()">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="tlName" placeholder="e.g. Monitoring Round"></div>
-      <div class="form-group">
-        <label class="form-label">Description <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+    <div class="modal-body settings-form-grid">
+      <div class="form-group"><label class="form-label" for="tlName">Name</label><input type="text" class="form-input" id="tlName" placeholder="e.g. Monitoring Round"></div>
+      <div class="form-group"><label class="form-label" for="tlOrg">Organisation <span class="settings-optional-label">Optional</span></label><select class="form-select" id="tlOrg"><option value="">— None (visible to all) —</option></select></div>
+      <div class="form-group settings-field-wide">
+        <label class="form-label">Description <span class="settings-optional-label">Optional</span></label>
         <div class="tl-desc-toolbar">
           <button type="button" id="tlDescBold" onclick="_tlDescCmd('bold')" title="Bold"><b>B</b></button>
           <button type="button" id="tlDescUnderline" onclick="_tlDescCmd('underline')" title="Underline"><u>U</u></button>
@@ -893,10 +1093,9 @@
           data-placeholder="Describe what this task list involves…"
           oninput="_tlDescUpdateToolbar()" onkeyup="_tlDescUpdateToolbar()" onmouseup="_tlDescUpdateToolbar()"></div>
       </div>
-      <div class="form-group"><label class="form-label">Organisation <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlOrg"><option value="">— None (visible to all) —</option></select></div>
-      <div class="form-group"><label class="form-label">Linked location <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="tlLocation"><option value="">— None —</option></select></div>
-      <div class="form-group"><label class="form-label">Label <span style="color:var(--text-3);font-weight:400">(optional — e.g. new, old, archived)</span></label><input type="text" class="form-input" id="tlLabel" placeholder="e.g. new, old, archived"></div>
-      <div class="form-group"><label class="form-label">Colour</label><div id="tlColourPicker"></div></div>
+      <div class="form-group"><label class="form-label" for="tlLocation">Linked location <span class="settings-optional-label">Optional</span></label><select class="form-select" id="tlLocation"><option value="">— None —</option></select></div>
+      <div class="form-group"><label class="form-label" for="tlLabel">Label <span class="settings-optional-label">Optional</span></label><input type="text" class="form-input" id="tlLabel" placeholder="e.g. new, old, archived"></div>
+      <div class="form-group settings-field-wide settings-colour-field"><label class="form-label">Colour</label><div id="tlColourPicker"></div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeTaskListModal()">Cancel</button>
@@ -911,11 +1110,11 @@
       <h3 class="modal-title" id="locModalTitle">Add Location</h3>
       <button class="modal-close" onclick="closeLocModal()">✕</button>
     </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="lName" placeholder="e.g. Head Office"></div>
-      <div class="form-group"><label class="form-label">Address <span style="color:var(--text-3);font-weight:400">(optional)</span></label><input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London"></div>
-      <div class="form-group"><label class="form-label">Organisation <span style="color:var(--text-3);font-weight:400">(optional)</span></label><select class="form-select" id="lOrg"><option value="">— None (visible to all) —</option></select></div>
-      <div class="form-group"><label class="form-label">Colour</label><div id="locColourPicker"></div></div>
+    <div class="modal-body settings-form-grid">
+      <div class="form-group"><label class="form-label" for="lName">Name</label><input type="text" class="form-input" id="lName" placeholder="e.g. Head Office"></div>
+      <div class="form-group"><label class="form-label" for="lOrg">Organisation <span class="settings-optional-label">Optional</span></label><select class="form-select" id="lOrg"><option value="">— None (visible to all) —</option></select></div>
+      <div class="form-group settings-field-wide"><label class="form-label" for="lAddress">Address <span class="settings-optional-label">Optional</span></label><input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London"></div>
+      <div class="form-group settings-field-wide settings-colour-field"><label class="form-label">Calendar colour</label><div id="locColourPicker"></div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeLocModal()">Cancel</button>
@@ -934,11 +1133,97 @@ let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
 let euPwIndicator = null
 let isAdmin = false, isManager = false, isShiftLead = false
 let resetLinkDelegatedBound = false
+let settingsModalObserver = null
+
+const SETTINGS_MODAL_PROFILES = [
+  { match: /delete/i, tone: 'danger', mark: '!', kicker: 'Sensitive action', subtitle: 'Review the impact carefully before continuing.' },
+  { match: /member/i, tone: 'members', mark: 'M', kicker: 'Access control', subtitle: 'Choose who should have access to this workspace resource.' },
+  { match: /location/i, tone: 'location', mark: 'L', kicker: 'Location settings', subtitle: 'Manage its details, organisation and calendar appearance.' },
+  { match: /organisation/i, tone: 'organisation', mark: 'O', kicker: 'Workspace settings', subtitle: 'Manage how related resources are grouped and shared.' },
+  { match: /task list/i, tone: 'tasks', mark: '✓', kicker: 'Task settings', subtitle: 'Keep task details, visibility and presentation organised.' },
+  { match: /template/i, tone: 'template', mark: 'T', kicker: 'Template settings', subtitle: 'Configure reusable scheduling resources and access.' },
+  { match: /team/i, tone: 'team', mark: 'T', kicker: 'Team settings', subtitle: 'Update the team and the people who belong to it.' },
+  { match: /user|account/i, tone: 'user', mark: 'U', kicker: 'Account settings', subtitle: 'Manage profile details, role and account access.' },
+  { match: /password reset/i, tone: 'security', mark: 'R', kicker: 'Security', subtitle: 'Generate and share a time-limited recovery link.' },
+  { match: /group/i, tone: 'group', mark: 'G', kicker: 'Group settings', subtitle: 'Organise related resources and their visibility.' },
+]
+
+function getSettingsModalProfile(title) {
+  return SETTINGS_MODAL_PROFILES.find(profile => profile.match.test(title)) || {
+    tone: 'settings',
+    mark: 'S',
+    kicker: 'Settings',
+    subtitle: 'Review the details below and save when you are ready.',
+  }
+}
+
+function enhanceSettingsModal(overlay) {
+  if (!overlay?.classList?.contains('modal-overlay')) return
+  const modal = overlay.querySelector('.modal')
+  if (!modal || modal.dataset.settingsEnhanced === 'true') return
+  const header = modal.querySelector('.modal-header')
+  const title = header?.querySelector('.modal-title')
+  if (!header || !title) return
+
+  const profile = getSettingsModalProfile(title.textContent.trim())
+  const closeButton = header.querySelector('.modal-close')
+  const heading = document.createElement('div')
+  const mark = document.createElement('span')
+  const copy = document.createElement('div')
+  const kicker = document.createElement('span')
+  const subtitle = document.createElement('p')
+
+  modal.dataset.settingsEnhanced = 'true'
+  modal.classList.add('settings-modal', `settings-modal--${profile.tone}`)
+  if (/member/i.test(title.textContent)) modal.classList.add('settings-modal--members')
+
+  heading.className = 'settings-modal-heading'
+  mark.className = 'settings-modal-mark'
+  mark.setAttribute('aria-hidden', 'true')
+  mark.textContent = profile.mark
+  copy.className = 'settings-modal-heading-copy'
+  kicker.className = 'settings-modal-kicker'
+  kicker.textContent = profile.kicker
+  subtitle.className = 'settings-modal-subtitle'
+  subtitle.id = `${overlay.id || 'settingsModal'}Description`
+  subtitle.textContent = profile.subtitle
+
+  copy.append(kicker, title, subtitle)
+  heading.append(mark, copy)
+  header.insertBefore(heading, closeButton || null)
+
+  if (!title.id) title.id = `${overlay.id || 'settingsModal'}Title`
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+  modal.setAttribute('aria-labelledby', title.id)
+  modal.setAttribute('aria-describedby', subtitle.id)
+  modal.querySelector('.modal-body')?.classList.add('settings-modal-body')
+  modal.querySelector('.modal-footer')?.classList.add('settings-modal-footer')
+  if (closeButton && !closeButton.getAttribute('aria-label')) {
+    closeButton.setAttribute('aria-label', `Close ${title.textContent.trim()}`)
+  }
+}
+
+function initSettingsModalSystem() {
+  document.querySelectorAll('.modal-overlay').forEach(enhanceSettingsModal)
+  if (settingsModalObserver) return
+  settingsModalObserver = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      mutation.addedNodes.forEach(node => {
+        if (!(node instanceof Element)) return
+        if (node.classList.contains('modal-overlay')) enhanceSettingsModal(node)
+        node.querySelectorAll?.('.modal-overlay').forEach(enhanceSettingsModal)
+      })
+    })
+  })
+  settingsModalObserver.observe(document.body, { childList: true })
+}
 
 async function init() {
   cfg = await loadConfig()
   if (!cfg) return
   renderShell(cfg, 'settings')
+  initSettingsModalSystem()
   // Load user prefs so the Preferences panel can show current values
   await loadPrefs()
 
@@ -2826,22 +3111,27 @@ async function getResetLink(id, name, email) {
   const modal = document.createElement('div')
   modal.className = 'modal-overlay'
   modal.id = 'reset-link-modal'
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(9,30,66,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px'
+  modal.style.zIndex = '1000'
   modal.innerHTML = `
-    <div style="background:var(--surface);border-radius:var(--r-xl);padding:24px;width:100%;max-width:440px;box-shadow:0 24px 80px rgba(9,30,66,.3)">
-      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Password Reset Link</div>
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Password Reset Link</h3>
+        <button type="button" class="modal-close" onclick="document.getElementById('reset-link-modal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:16px;line-height:1.55">
         Generate a secure reset link for <strong>${escHtml(name)}</strong> (${escHtml(email || 'No email')}).<br>
         This link expires in <strong>15 minutes</strong> and can only be used once.
-      </div>
-      <div id="reset-link-result" style="margin:14px 0;font-size:13px;color:var(--text-2)">
-        <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
-          <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
-          Generating…
         </div>
+        <div id="reset-link-result" style="margin:14px 0;font-size:13px;color:var(--text-2)">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
+            <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
+            Generating…
+          </div>
+        </div>
+        <div id="reset-link-email-msg" style="display:none;margin-top:10px;font-size:12px;padding:10px 12px;border-radius:var(--r-md)"></div>
       </div>
-      <div id="reset-link-email-msg" style="display:none;margin-top:10px;font-size:12px;padding:10px 12px;border-radius:var(--r-md)"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
+      <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="reset-link-close">Close</button>
         <button type="button" class="btn btn-secondary" id="reset-link-send" style="display:none">Send to user</button>
         <button type="button" class="btn btn-primary" id="reset-link-copy" style="display:none">
@@ -3123,6 +3413,7 @@ function openCreateTaskList() {
 
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
+  setTimeout(() => document.getElementById('tlName')?.focus(), 50)
 }
 function openEditTaskList(id) {
   const t = taskLists.find(x => x.id === id); if (!t) return
@@ -3135,6 +3426,7 @@ function openEditTaskList(id) {
   _populateTlLocationSelect(t.location_id)
   setupTlColour()
   document.getElementById('taskListModal').classList.add('open')
+  setTimeout(() => { const input = document.getElementById('tlName'); input?.focus(); input?.select() }, 50)
 }
 function _populateTlLocationSelect(selectedId) {
   const sel = document.getElementById('tlLocation')
@@ -3653,6 +3945,7 @@ function openCreateLoc() {
   _populateLocOrgSelect(null)
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
+  setTimeout(() => document.getElementById('lName')?.focus(), 50)
 }
 function openEditLoc(id) {
   const l = locations.find(x => x.id === id); if (!l) return
@@ -3663,6 +3956,7 @@ function openEditLoc(id) {
   _populateLocOrgSelect(l.org_id || null)
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
+  setTimeout(() => { const input = document.getElementById('lName'); input?.focus(); input?.select() }, 50)
 }
 function closeLocModal() { document.getElementById('locModal').classList.remove('open') }
 function setupLocColour() {
