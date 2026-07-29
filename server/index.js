@@ -60,6 +60,7 @@ const cookieParser = require('cookie-parser')
 const rateLimit    = require('express-rate-limit')
 const { requireAuth, optionalAuth } = require('./middleware/auth')
 const { getPasswordPolicy } = require('./auth-utils')
+const { API_CATALOG_VERSION, MOBILE_API_CONTRACT, buildApiCatalog } = require('./api-catalog')
 const emailSvc = require('./email')
 const logger   = require('./utils/logger')
 
@@ -383,6 +384,27 @@ app.get('/api/stats', requireAuth, (req, res) => {
   const locations = db.prepare('SELECT COUNT(*) as c FROM locations').get().c
   const templates = db.prepare('SELECT COUNT(*) as c FROM shift_templates').get().c
   res.json({ users, shifts, locations, templates })
+})
+
+// ── GET /api/endpoints — admin-only API catalogue ─────────────────────────────
+app.get('/api/endpoints', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  try {
+    const groups = buildApiCatalog()
+    const endpointCount = groups.reduce((total, group) => total + group.endpoints.length, 0)
+    res.set('Cache-Control', 'no-store')
+    res.json({
+      catalogVersion: API_CATALOG_VERSION,
+      appVersion: APP_VERSION,
+      authentication: 'Secure HTTP-only session cookie',
+      endpointCount,
+      mobileEndpointCount: MOBILE_API_CONTRACT.length,
+      groups,
+    })
+  } catch (err) {
+    logger.error('api catalogue:', err.message)
+    res.status(500).json({ error: 'Failed to build API catalogue' })
+  }
 })
 
 // ── SSE — Real-time broadcast ──────────────────────────────────────────────────
