@@ -2,6 +2,8 @@
 
 ## 2026-07-29
 
+- Modernised Month, Week, and Agenda calendars across desktop and mobile with a calmer responsive toolbar, card-based month days, clearer current-day and weekend treatments, roomier shift chips, a refined week timeline, streamlined mobile overflow, polished agenda rows, and theme-safe loading/detail surfaces.
+- Centred repeat-day button labels throughout the shift editor so weekday controls remain visually balanced at every responsive width.
 - Modernised shift creation, shift editing, and task assignment with contextual headers, card-based sections, clearer scheduling controls, refined status choices, cleaner day pickers, responsive action bars, and more useful date/week context.
 - Centralised theme-aware ForgeShift artwork so topbar, Settings About, authentication pages, every favicon variant, Apple touch icons, browser theme colour, and PWA manifests all stay in sync across Light, Dark, OLED, System, OS-driven, and cross-tab theme changes.
 - Modernised the complete authentication journey with a responsive split-screen presentation, clearer form hierarchy, larger controls, improved recovery states, and a focused mobile layout for sign-in, sign-up, forgot-password, and reset-password screens.
