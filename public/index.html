@@ -29,7 +29,7 @@
         <div class="cal-toolbar" role="toolbar" aria-label="Calendar controls">
           <div class="cal-nav">
             <button class="cal-nav-btn" id="prevBtn" title="Previous period" aria-label="Previous period">&#8249;</button>
-            <button class="cal-today-btn" onclick="goToday()">Today</button>
+            <button class="cal-today-btn" onclick="goToday()" aria-label="Go to today">Today</button>
             <button class="cal-nav-btn" id="nextBtn" title="Next period" aria-label="Next period">&#8250;</button>
           </div>
           <h2 class="cal-title" id="calTitle">Loading…</h2>
@@ -92,7 +92,7 @@
           </div>
         </div>
         <!-- Grid -->
-        <div id="calEmptyBanner" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;margin:0 0 6px;background:var(--bg-2);border:1px solid var(--border-1);border-radius:8px;font-size:13px;color:var(--text-3)">
+        <div id="calEmptyBanner" class="cal-empty-banner" style="display:none">
           <span id="calEmptyBannerMsg"></span>
           <button id="calEmptyBannerBtn" class="btn btn-primary btn-sm" style="display:none;flex-shrink:0"></button>
         </div>
@@ -1014,13 +1014,16 @@ function renderMonth() {
 
   // Week number header gutter
   if (showWkNums) html += '<div class="cal-wknum-header"></div>'
-  dayAbbrs.forEach(d => { html += '<div class="cal-day-header">' + d + '</div>' })
+  dayAbbrs.forEach(d => {
+    html += '<div class="cal-day-header' + (d === 'Sat' || d === 'Sun' ? ' is-weekend' : '') + '">' + d + '</div>'
+  })
 
   for (let i = 0; i < totalCells; i++) {
     const d  = new Date(year, month, 1 - startOffset + i)
     const ds = toDateStr(d)
     const isCurrentMonth = d.getMonth() === month
     const isToday        = ds === today
+    const isWeekend      = d.getDay() === 0 || d.getDay() === 6
     const dayShifts      = shiftMap[ds] || []
     const dayHols        = getHolidayMap(d.getFullYear())[ds] || []
 
@@ -1051,6 +1054,7 @@ function renderMonth() {
     html += '<div class="cal-cell' +
       (isCurrentMonth ? '' : ' other-month') +
       (isToday ? ' today' : '') +
+      (isWeekend ? ' is-weekend' : '') +
       (selectedCalendarDate === ds ? ' selected-day' : '') +
       (dayHols.length ? ' is-holiday' : '') +
       (hasPaste ? ' can-paste' : '') +
@@ -1073,10 +1077,12 @@ function renderMonth() {
     if (taskBannerHtml) html += taskBannerHtml
 
     // Shift chips — show up to 3, then "+N more"
-    const MAX_CHIPS = dayTaskCount > 0 ? 2 : 3
-    const chipsToShow = dayShifts.slice(0, MAX_CHIPS)
-    const overflow    = dayShifts.length - MAX_CHIPS
-    chipsToShow.forEach(s => {
+    const desktopMaxChips = dayTaskCount > 0 ? 2 : 3
+    const mobileMaxChips  = dayTaskCount > 0 ? 1 : 2
+    const chipsToShow = dayShifts.slice(0, desktopMaxChips)
+    const desktopOverflow = dayShifts.length - desktopMaxChips
+    const mobileOverflow  = dayShifts.length - mobileMaxChips
+    chipsToShow.forEach((s, chipIndex) => {
       const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
@@ -1086,11 +1092,12 @@ function renderMonth() {
         const mins = _shiftDurationMins(s.start_time, s.end_time)
         if (mins > 0) {
           const h = Math.floor(mins / 60); const m = mins % 60
-          durBadge = `<span style="opacity:.75;font-size:9px;margin-left:3px">${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''}</span>`
+          durBadge = `<span class="cal-shift-duration">${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''}</span>`
         }
       }
       const titleStr = (s.user_name ? s.user_name + ': ' : '') + label + (s.start_time ? ' ' + s.start_time + '–' + s.end_time : '')
       html += '<div class="cal-shift-chip' + (s.is_off ? ' is-off' : '') + (s.is_oncall ? ' is-oncall' : '') +
+        (chipIndex >= mobileMaxChips ? ' cal-shift-chip--mobile-hidden' : '') +
         '" style="background:' + color + '"' +
         ' title="' + escHtml(titleStr) + '"' +
         ' role="button" tabindex="0" aria-label="' + escHtml(titleStr) + '" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openShiftPanel(\'' + escHtml(s.id) + '\')}"' +
@@ -1099,8 +1106,11 @@ function renderMonth() {
         ' data-shift-id="' + escHtml(s.id) + '"' + '>' +
         escHtml(name) + escHtml(label) + durBadge + '</div>'
     })
-    if (overflow > 0) {
-      html += '<button type="button" class="cal-more-badge" onclick="event.stopPropagation();openDayPanel(\'' + ds + '\')" title="' + overflow + ' more shift' + (overflow > 1 ? 's' : '') + '" aria-label="Show more shifts for ' + ds + '">+' + overflow + ' more</button>'
+    if (desktopOverflow > 0) {
+      html += '<button type="button" class="cal-more-badge cal-more-badge--desktop" onclick="event.stopPropagation();openDayPanel(\'' + ds + '\')" title="' + desktopOverflow + ' more shift' + (desktopOverflow > 1 ? 's' : '') + '" aria-label="Show more shifts for ' + ds + '">+' + desktopOverflow + ' more</button>'
+    }
+    if (mobileOverflow > 0) {
+      html += '<button type="button" class="cal-more-badge cal-more-badge--mobile" onclick="event.stopPropagation();openDayPanel(\'' + ds + '\')" title="' + mobileOverflow + ' more shift' + (mobileOverflow > 1 ? 's' : '') + '" aria-label="Show more shifts for ' + ds + '">+' + mobileOverflow + ' more</button>'
     }
 
     // Paste hint
@@ -1227,7 +1237,8 @@ function renderWeek() {
     const isToday = ds === todayStr
     const hols    = getHolidayMap(d.getFullYear())[ds] || []
     const coverageLabel = getWeekSegmentCoverageLabel(shiftMap[ds] || [])
-    html += `<div class="cal-week-day-header${isToday ? ' today' : ''}${hols.length ? ' is-holiday' : ''}">
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6
+    html += `<div class="cal-week-day-header${isToday ? ' today' : ''}${isWeekend ? ' is-weekend' : ''}${hols.length ? ' is-holiday' : ''}">
       <div class="day-name">${DAY_ABBR[d.getDay()]}</div>
       <div class="day-num">${d.getDate()}</div>
       ${coverageLabel ? `<div class="cal-week-day-summary">${escHtml(coverageLabel)}</div>` : ''}
@@ -1237,15 +1248,15 @@ function renderWeek() {
 
   // ── Task row (optional, sits between header and time body) ───────────────────
   if (cfg.featureTasks && (weekHasTasks || canManage())) {
-    html += `<div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border);flex-shrink:0">`
-    html += `<div style="border-right:1px solid var(--border)"></div>` // gutter spacer
+    html += `<div class="cal-week-task-row">`
+    html += `<div class="cal-week-task-gutter" aria-hidden="true"></div>` // gutter spacer
     days.forEach(d => {
       const ds = toDateStr(d)
       const dayAssignments = taskMap[ds] || []
       const clickAttr = canManage() && taskLists.length
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
-      html += `<div style="border-right:1px solid var(--border);padding:4px 6px;display:flex;flex-direction:column;gap:2px">`
+      html += `<div class="cal-week-task-cell">`
       if (dayAssignments.length) {
         html += renderTaskDots(dayAssignments, ds, 'week-task-dots')
       } else if (canManage() && taskLists.length && isSingleUserView) {
@@ -1273,8 +1284,10 @@ function renderWeek() {
     const dayShifts = shiftMap[ds] || []
     const dayHols   = getHolidayMap(d.getFullYear())[ds] || []
     const hasPaste  = copiedShift && dayShifts.length === 0
+    const isToday   = ds === todayStr
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6
 
-    html += `<div class="cal-week-day-col${selectedCalendarDate === ds ? ' selected-day' : ''}${dayHols.length ? ' is-holiday' : ''}" onclick="handleCellClick('${ds}')">`
+    html += `<div class="cal-week-day-col${selectedCalendarDate === ds ? ' selected-day' : ''}${isToday ? ' is-today' : ''}${isWeekend ? ' is-weekend' : ''}${dayHols.length ? ' is-holiday' : ''}" onclick="handleCellClick('${ds}')">`
     html += `<div class="cal-week-col-inner">`
 
     // Hour grid lines
@@ -1314,7 +1327,7 @@ function renderWeek() {
           : `${s.start_time}–${s.end_time}`
         const showTime = height >= 32
         const showNotes = s.notes && height >= 52
-        html += `<div class="cal-week-shift-card${s.is_oncall ? ' is-oncall' : ''}"
+        html += `<div class="cal-week-shift-card${height < 32 ? ' is-compact' : ''}${s.is_oncall ? ' is-oncall' : ''}"
           style="background:${color};top:${top}px;height:${height}px"
           role="button" tabindex="0" aria-label="${escHtml(`${label}, ${timeStr}`)}" onclick="event.stopPropagation();${clickFn}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${clickFn}}" ${ctxAttr}>
           <div class="shift-loc">${escHtml(prefix)}${escHtml(label)}</div>
@@ -1359,12 +1372,16 @@ function renderAgenda() {
     const ds = toDateStr(d); const dayShifts = (shiftMap[ds] || []).slice().sort((a,b) => (a.start_time || '99:99').localeCompare(b.start_time || '99:99'))
     const dayTasks = taskMap[ds] || []; const hols = getHolidayMap(d.getFullYear())[ds] || []
     const coverageLabel = getDayCoverageLabel(dayShifts)
-    html += `<section class="cal-agenda-day${ds === toDateStr(new Date()) ? ' today' : ''}" aria-labelledby="agenda-${ds}">`
-    html += `<header class="cal-agenda-day-header"><div><h3 id="agenda-${ds}">${escHtml(d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))}</h3>${coverageLabel ? `<span class="cal-agenda-coverage">${escHtml(coverageLabel)}</span>` : ''}${hols.length ? `<span class="cal-agenda-holiday">${escHtml(hols.map(h => h.emoji + ' ' + h.name).join(' · '))}</span>` : ''}</div>${canManage() ? `<button class="btn btn-secondary btn-sm" onclick="openCreateModal('${ds}')" aria-label="Add shift on ${ds}">+ Shift</button>` : ''}</header>`
+    const isToday = ds === toDateStr(new Date())
+    const fullDateLabel = d.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' })
+    const weekdayLabel = d.toLocaleDateString(undefined, { weekday:'long' })
+    const dateLabel = d.toLocaleDateString(undefined, { month:'short', day:'numeric' })
+    html += `<section class="cal-agenda-day${isToday ? ' today' : ''}" aria-labelledby="agenda-${ds}">`
+    html += `<header class="cal-agenda-day-header"><div class="cal-agenda-date-block"><h3 id="agenda-${ds}"><time datetime="${ds}" aria-label="${escHtml(fullDateLabel)}"><span class="cal-agenda-weekday">${escHtml(weekdayLabel)}</span><span class="cal-agenda-date">${escHtml(dateLabel)}</span></time></h3>${coverageLabel ? `<span class="cal-agenda-coverage">${escHtml(coverageLabel)}</span>` : ''}${hols.length ? `<span class="cal-agenda-holiday">${escHtml(hols.map(h => h.emoji + ' ' + h.name).join(' · '))}</span>` : ''}</div>${canManage() ? `<button class="btn btn-secondary btn-sm cal-agenda-add" onclick="openCreateModal('${ds}')" aria-label="Add shift on ${ds}">+ Shift</button>` : ''}</header>`
     if (dayShifts.length) dayShifts.forEach(s => {
       const label = s.is_off ? 'Day off' : (s.location_name || 'Shift')
       const meta = [s.user_name, s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day', s.is_oncall ? 'On-call' : ''].filter(Boolean).join(' · ')
-      html += `<button type="button" class="cal-agenda-shift" onclick="openShiftPanel('${escHtml(s.id)}')" aria-label="${escHtml(`${label}, ${meta}`)}"><span class="cal-agenda-dot" style="background:${getShiftDisplayColour(s)}"></span><span class="cal-agenda-shift-main"><strong>${escHtml(label)}</strong><span>${escHtml(meta)}</span>${s.notes ? `<small>${escHtml(s.notes)}</small>` : ''}</span></button>`
+      html += `<button type="button" class="cal-agenda-shift" onclick="openShiftPanel('${escHtml(s.id)}')" aria-label="${escHtml(`${label}, ${meta}`)}"><span class="cal-agenda-dot" style="background:${getShiftDisplayColour(s)}" aria-hidden="true"></span><span class="cal-agenda-shift-main"><strong>${escHtml(label)}</strong><span class="cal-agenda-shift-meta">${escHtml(meta)}</span>${s.notes ? `<small>${escHtml(s.notes)}</small>` : ''}</span><span class="cal-agenda-chevron" aria-hidden="true">›</span></button>`
     }); else html += `<p class="cal-agenda-empty">No shifts scheduled.</p>`
     if (dayTasks.length) { html += '<div class="cal-agenda-tasks"><strong>Tasks</strong>'; dayTasks.forEach(a => { html += `<div class="cal-agenda-task"><span>${escHtml(a.task_list_name || 'Task')}</span>${a.user_name ? `<small>${escHtml(a.user_name)}</small>` : ''}</div>` }); html += '</div>' }
     html += '</section>'
