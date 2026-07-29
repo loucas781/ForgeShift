@@ -2321,7 +2321,11 @@ button.shift-panel-task-card { cursor:pointer; }
 
 /* Month cards */
 .cal-month {
-  min-height:620px;
+  height:auto;
+  min-height:max(620px,100%);
+  grid-template-rows:auto;
+  grid-auto-rows:minmax(126px,auto);
+  align-content:stretch;
   padding:10px;
   gap:7px;
   background:transparent;
@@ -2409,8 +2413,12 @@ button.shift-panel-task-card { cursor:pointer; }
   box-shadow:0 5px 12px color-mix(in srgb, var(--brand) 24%, transparent);
 }
 .cal-day-summary {
+  position:absolute;
+  top:9px;
+  right:8px;
   min-height:20px;
-  margin-bottom:5px;
+  max-width:calc(100% - 52px);
+  margin:0;
   padding:2px 7px;
   border-color:var(--border-2);
   background:var(--surface-2);
@@ -2858,7 +2866,8 @@ button.shift-panel-task-card { cursor:pointer; }
     padding:9px;
   }
   .cal-month {
-    min-height:560px;
+    min-height:max(560px,100%);
+    grid-auto-rows:minmax(112px,auto);
     padding:6px;
     gap:4px;
   }
@@ -2908,7 +2917,7 @@ button.shift-panel-task-card { cursor:pointer; }
   }
 }
 
-@media (max-width:600px) {
+@media (max-width:768px) {
   .cal-day-summary,
   .cal-shift-duration {
     display:none;
@@ -2980,7 +2989,8 @@ button.shift-panel-task-card { cursor:pointer; }
     min-height:42px;
   }
   .cal-month {
-    min-height:520px;
+    min-height:max(520px,100%);
+    grid-auto-rows:minmax(104px,auto);
     padding:4px;
     gap:3px;
   }
