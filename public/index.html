@@ -33,6 +33,13 @@
             <button class="cal-nav-btn" id="nextBtn" title="Next period" aria-label="Next period">&#8250;</button>
           </div>
           <h2 class="cal-title" id="calTitle">Loading…</h2>
+          <button class="cal-filter-toggle" id="calendarFilterToggle" type="button" onclick="toggleCalendarFilters()" aria-controls="calendarFilters" aria-expanded="false">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 104.368 8.847l3.642 3.643a1 1 0 001.414-1.414l-3.643-3.642A5.5 5.5 0 008.5 3zM5 8.5a3.5 3.5 0 117 0 3.5 3.5 0 01-7 0z" clip-rule="evenodd"/></svg>
+            <span>Search &amp; filters</span>
+            <span class="cal-filter-toggle-status" id="calendarFilterToggleStatus">Show</span>
+            <span class="cal-filter-count" id="calendarFilterCount" hidden></span>
+            <svg class="cal-filter-toggle-chevron" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
           <div class="cal-filter-row" id="calendarFilters" aria-label="Calendar filters">
             <div class="cal-filter-controls" role="group" aria-label="Filter calendar">
               <label class="sr-only" for="teamFilter">Scope</label>
@@ -437,17 +444,56 @@ function getFilteredTaskAssignments() {
     _matchesSearch(a, search)
   )
 }
+
+let _mobileFiltersOpen = false
+
+function getActiveCalendarFilterCount() {
+  return ['teamFilter', 'locationFilter', 'typeFilter', 'shiftSearch']
+    .reduce((count, id) => {
+      const value = (document.getElementById(id)?.value || '').trim()
+      return count + (value ? 1 : 0)
+    }, 0)
+}
+
+function syncCalendarFilterDisclosure() {
+  const row = document.getElementById('calendarFilters')
+  const toggle = document.getElementById('calendarFilterToggle')
+  const status = document.getElementById('calendarFilterToggleStatus')
+  const countBadge = document.getElementById('calendarFilterCount')
+  if (!row || !toggle) return
+
+  row.classList.toggle('is-mobile-open', _mobileFiltersOpen)
+  toggle.classList.toggle('is-open', _mobileFiltersOpen)
+  toggle.setAttribute('aria-expanded', String(_mobileFiltersOpen))
+
+  const activeCount = getActiveCalendarFilterCount()
+  toggle.setAttribute('aria-label', `${_mobileFiltersOpen ? 'Hide' : 'Show'} search and calendar filters${activeCount ? `, ${activeCount} active` : ''}`)
+  toggle.classList.toggle('has-active-filters', activeCount > 0)
+  if (status) status.textContent = _mobileFiltersOpen ? 'Hide' : (activeCount ? 'Active' : 'Show')
+  if (countBadge) {
+    countBadge.hidden = activeCount === 0
+    countBadge.textContent = String(activeCount)
+    countBadge.setAttribute('aria-label', `${activeCount} active filter${activeCount === 1 ? '' : 's'}`)
+  }
+}
+
+function toggleCalendarFilters(force) {
+  _mobileFiltersOpen = typeof force === 'boolean' ? force : !_mobileFiltersOpen
+  syncCalendarFilterDisclosure()
+}
+
 function applyCalendarFilters() {
   shifts = getFilteredShifts(); taskAssignments = getFilteredTaskAssignments()
   const clear = document.getElementById('clearFiltersBtn')
   if (clear) clear.hidden = !((document.getElementById('locationFilter')?.value || '') || (document.getElementById('typeFilter')?.value || '') || (document.getElementById('shiftSearch')?.value || '').trim())
+  syncCalendarFilterDisclosure()
   updateTitle(); renderCurrentView(); updateHoursStat()
 }
 function clearCalendarFilters() {
   ;['locationFilter', 'typeFilter', 'shiftSearch'].forEach(id => { const el = document.getElementById(id); if (el) el.value = '' })
   applyCalendarFilters()
 }
-function onScopeChange() { renderView() }
+function onScopeChange() { syncCalendarFilterDisclosure(); renderView() }
 function jumpToDate(value) { if (!value) return; currentDate = parseLocalDate(value); renderView() }
 function renderCurrentView() {
   const grid = document.getElementById('calGrid')
@@ -473,6 +519,11 @@ async function init() {
   cfg = await loadConfig()
   if (!cfg) return
   renderShell(cfg, 'calendar')
+  syncCalendarFilterDisclosure()
+  const mobileFilterMedia = window.matchMedia('(max-width: 768px)')
+  const handleFilterViewportChange = () => syncCalendarFilterDisclosure()
+  if (mobileFilterMedia.addEventListener) mobileFilterMedia.addEventListener('change', handleFilterViewportChange)
+  else if (mobileFilterMedia.addListener) mobileFilterMedia.addListener(handleFilterViewportChange)
   prefs = await loadPrefs()
   document.body.classList.toggle('shift-panel-left', (prefs.shiftPanelSide || 'right') === 'left')
 
@@ -2382,7 +2433,8 @@ document.addEventListener('keydown', e => {
     case '/':
       if (!modalOpen) {
         e.preventDefault()
-        document.getElementById('shiftSearch')?.focus()
+        toggleCalendarFilters(true)
+        requestAnimationFrame(() => document.getElementById('shiftSearch')?.focus())
       }
       break
     case 'n': case 'N':
@@ -2418,17 +2470,42 @@ document.getElementById('kbdHelpOverlay').addEventListener('click', e => {
 let _shiftPanelId = null
 let _shiftPanelDay = null
 let _shiftPanelReturnFocus = null
+let _shiftPanelPageScrollTop = 0
+
+function _focusWithoutScrolling(element) {
+  if (!element || typeof element.focus !== 'function') return
+  try { element.focus({ preventScroll: true }) } catch { element.focus() }
+}
+
+function _rememberShiftPanelOrigin(panel) {
+  if (panel?.classList.contains('open')) return
+  _shiftPanelReturnFocus = document.activeElement
+  _shiftPanelPageScrollTop = document.querySelector('.calendar-page')?.scrollTop || 0
+}
+
+function _stabiliseMobileCalendarViewport() {
+  if (!window.matchMedia('(max-width: 640px)').matches) return
+  const page = document.querySelector('.calendar-page')
+  if (page) page.scrollTop = _shiftPanelPageScrollTop
+  // The calendar owns mobile scrolling. Keep Safari from offsetting the outer
+  // viewport when focus moves between a shift card and the fixed detail sheet.
+  window.scrollTo(0, 0)
+}
 
 function _focusShiftPanel() {
   const panel = document.getElementById('shiftPanel')
-  if (panel) { panel.focus(); panel.scrollTop = 0 }
+  if (!panel) return
+  const panelBody = document.getElementById('shiftPanelBody')
+  if (panelBody) panelBody.scrollTop = 0
+  _focusWithoutScrolling(panel)
+  requestAnimationFrame(_stabiliseMobileCalendarViewport)
 }
 
 function openShiftPanel(shiftId) {
   const s = shifts.find(x => x.id == shiftId)
   if (!s) return
   const panel = document.getElementById('shiftPanel')
-  if (!panel.classList.contains('open')) _shiftPanelReturnFocus = document.activeElement
+  _rememberShiftPanelOrigin(panel)
   selectedCalendarDate = s.date
   syncSelectedDayHighlight()
   _shiftPanelId = shiftId
@@ -2497,7 +2574,7 @@ function openShiftPanel(shiftId) {
 
 function openDayPanel(dateStr) {
   const panel = document.getElementById('shiftPanel')
-  if (!panel.classList.contains('open')) _shiftPanelReturnFocus = document.activeElement
+  _rememberShiftPanelOrigin(panel)
   selectedCalendarDate = dateStr
   syncSelectedDayHighlight()
   _shiftPanelId = null
@@ -2559,7 +2636,10 @@ function closeShiftPanel(restoreFocus = true) {
   syncSelectedDayHighlight()
   const restore = _shiftPanelReturnFocus
   _shiftPanelReturnFocus = null
-  if (restoreFocus && restore && typeof restore.focus === 'function') setTimeout(() => restore.focus(), 0)
+  requestAnimationFrame(() => {
+    if (restoreFocus) _focusWithoutScrolling(restore)
+    _stabiliseMobileCalendarViewport()
+  })
   return restore
 }
 
@@ -3275,6 +3355,10 @@ body.shift-panel-left:not(.shift-panel-open) .shift-panel {
 .shift-panel-value { font-size: 14px; font-weight: 500; color: var(--text-1); }
 .shift-panel-section { border-top: 1px solid var(--border); padding-top: 14px; }
 .shift-panel-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-bottom: 8px; }
+.shift-panel-section > .shift-panel-task-wrap + .shift-panel-task-wrap,
+.shift-panel-section > .shift-panel-task-card + .shift-panel-task-card {
+  margin-top: 10px;
+}
 .shift-panel-task-card {
   background: var(--bg-2);
   border: 1px solid var(--border);
@@ -3298,6 +3382,10 @@ body.shift-panel-left:not(.shift-panel-open) .shift-panel {
 .shift-panel-task-desc-body p { margin: 0 0 4px; }
 .shift-panel-task-desc-body p:last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
+  body.shift-panel-open .topbar {
+    z-index: 600;
+    transform: translateZ(0);
+  }
   body.shift-panel-open .cal-main {
     margin-right: 0;
     margin-left: 0;
