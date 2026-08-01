@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-30
+
+- Fixed the mobile calendar being cut off and unable to scroll by giving the page one touch-friendly vertical scroller, allowing readable Month rows to extend naturally, and retaining the fitted non-scrolling calendar layout on desktop.
+
 ## 2026-07-29
 
 - Modernised every custom Settings dialog with contextual headers, clearer hierarchy, theme-safe form surfaces, responsive actions and accessible dialog labelling; refined Location and Task List editors into responsive field grids and brought the legacy password-reset popup into the shared dialog system.
