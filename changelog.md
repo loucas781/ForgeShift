@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-01
+
+- Fixed the mobile shift-details flow moving the outer Safari viewport and hiding the ForgeShift navigation by preserving calendar scroll position and using no-scroll focus restoration.
+- Added consistent spacing between task-list cards in the shift and day detail panel across desktop and mobile.
+- Replaced the always-expanded mobile search and filter shelf with a compact accessible disclosure that defaults closed, shows the active-filter count, expands for the `/` shortcut, and leaves the desktop search workflow unchanged.
+
 ## 2026-07-30
 
 - Fixed the mobile calendar being cut off and unable to scroll by giving the page one touch-friendly vertical scroller, allowing readable Month rows to extend naturally, and retaining the fitted non-scrolling calendar layout on desktop.

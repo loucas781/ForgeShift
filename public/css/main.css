@@ -2569,6 +2569,57 @@ button.shift-panel-task-card { cursor:pointer; }
   border-radius:14px;
   background:color-mix(in srgb, var(--surface-2) 72%, var(--surface));
 }
+.cal-filter-toggle {
+  grid-area:filter-toggle;
+  display:none;
+  width:100%;
+  min-height:40px;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+  color:var(--text-2);
+  font:inherit;
+  font-size:11px;
+  font-weight:750;
+  text-align:left;
+  cursor:pointer;
+}
+.cal-filter-toggle-status {
+  margin-left:auto;
+  color:var(--text-3);
+  font-size:10px;
+  font-weight:650;
+}
+.cal-filter-count {
+  display:inline-flex;
+  min-width:20px;
+  min-height:20px;
+  align-items:center;
+  justify-content:center;
+  padding:0 6px;
+  border-radius:999px;
+  background:var(--brand);
+  color:var(--brand-text);
+  font-size:10px;
+  font-weight:800;
+}
+.cal-filter-count[hidden] {
+  display:none;
+}
+.cal-filter-toggle-chevron {
+  transition:transform var(--t-base);
+}
+.cal-filter-toggle.is-open {
+  border-color:color-mix(in srgb, var(--brand) 42%, var(--border));
+  background:color-mix(in srgb, var(--brand-light) 50%, var(--surface));
+  color:var(--brand);
+}
+.cal-filter-toggle.is-open .cal-filter-toggle-chevron {
+  transform:rotate(180deg);
+}
 .cal-filter-controls {
   gap:7px;
 }
@@ -3177,6 +3228,7 @@ button.shift-panel-task-card { cursor:pointer; }
     grid-template-areas:
       "title views"
       "nav date"
+      "filter-toggle filter-toggle"
       "filters filters"
       "tools tools";
     gap:10px;
@@ -3206,6 +3258,15 @@ button.shift-panel-task-card { cursor:pointer; }
     grid-template-columns:1fr;
     gap:9px;
     padding:9px;
+  }
+  .cal-filter-toggle {
+    display:flex;
+  }
+  .cal-filter-row:not(.is-mobile-open) {
+    display:none;
+  }
+  .cal-filter-row.is-mobile-open {
+    animation:calendar-filters-in .16s ease-out;
   }
   .cal-month {
     min-height:0;
@@ -3256,6 +3317,11 @@ button.shift-panel-task-card { cursor:pointer; }
   .cal-agenda-day {
     border-radius:14px;
   }
+}
+
+@keyframes calendar-filters-in {
+  from { opacity:0; transform:translateY(-4px); }
+  to { opacity:1; transform:none; }
 }
 
 @media (max-width:768px) {
