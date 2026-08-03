@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-04
+
+- Fixed the collapsed Search & Filters control being auto-placed into the mobile navigation grid on extra-small screens, restoring the intended title, calendar navigation, date, filter and summary rows.
+
 ## 2026-08-01
 
 - Fixed the mobile shift-details flow moving the outer Safari viewport and hiding the ForgeShift navigation by preserving calendar scroll position and using no-scroll focus restoration.
