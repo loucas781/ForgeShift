@@ -3261,6 +3261,8 @@ button.shift-panel-task-card { cursor:pointer; }
   }
   .cal-filter-toggle {
     display:flex;
+    grid-column:1 / -1;
+    min-width:0;
   }
   .cal-filter-row:not(.is-mobile-open) {
     display:none;
@@ -3362,6 +3364,7 @@ button.shift-panel-task-card { cursor:pointer; }
       "title title"
       "nav views"
       "date date"
+      "filter-toggle filter-toggle"
       "filters filters"
       "tools tools";
     padding:12px;
