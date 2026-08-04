@@ -36,19 +36,15 @@ function isMaintenanceModeEnabled() {
 
 // ─── Version ──────────────────────────────────────────────────────────────────
 const versionFile = path.join(__dirname, '../.version')
-const rawVersion  = fs.existsSync(versionFile)
-  ? fs.readFileSync(versionFile, 'utf8').trim()
-  : require('../package.json').version
-
-const baseVersion = rawVersion.replace(/-dev\.\d+/, '').replace(/-rc.*/, '')
 const APP_ENV_NORM = (process.env.APP_ENV || env).toLowerCase()
-let APP_VERSION
-if (APP_ENV_NORM === 'production') {
-  APP_VERSION = baseVersion
-} else if (APP_ENV_NORM === 'staging') {
-  APP_VERSION = rawVersion.includes('-rc') ? rawVersion : `${baseVersion}-rc`
-} else {
-  APP_VERSION = rawVersion.includes('-dev.') ? rawVersion : `${baseVersion}-dev.0`
+function getAppVersion() {
+  const rawVersion = fs.existsSync(versionFile)
+    ? fs.readFileSync(versionFile, 'utf8').trim()
+    : require('../package.json').version
+  const baseVersion = rawVersion.replace(/-dev\.\d+/, '').replace(/-rc.*/, '')
+  if (APP_ENV_NORM === 'production') return baseVersion
+  if (APP_ENV_NORM === 'staging') return rawVersion.includes('-rc') ? rawVersion : `${baseVersion}-rc`
+  return rawVersion.includes('-dev.') ? rawVersion : `${baseVersion}-dev.0`
 }
 
 // ─── Run migration on startup ─────────────────────────────────────────────────
@@ -149,7 +145,7 @@ app.get('/api/health', (req, res) => {
   try {
     const db = require('./db/connection')
     db.prepare('SELECT 1').get()
-    res.json({ ok: true, version: APP_VERSION, uptime: Math.floor(process.uptime()) })
+    res.json({ ok: true, version: getAppVersion(), uptime: Math.floor(process.uptime()) })
   } catch (err) {
     res.status(503).json({ ok: false, error: 'Database unavailable' })
   }
@@ -157,7 +153,9 @@ app.get('/api/health', (req, res) => {
 
 // ── Config endpoint ────────────────────────────────────────────────────────────
 app.get('/api/config', optionalAuth, (req, res) => {
-  res.set('Cache-Control', req.user ? 'no-store' : 'private, max-age=10, stale-while-revalidate=30')
+  // Version metadata can be bumped without restarting a long-running dev
+  // process, so do not let an intermediary retain the previous counter.
+  res.set('Cache-Control', 'no-store')
   const overrides = loadOverrides()
   let user = null
   if (req.user) {
@@ -179,7 +177,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
   res.json({
     appName:        process.env.APP_NAME      || 'ForgeShift',
     appEnv:         process.env.APP_ENV       || env,
-    version:        APP_VERSION,
+    version:        getAppVersion(),
     nodeVersion:    process.version,
     platform:       process.platform,
     user,
@@ -402,7 +400,7 @@ app.get('/api/endpoints', requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store')
     res.json({
       catalogVersion: API_CATALOG_VERSION,
-      appVersion: APP_VERSION,
+      appVersion: getAppVersion(),
       authentication: 'Secure HTTP-only session cookie',
       endpointCount,
       mobileEndpointCount: MOBILE_API_CONTRACT.length,
