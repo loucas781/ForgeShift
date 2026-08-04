@@ -2392,6 +2392,8 @@ button.shift-panel-task-card { cursor:pointer; }
   margin:18px;
 }
 .cal-main {
+  container-type: inline-size;
+  container-name: calendar-main;
   border-color:color-mix(in srgb, var(--border) 88%, transparent);
   border-radius:22px;
   background:var(--surface);
@@ -3179,7 +3181,52 @@ button.shift-panel-task-card { cursor:pointer; }
       "filters filters filters";
   }
   .cal-toolbar-end {
-    justify-self:end;
+    justify-self:stretch;
+    width:100%;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+}
+
+/*
+ * The shift details panel takes width from .cal-main without changing the
+ * viewport width. A viewport-only breakpoint therefore leaves the five-column
+ * toolbar in place and its controls can overlap. Use the calendar surface as
+ * the breakpoint as well, while retaining the roomy desktop arrangement when
+ * the calendar itself is wide enough.
+ */
+@container calendar-main (max-width:1450px) {
+  .cal-toolbar {
+    grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-areas:
+      "nav title views"
+      "date tools tools"
+      "filters filters filters";
+  }
+  .cal-toolbar-end {
+    justify-self:stretch;
+    width:100%;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+}
+
+/* Opening the details panel reduces the usable calendar width even when the
+ * browser viewport remains very wide. Keep the panel-open toolbar on the
+ * compact three-column layout so its controls never compete for one row. */
+@media (min-width:769px) {
+  body.shift-panel-open .cal-toolbar {
+    grid-template-columns:auto minmax(0,1fr) auto;
+    grid-template-areas:
+      "nav title views"
+      "date tools tools"
+      "filters filters filters";
+  }
+  body.shift-panel-open .cal-toolbar-end {
+    justify-self:stretch;
+    width:100%;
+    flex-wrap:wrap;
+    justify-content:flex-end;
   }
 }
 
@@ -3247,6 +3294,7 @@ button.shift-panel-task-card { cursor:pointer; }
     width:100%;
     justify-content:flex-start;
     justify-self:stretch;
+    flex-wrap:nowrap;
     overflow-x:auto;
     padding-bottom:2px;
     scrollbar-width:none;

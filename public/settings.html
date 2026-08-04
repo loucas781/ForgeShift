@@ -1181,11 +1181,71 @@
 
 let cfg = null, users = [], locations = [], orgs = [], roles = [], rolePermissionCatalog = []
 let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
-let editingRoleId = null, roleColour = '#6554c0'
+let editingRoleId = null, roleColour = '#4f46e5'
+let roleSaveInFlight = false
 let euPwIndicator = null
 let isAdmin = false, isManager = false, isShiftLead = false
 let resetLinkDelegatedBound = false
 let settingsModalObserver = null
+
+// Keep role management usable while an older ForgeShift server is being
+// upgraded. These values intentionally mirror server/utils/roles.js so a
+// partial roles API response can never make protected roles appear empty.
+const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
+  { key:'view_own_rota', label:'View own rota', category:'Rota' },
+  { key:'view_other_rotas', label:'View other users’ rotas', category:'Rota' },
+  { key:'add_own_shifts', label:'Add own shifts', category:'Shifts' },
+  { key:'edit_own_shifts', label:'Edit own shifts', category:'Shifts' },
+  { key:'delete_own_shifts', label:'Delete own shifts', category:'Shifts' },
+  { key:'add_other_shifts', label:'Add shifts for other users', category:'Shifts' },
+  { key:'edit_other_shifts', label:'Edit shifts for other users', category:'Shifts' },
+  { key:'delete_other_shifts', label:'Delete shifts for other users', category:'Shifts' },
+  { key:'manage_tasks', label:'Manage tasks and assignments', category:'Administration' },
+  { key:'manage_templates', label:'Manage shift templates', category:'Administration' },
+  { key:'manage_teams', label:'Manage teams', category:'Administration' },
+  { key:'manage_locations', label:'Manage locations', category:'Administration' },
+  { key:'manage_organisations', label:'Manage organisations', category:'Administration' },
+  { key:'manage_users', label:'Manage users', category:'Administration' },
+  { key:'manage_roles', label:'Manage roles', category:'Administration' },
+  { key:'manage_settings', label:'Manage settings', category:'Administration' },
+  { key:'view_audit', label:'View audit log', category:'Administration' },
+  { key:'manage_backups', label:'Manage backups', category:'Administration' },
+  { key:'manage_holidays', label:'Manage holidays', category:'Administration' },
+])
+const BUILTIN_ROLE_FALLBACK = Object.freeze([
+  { id:'builtin-member', name:'Member', color:'#059669', permissions:['view_own_rota'], is_builtin:true, is_system:false },
+  { id:'builtin-shift-lead', name:'Shift Lead', color:'#2563eb', permissions:['view_own_rota','view_other_rotas','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', color:'#d97706', permissions:['view_own_rota','view_other_rotas','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_templates','manage_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-admin', name:'Admin', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
+  { id:'system-inactive', name:'Inactive', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
+])
+const ROLE_API_UNAVAILABLE_MESSAGE = 'Roles API is unavailable. Restart/update the ForgeShift server before managing roles.'
+
+function isRoleApiUnavailable(error) {
+  return !!error?.roleApiUnavailable || error?.status === 404 || Number(error?.status) >= 500 || /failed to fetch|network error|load failed|aborted|timeout/i.test(String(error?.message || ''))
+}
+
+async function roleApiRequest(path, options = {}) {
+  try {
+    const response = await fetchWithTimeout(path, {
+      credentials: 'same-origin',
+      ...options,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(options.headers || {}) },
+      body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body,
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const error = new Error(data.error || `HTTP ${response.status}`)
+      error.status = response.status
+      error.roleApiUnavailable = response.status === 404 || response.status >= 500
+      throw error
+    }
+    return data
+  } catch (error) {
+    if (error instanceof TypeError) error.roleApiUnavailable = true
+    throw error
+  }
+}
 
 function hasPermission(permission) {
   if (cfg?.user?.role === 'admin') return true
@@ -1333,7 +1393,7 @@ async function init() {
   const ALL_TABS = [
     { id: 'appearance', label: 'Appearance', roles: ['admin','manager','shift_lead','member'],
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-    { id: 'preferences', label: 'Preferences', containsNew: true, roles: ['admin','manager','shift_lead','member'],
+    { id: 'preferences', label: 'Preferences', roles: ['admin','manager','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
     { id: 'my-teams', label: 'My Teams', roles: ['shift_lead'],
@@ -1771,19 +1831,39 @@ function showTab(id) {
 }
 
 async function loadRoles() {
-  try {
-    const [roleRows, catalog] = await Promise.all([api('/api/roles'), api('/api/roles/catalog')])
-    roles = Array.isArray(roleRows) ? roleRows : (roleRows.roles || [])
-    rolePermissionCatalog = Array.isArray(catalog?.permissions) ? catalog.permissions : []
-  } catch {
-    roles = [
-      { id:'builtin-member', name:'Member', color:'#0052cc', permissions:['view_own_rota'], is_builtin:true },
-      { id:'builtin-shift-lead', name:'Shift Lead', color:'#6554c0', permissions:[], is_builtin:true },
-      { id:'builtin-manager', name:'Manager', color:'#00875a', permissions:[], is_builtin:true },
-      { id:'builtin-admin', name:'Admin', color:'#ff5630', permissions:[], is_builtin:true },
-    ]
-    rolePermissionCatalog = []
+  // Fetch independently: a server with the roles route but without the
+  // catalogue route should still populate real roles, and vice versa. This
+  // deliberately avoids the global api() helper so a legacy 404 cannot emit a
+  // cascade of generic error toasts while the settings page is loading.
+  const [roleResult, catalogResult] = await Promise.allSettled([
+    roleApiRequest('/api/roles'),
+    roleApiRequest('/api/roles/catalog'),
+  ])
+  const rolePayload = roleResult.status === 'fulfilled' ? roleResult.value : null
+  const catalogPayload = catalogResult.status === 'fulfilled' ? catalogResult.value : null
+  const fetchedRoles = Array.isArray(rolePayload) ? rolePayload : (Array.isArray(rolePayload?.roles) ? rolePayload.roles : [])
+  const protectedRoles = Object.fromEntries(BUILTIN_ROLE_FALLBACK.map(role => [role.id, role]))
+
+  // Always normalise protected roles from the stable client contract. Older
+  // servers returned empty permission JSON for these rows even though the
+  // effective permissions were still enforced server-side.
+  const normalizedRoles = fetchedRoles.map(role => {
+    const fallback = protectedRoles[role.id]
+    let permissions = role?.permissions
+    if (!Array.isArray(permissions)) {
+      try { permissions = JSON.parse(permissions || '[]') } catch { permissions = [] }
+    }
+    return fallback
+      ? { ...fallback, ...role, color:fallback.color, permissions:fallback.permissions.slice(), is_builtin:true, is_system:!!fallback.is_system }
+      : { ...role, permissions: Array.isArray(permissions) ? permissions : [] }
+  })
+  for (const fallback of BUILTIN_ROLE_FALLBACK) {
+    if (!normalizedRoles.some(role => role.id === fallback.id)) normalizedRoles.push({ ...fallback, permissions:fallback.permissions.slice() })
   }
+  roles = normalizedRoles
+  rolePermissionCatalog = Array.isArray(catalogPayload?.permissions) && catalogPayload.permissions.length
+    ? catalogPayload.permissions
+    : ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => ({ ...permission }))
 }
 async function loadUsers() { try { users = await api('/api/users') } catch { users = [] } }
 async function loadLocations() { locations = await api('/api/locations') }
@@ -1883,7 +1963,7 @@ async function renderPreferencesPanel() {
           <div style="display:flex;gap:6px">
             <button class="pref-choice-btn${p.defaultView==='month'?' active':''}" id="dv-month" onclick="pickDefaultView('month')">Month</button>
             <button class="pref-choice-btn${p.defaultView==='week'?' active':''}" id="dv-week" onclick="pickDefaultView('week')">Week</button>
-            <button class="pref-choice-btn${p.defaultView==='agenda'?' active':''}" id="dv-agenda" onclick="pickDefaultView('agenda')">Agenda <span class="settings-new-badge">New</span></button>
+            <button class="pref-choice-btn${p.defaultView==='agenda'?' active':''}" id="dv-agenda" onclick="pickDefaultView('agenda')">Agenda</button>
           </div>
         </div>
 
@@ -2619,7 +2699,7 @@ function openRoleModal(id = null) {
   if (role && (!role.deletable || !canManageRoleDefinition(role))) return
   document.getElementById('roleModal')?.remove()
   editingRoleId = role?.id || null
-  roleColour = resolveColourValue(role?.color, '#6554c0')
+  roleColour = resolveColourValue(role?.color, '#4f46e5')
   const selected = new Set(role?.permissions || ['view_own_rota'])
   const availablePermissions = isAdmin ? rolePermissionCatalog : rolePermissionCatalog.filter(permission => hasPermission(permission.key))
   const groups = availablePermissions.reduce((all, permission) => {
@@ -2660,30 +2740,48 @@ function setAllRolePermissions(checked) {
 }
 
 async function saveRole() {
+  if (roleSaveInFlight) return
   const name = document.getElementById('roleName')?.value.trim()
   if (!name) { toast('Enter a role name', 'error'); return }
   const permissions = Array.from(document.querySelectorAll('#roleModal input[name="rolePermission"]:checked')).map(input => input.value)
+  const saveButton = document.querySelector('#roleModal .modal-footer .btn-primary')
+  const originalButtonText = saveButton?.textContent || ''
+  roleSaveInFlight = true
+  if (saveButton) {
+    saveButton.disabled = true
+    saveButton.setAttribute('aria-busy', 'true')
+    saveButton.textContent = 'Saving…'
+  }
   try {
     const path = editingRoleId ? `/api/roles/${editingRoleId}` : '/api/roles'
-    await api(path, { method: editingRoleId ? 'PATCH' : 'POST', body: { name, color: roleColour, permissions } })
+    await roleApiRequest(path, { method: editingRoleId ? 'PATCH' : 'POST', body: { name, color: roleColour, permissions } })
     document.getElementById('roleModal')?.remove()
     await loadRoles()
     renderRolesPanel()
     renderTeamList()
     toast(editingRoleId ? 'Role updated' : 'Role created', 'success')
-  } catch (err) { toast(err.message, 'error') }
+  } catch (err) {
+    toast(isRoleApiUnavailable(err) ? ROLE_API_UNAVAILABLE_MESSAGE : err.message, 'error')
+    if (saveButton) {
+      saveButton.disabled = false
+      saveButton.removeAttribute('aria-busy')
+      saveButton.textContent = originalButtonText
+    }
+  } finally {
+    roleSaveInFlight = false
+  }
 }
 
 async function deleteRole(id) {
   const role = roles.find(item => item.id === id)
   if (!role?.deletable || Number(role.assigned_count || 0) > 0 || !canManageRoleDefinition(role) || !confirm(`Delete the custom role “${role.name}”?`)) return
   try {
-    await api(`/api/roles/${id}`, { method: 'DELETE' })
+    await roleApiRequest(`/api/roles/${id}`, { method: 'DELETE' })
     await loadRoles()
     renderRolesPanel()
     renderTeamList()
     toast('Role deleted', 'success')
-  } catch (err) { toast(err.message, 'error') }
+  } catch (err) { toast(isRoleApiUnavailable(err) ? ROLE_API_UNAVAILABLE_MESSAGE : err.message, 'error') }
 }
 
 let activeRoleTab = ''
