@@ -1543,6 +1543,9 @@ tr:hover td { background: var(--surface-2); }
   .cal-main { border-radius: 14px; }
   .cal-view-tabs .cal-view-tab span { display: none; }
   .cal-view-tabs .cal-view-tab-icon { display: inline-block; }
+  /* With labels hidden, keep the segmented control only as wide as its icons. */
+  .cal-view-tabs { width: max-content; justify-self: end; }
+  .cal-view-tab { flex: 0 0 auto; padding-inline: 9px; }
   .cal-title { font-size: 14px; min-width: 120px; }
   .template-grid { grid-template-columns: 1fr; }
   .modal { max-width: 100%; margin: 0; border-radius: var(--r-xl) var(--r-xl) 0 0; align-self: flex-end; }
@@ -2391,6 +2394,64 @@ button.shift-panel-task-card { cursor:pointer; }
 .cal-wrapper {
   margin:18px;
 }
+
+/* ── Profile surfaces ─────────────────────────────────────────────────────── */
+.profile-page {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 34%),
+    var(--bg);
+}
+.profile-shell {
+  width:100%;
+  max-width:960px;
+  margin:0 auto;
+}
+.profile-page-header {
+  align-items:flex-end;
+  margin-bottom:22px;
+}
+.profile-eyebrow {
+  margin-bottom:6px;
+  color:var(--brand);
+  font-size:10px;
+  font-weight:850;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.profile-page-subtitle {
+  margin:6px 0 0;
+  color:var(--text-3);
+  font-size:13px;
+  line-height:1.5;
+}
+.profile-card-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.profile-card {
+  min-width:0;
+  overflow:hidden;
+  border-color:color-mix(in srgb, var(--border) 88%, transparent);
+  box-shadow:var(--shadow-sm);
+}
+.profile-card-wide { grid-column:1 / -1; }
+.profile-card .card-header {
+  background:linear-gradient(135deg, color-mix(in srgb, var(--brand) 8%, var(--surface)), var(--surface));
+}
+.profile-card .card-title { letter-spacing:-.01em; }
+.profile-card .card-body { min-width:0; }
+.profile-danger-card { box-shadow:none; }
+@media (max-width:720px) {
+  .profile-page { padding-left:12px; padding-right:12px; }
+  .profile-page-header { margin-bottom:16px; }
+  .profile-card-grid { grid-template-columns:1fr; gap:12px; }
+  .profile-card-wide { grid-column:auto; }
+}
+
 .cal-main {
   container-type: inline-size;
   container-name: calendar-main;

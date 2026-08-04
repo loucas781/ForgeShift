@@ -22,15 +22,19 @@
 <body>
 <div class="app-shell">
   <header class="topbar" id="topbar"></header>
-  <main class="page-content" style="display:flex;flex-direction:column;align-items:center">
-      <div style="width:100%;max-width:720px">
-      <div class="page-header">
-        <h1 class="page-title">My Profile</h1>
+  <main class="page-content profile-page">
+      <div class="profile-shell">
+      <div class="page-header profile-page-header">
+        <div>
+          <div class="profile-eyebrow">Account</div>
+          <h1 class="page-title">Your Profile</h1>
+          <p class="profile-page-subtitle">Keep your identity, security and calendar access up to date.</p>
+        </div>
       </div>
-      <div style="display:grid;gap:20px">
+      <div class="profile-card-grid">
 
         <!-- Profile Info -->
-        <div class="card">
+        <div class="card profile-card profile-card-wide">
           <div class="card-header"><h3 class="card-title">Profile</h3></div>
           <div class="card-body">
             <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
@@ -63,13 +67,13 @@
         </div>
 
         <!-- Email Address -->
-        <div class="card" id="emailCard">
+        <div class="card profile-card" id="emailCard">
           <div class="card-header"><h3 class="card-title">Email Address</h3></div>
           <div class="card-body" id="emailCardBody">Loading…</div>
         </div>
 
         <!-- Change Password -->
-        <div class="card">
+        <div class="card profile-card">
           <div class="card-header"><h3 class="card-title">Change Password</h3></div>
           <div class="card-body">
             <div class="form-group">
@@ -95,7 +99,7 @@
         </div>
 
         <!-- iCal Feed -->
-        <div class="card">
+        <div class="card profile-card">
           <div class="card-header"><h3 class="card-title">Calendar Subscription</h3></div>
           <div class="card-body">
             <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
@@ -107,7 +111,7 @@
         </div>
 
         <!-- Active Sessions -->
-        <div class="card">
+        <div class="card profile-card">
           <div class="card-header"><h3 class="card-title">Active Sessions</h3></div>
           <div class="card-body">
             <div id="sessionsContent">Loading…</div>
@@ -116,7 +120,7 @@
         </div>
 
         <!-- Login History -->
-        <div class="card">
+        <div class="card profile-card">
           <div class="card-header"><h3 class="card-title">Login History</h3></div>
           <div class="card-body">
             <div id="loginHistoryContent">Loading…</div>
@@ -124,7 +128,7 @@
         </div>
 
         <!-- Export My Data -->
-        <div class="card">
+        <div class="card profile-card">
           <div class="card-header"><h3 class="card-title">Export My Data</h3></div>
           <div class="card-body">
             <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
@@ -138,7 +142,7 @@
         </div>
 
         <!-- Danger Zone -->
-        <div class="card" style="border-color:rgba(220,38,38,.3)">
+        <div class="card profile-card profile-card-wide profile-danger-card" style="border-color:rgba(220,38,38,.3)">
           <div class="card-header" style="border-bottom-color:rgba(220,38,38,.2)">
             <h3 class="card-title" style="color:var(--red)">Danger Zone</h3>
           </div>

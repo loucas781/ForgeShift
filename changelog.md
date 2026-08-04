@@ -8,6 +8,9 @@
 - Changed inactive accounts to move automatically into the Inactive role, revoke existing sessions, retain their previous role, and restore that role when re-enabled.
 - Hardened role-aware rota exports, iCal feeds, user-directory projections and shift/template mutations so custom read/write permissions are enforced consistently without changing the 36-route native mobile contract.
 - Fixed the collapsed Search & Filters control being auto-placed into the mobile navigation grid on extra-small screens, restoring the intended title, calendar navigation, date, filter and summary rows.
+- Fixed version metadata remaining stale in long-running development processes by reading the current version file for runtime responses and disabling config caching; compacted icon-only calendar view buttons so Agenda no longer leaves an empty label gap at smaller resolutions.
+- Prevented identical error toasts from stacking repeatedly, including repeated unavailable-role API messages while an older development server is being restarted.
+- Modernised the Your Profile page with a responsive two-column account layout, refreshed account header, elevated cards, and mobile-friendly spacing while preserving existing profile and security actions.
 - Fixed narrow desktop calendar toolbar overlap when the shift details panel is open by switching to a calendar-width-aware three-column layout; made Templates organisation filters deterministic; added complete role/catalogue fallbacks so protected roles retain their permissions when either roles endpoint is unavailable; aligned built-in role colours with ForgeShift's established Member, Shift Lead, Manager, and Admin palette across web and native API clients; removed the outdated Preferences/Agenda `New` markers; and bumped the API catalogue contract to v2.
 
 ## 2026-08-01

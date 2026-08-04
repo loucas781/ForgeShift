@@ -202,8 +202,13 @@ function toast(message, type = 'default', duration = 3500) {
     container.className = 'toast-container'
     document.body.appendChild(container)
   }
+  const toastMessage = String(message)
+  const duplicate = [...container.children].find(item => item.dataset.toastMessage === toastMessage && item.dataset.toastType === type)
+  if (duplicate) duplicate.remove()
   const t = document.createElement('div')
   t.className = `toast${type !== 'default' ? ' ' + type : ''}`
+  t.dataset.toastMessage = toastMessage
+  t.dataset.toastType = type
 
   const icons = {
     success: '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" style="flex-shrink:0"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>',
@@ -215,7 +220,7 @@ function toast(message, type = 'default', duration = 3500) {
     iconSpan.innerHTML = icons[type] // icons are hardcoded SVG — safe
     if (iconSpan.firstElementChild) t.appendChild(iconSpan.firstElementChild)
   }
-  t.appendChild(document.createTextNode(message))
+  t.appendChild(document.createTextNode(toastMessage))
   container.appendChild(t)
   setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; t.style.transition = '200ms'; setTimeout(() => t.remove(), 200) }, duration)
 }
