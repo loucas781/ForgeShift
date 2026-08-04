@@ -59,6 +59,7 @@ const express      = require('express')
 const cookieParser = require('cookie-parser')
 const rateLimit    = require('express-rate-limit')
 const { requireAuth, optionalAuth } = require('./middleware/auth')
+const { rolePermissions, hasPermission } = require('./utils/roles')
 const { getPasswordPolicy } = require('./auth-utils')
 const { API_CATALOG_VERSION, MOBILE_API_CONTRACT, buildApiCatalog } = require('./api-catalog')
 const emailSvc = require('./email')
@@ -161,7 +162,13 @@ app.get('/api/config', optionalAuth, (req, res) => {
   let user = null
   if (req.user) {
     const db = require('./db/connection')
-    user = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(req.user.id) || null
+    user = db.prepare(`SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
+                              r.name AS role_name, r.color AS role_color, r.permissions AS role_permissions
+                         FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?`).get(req.user.id) || null
+    if (user) {
+      user.permissions = rolePermissions({ role: user.role, id: user.role_id, permissions: user.role_permissions })
+      delete user.role_permissions
+    }
   }
   // Load feature flags from app_preferences
   const db = require('./db/connection')
@@ -207,7 +214,7 @@ app.get('/api/releases', requireAuth, async (req, res) => {
 
 // ── GET/PATCH /api/features — admin feature flag management ───────────────────
 app.get('/api/features', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
   const tasksRow    = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
   const dragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
@@ -217,7 +224,7 @@ app.get('/api/features', requireAuth, (req, res) => {
   })
 })
 app.patch('/api/features', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
   const { feature_tasks, feature_drag_drop } = req.body
   if (typeof feature_tasks === 'boolean') {
@@ -240,7 +247,7 @@ app.patch('/api/features', requireAuth, (req, res) => {
 
 // ── Admin: toggle runtime settings ────────────────────────────────────────────
 app.patch('/api/config', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const overrides = loadOverrides()
   if (typeof req.body.allowSignup === 'boolean')  overrides.ALLOW_SIGNUP   = req.body.allowSignup  ? 'true' : 'false'
   if (typeof req.body.maintenanceMode === 'boolean') overrides.MAINTENANCE_MODE = req.body.maintenanceMode ? 'true' : 'false'
@@ -277,7 +284,7 @@ app.patch('/api/config', requireAuth, (req, res) => {
 
 // ── PATCH /api/config/password-policy — admin: update password policy ─────────
 app.patch('/api/config/password-policy', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const { getPasswordPolicy } = require('./auth-utils')
   const overrides = loadOverrides()
   const current   = getPasswordPolicy(overrides)
@@ -301,7 +308,7 @@ app.patch('/api/config/password-policy', requireAuth, (req, res) => {
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 app.get('/api/audit', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'view_audit')) return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
   const limit    = Math.min(parseInt(req.query.limit  || '30'), 200)
   const offset   = parseInt(req.query.offset  || '0')
@@ -334,7 +341,7 @@ app.get('/api/audit', requireAuth, (req, res) => {
 })
 
 app.get('/api/audit/export', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'view_audit')) return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
   const action  = req.query.action   || ''
   const actorId = req.query.actor_id || ''
@@ -356,7 +363,7 @@ app.get('/api/audit/export', requireAuth, (req, res) => {
 })
 
 app.delete('/api/audit', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   try {
     const db = require('./db/connection')
     const audit = require('./audit')
@@ -377,7 +384,7 @@ function cacheShort(req, res, next) {
 
 // ── GET /api/stats — instance stats for Build Info panel ──────────────────────
 app.get('/api/stats', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const db = require('./db/connection')
   const users     = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_active = 1').get().c
   const shifts    = db.prepare('SELECT COUNT(*) as c FROM shifts').get().c
@@ -445,7 +452,7 @@ app.get('/api/sse', requireAuth, (req, res) => {
 // ── API Routes ─────────────────────────────────────────────────────────────────
 function blockApiDuringMaintenance(req, res, next) {
   if (!isMaintenanceModeEnabled()) return next()
-  if (req.user?.role === 'admin') return next()
+  if (req.user && hasPermission(req, 'manage_settings')) return next()
   return res.status(503).json({
     error: 'Maintenance mode is enabled. Access is currently limited to administrators.',
     maintenanceMode: true,
@@ -466,10 +473,11 @@ app.use('/api/tasks',            requireAuth, blockApiDuringMaintenance, require
 app.use('/api/task-list-groups', requireAuth, blockApiDuringMaintenance, require('./routes/task-list-groups'))
 app.use('/api/holidays',         requireAuth, blockApiDuringMaintenance, require('./routes/holidays'))
 app.use('/api/passkeys',         require('./routes/passkeys'))
+app.use('/api/roles',            requireAuth, blockApiDuringMaintenance, require('./routes/roles'))
 
 // ── GET /api/config/email — read SMTP config (admin, password masked) ─────────
 app.get('/api/config/email', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const o = loadOverrides()
   res.json({
     publicAppUrl: o.APP_URL || process.env.APP_URL || '',
@@ -490,7 +498,7 @@ app.get('/api/config/email', requireAuth, (req, res) => {
 
 // ── PATCH /api/config/email — save SMTP config ────────────────────────────────
 app.patch('/api/config/email', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const o = loadOverrides()
   const { publicAppUrl, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, smtpReplyTo, smtpTestSubject, smtpTestMessage } = req.body
   if (publicAppUrl !== undefined) {
@@ -522,7 +530,7 @@ app.patch('/api/config/email', requireAuth, (req, res) => {
 
 // ── POST /api/config/email/test — send a test email ───────────────────────────
 app.post('/api/config/email/test', requireAuth, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
   const result = await emailSvc.testConnection()
   if (!result.ok) return res.status(400).json({ error: result.error })
   const db   = require('./db/connection')
@@ -563,7 +571,7 @@ function sendMaintenancePage(res) {
 }
 
 function requirePageAccess(req, res, next) {
-  if (isMaintenanceModeEnabled() && req.user?.role !== 'admin') {
+  if (isMaintenanceModeEnabled() && !hasPermission(req, 'manage_settings')) {
     return sendMaintenancePage(res)
   }
   next()

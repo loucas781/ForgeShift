@@ -1,6 +1,7 @@
 'use strict'
 const jwt = require('jsonwebtoken')
 const db  = require('../db/connection')
+const { getRoleForUser, hasPermission, rolePermissions } = require('../utils/roles')
 
 // ── Inactivity timeout (cached, refreshed every 30s) ──────────────────────────
 let _inactivityCache = null
@@ -37,13 +38,25 @@ function requireAuth(req, res, next) {
   }
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET)
-    // Validate token_version to support "sign out all devices"
-    const row = db.prepare('SELECT token_version FROM users WHERE id = ?').get(req.user.id)
+    // Resolve the account and role on every request.  This makes role/active
+    // changes effective immediately instead of waiting for a JWT refresh.
+    const row = db.prepare('SELECT token_version, is_active, role, role_id FROM users WHERE id = ?').get(req.user.id)
     if (!row || (row.token_version || 0) !== (req.user.tv || 0)) {
       res.clearCookie('token', clearCookieOpts(req))
       if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
       return res.redirect('/login.html')
     }
+    if (!row.is_active) {
+      res.clearCookie('token', clearCookieOpts(req))
+      if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Account inactive' })
+      return res.redirect('/login.html?reason=inactive')
+    }
+    const role = getRoleForUser(req.user.id)
+    req.user.role = row.role
+    req.user.role_id = row.role_id || null
+    req.user.role_name = role?.name || null
+    req.user.role_color = role?.color || null
+    req.user.permissions = rolePermissions(role || { role: row.role })
     // Validate per-device session (JWTs with sid) and update last_used_at
     if (req.user.sid) {
       const sess = db.prepare('SELECT id, last_used_at FROM user_sessions WHERE id = ? AND user_id = ?')
@@ -78,29 +91,51 @@ function requireAuth(req, res, next) {
 function optionalAuth(req, res, next) {
   const token = req.cookies?.token
   if (token) {
-    try { req.user = jwt.verify(token, process.env.JWT_SECRET) }
-    catch { res.clearCookie('token', clearCookieOpts(req)) }
+    try {
+      const payload = jwt.verify(token, process.env.JWT_SECRET)
+      const row = db.prepare('SELECT token_version, is_active, role, role_id FROM users WHERE id = ?').get(payload.id)
+      if (!row || !row.is_active || (row.token_version || 0) !== (payload.tv || 0)) {
+        res.clearCookie('token', clearCookieOpts(req))
+      } else {
+        const role = getRoleForUser(payload.id)
+        req.user = {
+          ...payload,
+          role: row.role,
+          role_id: row.role_id || null,
+          role_name: role?.name || null,
+          role_color: role?.color || null,
+          permissions: rolePermissions(role || { role: row.role }),
+        }
+      }
+    } catch { res.clearCookie('token', clearCookieOpts(req)) }
   }
   next()
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!req.user || !hasPermission(req, 'manage_users')) return res.status(403).json({ error: 'Admin only' })
   next()
 }
 
 // Passes for admin or manager
 function requireAdminOrManager(req, res, next) {
-  if (!req.user || !['admin', 'manager'].includes(req.user.role))
+  if (!req.user || (!hasPermission(req, 'manage_templates') && !hasPermission(req, 'manage_teams')))
     return res.status(403).json({ error: 'Admin or manager only' })
   next()
 }
 
 // Passes for admin, manager, or shift_lead
 function requireShiftLead(req, res, next) {
-  if (!req.user || !['admin', 'manager', 'shift_lead'].includes(req.user.role))
+  if (!req.user || (!hasPermission(req, 'manage_tasks') && !hasPermission(req, 'add_other_shifts')))
     return res.status(403).json({ error: 'Insufficient permissions' })
   next()
 }
 
-module.exports = { requireAuth, optionalAuth, requireAdmin, requireAdminOrManager, requireShiftLead, clearCookieOpts }
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!req.user || !hasPermission(req, permission)) return res.status(403).json({ error: 'Insufficient permissions', permission })
+    next()
+  }
+}
+
+module.exports = { requireAuth, optionalAuth, requireAdmin, requireAdminOrManager, requireShiftLead, requirePermission, clearCookieOpts }

@@ -262,6 +262,15 @@ function avatarEl(user, size = '') {
   return el
 }
 
+function _cfgHasPermission(cfg, permission) {
+  if (cfg?.user?.role === 'admin') return true
+  let permissions = cfg?.user?.permissions || []
+  if (typeof permissions === 'string') {
+    try { permissions = JSON.parse(permissions) } catch { permissions = [] }
+  }
+  return Array.isArray(permissions) && permissions.includes(permission)
+}
+
 // ── Shell render ───────────────────────────────────────────────────────────────
 function renderShell(cfg, activePage) {
   // Topbar
@@ -272,6 +281,14 @@ function renderShell(cfg, activePage) {
   const safeVersion = escHtml(cfg.version)
   const safeName = escHtml(cfg.user?.name)
   const safeEmail = escHtml(cfg.user?.email)
+  const safeRoleName = escHtml(cfg.user?.role_name || ({ shift_lead:'Shift Lead', manager:'Manager', admin:'Admin', member:'Member' }[cfg.user?.role] || 'Member'))
+  const roleColour = resolveColourValue(cfg.user?.role_color, '#64748b')
+  const rolePill = `<span style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;border:1px solid color-mix(in srgb,${roleColour} 55%,var(--border));border-radius:999px;padding:3px 7px;color:var(--text-2);background:color-mix(in srgb,${roleColour} 12%,var(--surface));font-size:9px;font-weight:750;line-height:1;text-transform:uppercase;letter-spacing:.04em"><span style="width:6px;height:6px;border-radius:50%;background:${roleColour}"></span>${safeRoleName}</span>`
+  const mobileRolePill = `<span style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:3px 7px;color:#fff;background:rgba(255,255,255,.07);font-size:9px;font-weight:750;line-height:1;text-transform:uppercase;letter-spacing:.04em"><span style="width:6px;height:6px;border-radius:50%;background:${roleColour};box-shadow:0 0 0 1px rgba(255,255,255,.35)"></span>${safeRoleName}</span>`
+  const showTemplates = cfg.user?.role !== 'member'
+    || _cfgHasPermission(cfg, 'manage_templates')
+    || _cfgHasPermission(cfg, 'add_own_shifts')
+    || _cfgHasPermission(cfg, 'add_other_shifts')
   const showEnvBadges = envClass !== 'production'
 
   topbar.innerHTML = `
@@ -289,7 +306,7 @@ function renderShell(cfg, activePage) {
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
         Calendar
       </a>
-      ${cfg.user?.role !== 'member' ? `<a href="/templates.html" class="topbar-nav-btn${activePage==='templates'?' active':''}">
+      ${showTemplates ? `<a href="/templates.html" class="topbar-nav-btn${activePage==='templates'?' active':''}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/><path d="M3 8a2 2 0 012-2h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
         Templates
       </a>` : ''}
@@ -351,6 +368,7 @@ function renderShell(cfg, activePage) {
         <div class="dropdown-user-header">
           <div class="dropdown-user-name">${safeName}</div>
           <div class="dropdown-user-email">${safeEmail}</div>
+          ${rolePill}
         </div>
         <a href="/profile.html" class="dropdown-item">
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
@@ -383,6 +401,7 @@ function renderShell(cfg, activePage) {
       <div style="min-width:0">
         <div style="font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeName}</div>
         <div style="font-size:11px;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeEmail}</div>
+        ${mobileRolePill}
       </div>
     </div>
     <div class="mobile-nav-sep"></div>
@@ -390,7 +409,7 @@ function renderShell(cfg, activePage) {
       <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
       Calendar
     </a>
-    ${cfg.user?.role !== 'member' ? `<a href="/templates.html" class="topbar-nav-btn${activePage==='templates'?' active':''}" onclick="document.getElementById('mobileNavDropdown').classList.remove('open')">
+    ${showTemplates ? `<a href="/templates.html" class="topbar-nav-btn${activePage==='templates'?' active':''}" onclick="document.getElementById('mobileNavDropdown').classList.remove('open')">
       <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0012.586 2H9z"/><path d="M3 8a2 2 0 012-2h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
       Templates
     </a>` : ''}

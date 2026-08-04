@@ -2,7 +2,8 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
-const { requireAuth, requireAdmin } = require('../middleware/auth')
+const { requireAuth, requirePermission } = require('../middleware/auth')
+const { hasPermission } = require('../utils/roles')
 const audit  = require('../audit')
 const logger = require('../utils/logger')
 
@@ -14,7 +15,15 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 // Others: orgs they belong to (name + id only).
 router.get('/', requireAuth, (req, res) => {
   try {
-    if (req.user.role === 'manager') {
+    const canManageOrganisations = req.user.role === 'admin' || hasPermission(req, 'manage_organisations')
+    const needsOrganisationOptions = req.user.role === 'manager' || [
+      'manage_locations',
+      'manage_templates',
+      'manage_tasks',
+      'manage_teams',
+    ].some(permission => hasPermission(req, permission))
+
+    if (!canManageOrganisations && needsOrganisationOptions) {
       const orgs = db.prepare(`
         SELECT o.id, o.name, o.color
         FROM organisations o
@@ -23,7 +32,7 @@ router.get('/', requireAuth, (req, res) => {
       return res.json(orgs)
     }
 
-    if (req.user.role !== 'admin') {
+    if (!canManageOrganisations) {
       const orgs = db.prepare(`
         SELECT o.id, o.name, o.color
         FROM organisations o
@@ -36,13 +45,14 @@ router.get('/', requireAuth, (req, res) => {
     const orgs = db.prepare(`
       SELECT o.*,
              COUNT(DISTINCT om.user_id)  AS member_count,
-             COUNT(DISTINCT l.id)        AS location_count,
+      COUNT(DISTINCT CASE WHEN lo.org_id = o.id THEN lo.location_id WHEN l.org_id = o.id THEN l.id END) AS location_count,
              COUNT(DISTINCT tl.id)       AS task_list_count,
              COUNT(DISTINCT st.id)       AS template_count,
              COUNT(DISTINCT t.id)        AS team_count
       FROM organisations o
       LEFT JOIN organisation_members om ON om.org_id = o.id
       LEFT JOIN locations l             ON l.org_id  = o.id
+      LEFT JOIN location_organisations lo ON lo.org_id = o.id
       LEFT JOIN task_lists tl           ON tl.org_id = o.id
       LEFT JOIN shift_templates st      ON st.org_id = o.id
       LEFT JOIN teams t                 ON t.org_id  = o.id
@@ -53,15 +63,16 @@ router.get('/', requireAuth, (req, res) => {
     if (orgs.length) {
       const orgIds = orgs.map(o => o.id)
       const members = db.prepare(`
-        SELECT om.org_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.is_active
-        FROM organisation_members om JOIN users u ON u.id = om.user_id
+        SELECT om.org_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.role_id,
+               r.name AS role_name, r.color AS role_color, u.is_active
+        FROM organisation_members om JOIN users u ON u.id = om.user_id LEFT JOIN roles r ON r.id=u.role_id
         WHERE om.org_id IN (${orgIds.map(() => '?').join(',')})
         ORDER BY u.name
       `).all(...orgIds)
       const byOrg = {}
       members.forEach(m => {
         if (!byOrg[m.org_id]) byOrg[m.org_id] = []
-        byOrg[m.org_id].push({ id: m.id, name: m.name, initials: m.initials, color: m.color, avatar: m.avatar, role: m.role, is_active: m.is_active })
+        byOrg[m.org_id].push({ id: m.id, name: m.name, initials: m.initials, color: m.color, avatar: m.avatar, role: m.role, role_id: m.role_id, role_name: m.role_name, role_color: m.role_color, is_active: m.is_active })
       })
       orgs.forEach(o => { o.members = byOrg[o.id] || [] })
     } else {
@@ -76,7 +87,7 @@ router.get('/', requireAuth, (req, res) => {
 })
 
 // ── POST /api/organisations — create (admin-only) ─────────────────────────────
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requirePermission('manage_organisations'), (req, res) => {
   try {
     const { name, color } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Organisation name is required.' })
@@ -101,7 +112,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── PATCH /api/organisations/:id — rename / recolour (admin-only) ─────────────
-router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
+router.patch('/:id', requireAuth, requirePermission('manage_organisations'), (req, res) => {
   try {
     const { name, color } = req.body
     const org = db.prepare('SELECT * FROM organisations WHERE id = ?').get(req.params.id)
@@ -122,12 +133,16 @@ router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
 
 // ── DELETE /api/organisations/:id — (admin-only) ──────────────────────────────
 // Nullifies org_id on all linked items; members are cascade-deleted.
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('manage_organisations'), (req, res) => {
   try {
     const org = db.prepare('SELECT * FROM organisations WHERE id = ?').get(req.params.id)
     if (!org) return res.status(404).json({ error: 'Organisation not found' })
     const tx = db.transaction(() => {
-      db.prepare('UPDATE locations       SET org_id = NULL WHERE org_id = ?').run(req.params.id)
+      db.prepare('DELETE FROM location_organisations WHERE org_id = ?').run(req.params.id)
+      db.prepare(`UPDATE locations SET org_id = (
+        SELECT lo.org_id FROM location_organisations lo
+        WHERE lo.location_id = locations.id ORDER BY lo.org_id LIMIT 1
+      ) WHERE org_id = ?`).run(req.params.id)
       db.prepare('UPDATE task_lists      SET org_id = NULL WHERE org_id = ?').run(req.params.id)
       db.prepare('UPDATE shift_templates SET org_id = NULL WHERE org_id = ?').run(req.params.id)
       db.prepare('UPDATE teams           SET org_id = NULL WHERE org_id = ?').run(req.params.id)
@@ -143,7 +158,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── PUT /api/organisations/:id/members — replace full member list (admin-only) ─
-router.put('/:id/members', requireAuth, requireAdmin, (req, res) => {
+router.put('/:id/members', requireAuth, requirePermission('manage_organisations'), (req, res) => {
   try {
     const org = db.prepare('SELECT * FROM organisations WHERE id = ?').get(req.params.id)
     if (!org) return res.status(404).json({ error: 'Organisation not found' })

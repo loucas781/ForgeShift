@@ -17,6 +17,7 @@ const express       = require('express')
 const { v4: uuid }  = require('uuid')
 const db            = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
+const { hasPermission } = require('../utils/roles')
 const jwt           = require('jsonwebtoken')
 const logger        = require('../utils/logger')
 
@@ -262,7 +263,7 @@ router.post('/auth-verify', async (req, res) => {
 router.delete('/:id', requireAuth, (req, res) => {
   const row = db.prepare('SELECT id, user_id FROM passkey_credentials WHERE id = ?').get(req.params.id)
   if (!row) return res.status(404).json({ error: 'Passkey not found' })
-  if (row.user_id !== req.user.id && req.user.role !== 'admin') {
+  if (row.user_id !== req.user.id && !hasPermission(req, 'manage_users')) {
     return res.status(403).json({ error: 'Forbidden' })
   }
   db.prepare('DELETE FROM passkey_credentials WHERE id = ?').run(req.params.id)

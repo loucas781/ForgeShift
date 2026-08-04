@@ -24,6 +24,7 @@
 const router  = require('express').Router()
 const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
+const { hasPermission, ensureBuiltinRoles, BUILTIN } = require('../utils/roles')
 const audit   = require('../audit')
 const logger  = require('../utils/logger')
 const { DEFAULT_COLOR, resolveStoredColor } = require('../utils/color-utils')
@@ -38,7 +39,7 @@ router.use(requireAuth)
 
 // ── Admin guard ───────────────────────────────────────────────────────────────
 router.use((req, res, next) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_backups')) return res.status(403).json({ error: 'Admin only' })
   next()
 })
 
@@ -51,9 +52,11 @@ router.get('/export', (req, res) => {
     const tables = {
       // Parents first
       users:                 db.prepare('SELECT * FROM users ORDER BY created_at').all(),
+      roles:                 allTables.has('roles') ? db.prepare('SELECT * FROM roles ORDER BY name').all() : [],
       organisations:         allTables.has('organisations')
                                ? db.prepare('SELECT * FROM organisations ORDER BY created_at').all() : [],
       locations:             db.prepare('SELECT * FROM locations ORDER BY created_at').all(),
+      location_organisations: allTables.has('location_organisations') ? db.prepare('SELECT * FROM location_organisations').all() : [],
       template_groups:       allTables.has('template_groups')
                                ? db.prepare('SELECT * FROM template_groups ORDER BY sort_order, created_at').all() : [],
       // Children of the above
@@ -162,6 +165,24 @@ router.post('/restore', (req, res) => {
     try {
 
       // ── 1. Users ───────────────────────────────────────────────────────────
+      if (existingTables.has('roles')) {
+        const protectedRoleIds = new Set(Object.values(BUILTIN).map(role => role.id))
+        const upsertRole = db.prepare(`INSERT INTO roles (id,name,color,permissions,is_builtin,is_system,created_by,created_at,updated_at)
+          VALUES (@id,@name,@color,@permissions,@is_builtin,@is_system,@created_by,@created_at,@updated_at)
+          ON CONFLICT(id) DO UPDATE SET name=excluded.name,color=excluded.color,permissions=excluded.permissions,
+            is_builtin=excluded.is_builtin,is_system=excluded.is_system`)
+        for (const r of (tables.roles || [])) upsertRole.run({
+          id: r.id,
+          name: r.name,
+          color: r.color || '#0052cc',
+          permissions: typeof r.permissions === 'string' ? r.permissions : JSON.stringify(r.permissions || []),
+          is_builtin: protectedRoleIds.has(r.id) ? 1 : 0,
+          is_system: r.id === BUILTIN.inactive.id ? 1 : 0,
+          created_by: r.created_by || null,
+          created_at: r.created_at || new Date().toISOString(),
+          updated_at: r.updated_at || r.created_at || new Date().toISOString(),
+        })
+      }
       // Two-step upsert handles BOTH unique constraints (id PK + email UNIQUE):
       //   • Scenario A — same id exists → UPDATE in place
       //   • Scenario B — same email exists under a different id (e.g. fresh
@@ -177,11 +198,15 @@ router.post('/restore', (req, res) => {
           ${userCols.has('totp_secret')  ? ', totp_secret'  : ''}
           ${userCols.has('totp_enabled') ? ', totp_enabled' : ''}
           ${userCols.has('prefs')        ? ', prefs'        : ''}
+          ${userCols.has('role_id')      ? ', role_id'      : ''}
+          ${userCols.has('previous_role_id') ? ', previous_role_id' : ''}
         ) VALUES (
           @id, @name, @email, @password, @initials, @color, @avatar, @role, @is_active, @created_at
           ${userCols.has('totp_secret')  ? ', @totp_secret'  : ''}
           ${userCols.has('totp_enabled') ? ', @totp_enabled' : ''}
           ${userCols.has('prefs')        ? ', @prefs'        : ''}
+          ${userCols.has('role_id')      ? ', @role_id'      : ''}
+          ${userCols.has('previous_role_id') ? ', @previous_role_id' : ''}
         )
         ON CONFLICT(id) DO UPDATE SET
           name=excluded.name, email=excluded.email, initials=excluded.initials,
@@ -190,6 +215,8 @@ router.post('/restore', (req, res) => {
           ${userCols.has('totp_secret')  ? ', totp_secret=excluded.totp_secret'   : ''}
           ${userCols.has('totp_enabled') ? ', totp_enabled=excluded.totp_enabled' : ''}
           ${userCols.has('prefs')        ? ', prefs=excluded.prefs'               : ''}
+          ${userCols.has('role_id')      ? ', role_id=COALESCE(excluded.role_id, users.role_id)' : ''}
+          ${userCols.has('previous_role_id') ? ', previous_role_id=COALESCE(excluded.previous_role_id, users.previous_role_id)' : ''}
       `)
       let userCount = 0
       for (const u of (tables.users || [])) {
@@ -208,6 +235,8 @@ router.post('/restore', (req, res) => {
           totp_secret:  u.totp_secret  || null,
           totp_enabled: u.totp_enabled ?? 0,
           prefs:        u.prefs        || '{}',
+          role_id:      u.role_id || null,
+          previous_role_id: u.previous_role_id || null,
         })
         userCount++
       }
@@ -268,6 +297,25 @@ router.post('/restore', (req, res) => {
         locCount++
       }
       stats.locations = locCount
+
+      if (existingTables.has('location_organisations')) {
+        const upsertLocationOrg = db.prepare(`INSERT OR IGNORE INTO location_organisations (location_id, org_id, added_at)
+          VALUES (@location_id, @org_id, @added_at)`)
+        let loCount = 0
+        for (const lo of (tables.location_organisations || [])) {
+          upsertLocationOrg.run({ location_id: lo.location_id, org_id: lo.org_id, added_at: lo.added_at || new Date().toISOString() })
+          loCount++
+        }
+        // Backups from before multi-organisation locations only contain org_id.
+        if (!(tables.location_organisations || []).length) {
+          for (const location of (tables.locations || [])) {
+            if (!location.org_id) continue
+            upsertLocationOrg.run({ location_id: location.id, org_id: location.org_id, added_at: location.created_at || new Date().toISOString() })
+            loCount++
+          }
+        }
+        stats.locationOrganisations = loCount
+      }
 
       // ── 4. Template Groups ─────────────────────────────────────────────────
       // Must come before shift_templates which references group_id.
@@ -632,6 +680,9 @@ router.post('/restore', (req, res) => {
 
   try {
     restore()
+    // Reassert immutable built-ins and park/restore legacy inactive accounts
+    // after importing both role and user rows.
+    ensureBuiltinRoles()
 
     // ── Restore avatar files ─────────────────────────────────────────────────
     // Written to disk after the DB transaction so a DB failure doesn't leave

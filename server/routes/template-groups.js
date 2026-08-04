@@ -2,7 +2,8 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
-const { requireAuth, requireAdmin } = require('../middleware/auth')
+const { requireAuth, requirePermission } = require('../middleware/auth')
+const { hasPermission } = require('../utils/roles')
 const audit  = require('../audit')
 const logger = require('../utils/logger')
 
@@ -18,7 +19,7 @@ router.get('/', requireAuth, (req, res) => {
   `).all()
 
   // Attach member list (id + name + role) to each group for admin display
-  if (req.user.role === 'admin') {
+  if (req.user.role === 'admin' || hasPermission(req, 'manage_templates')) {
     const members = db.prepare(`
       SELECT utg.group_id, u.id, u.name, u.role, u.color, u.initials
       FROM user_template_groups utg
@@ -37,7 +38,7 @@ router.get('/', requireAuth, (req, res) => {
 })
 
 // ── POST /api/template-groups ─────────────────────────────────────────────────
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requirePermission('manage_templates'), (req, res) => {
   try {
     const { name } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Group name is required.' })
@@ -59,7 +60,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── PATCH /api/template-groups/:id ───────────────────────────────────────────
-router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
+router.patch('/:id', requireAuth, requirePermission('manage_templates'), (req, res) => {
   try {
     const group = db.prepare('SELECT * FROM template_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
@@ -74,7 +75,7 @@ router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── DELETE /api/template-groups/:id ──────────────────────────────────────────
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('manage_templates'), (req, res) => {
   try {
     const group = db.prepare('SELECT * FROM template_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
@@ -89,7 +90,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── PUT /api/template-groups/:id/members — replace full member list ───────────
-router.put('/:id/members', requireAuth, requireAdmin, (req, res) => {
+router.put('/:id/members', requireAuth, requirePermission('manage_templates'), (req, res) => {
   try {
     const group = db.prepare('SELECT * FROM template_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })

@@ -527,6 +527,7 @@ try {
   migrateHolidays()
   migrateLocationMembers()
   migrateOrganisations()
+  migrateRoles()
 } catch (err) {
   console.error('Migration failed:', err.message)
   process.exit(1)
@@ -602,6 +603,44 @@ function migrateOrganisations() {
     }
   }
   console.log('✓ Organisations schema ready')
+}
+
+// Additive roles and location-to-organisation memberships.  Role ids are
+// intentionally separate from the legacy users.role string so old clients and
+// backups remain compatible while authorisation can use database permissions.
+function migrateRoles() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#0052cc',
+      permissions TEXT NOT NULL DEFAULT '[]',
+      is_builtin INTEGER NOT NULL DEFAULT 0,
+      is_system INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_roles_builtin ON roles(is_builtin, is_system);
+    CREATE TABLE IF NOT EXISTS location_organisations (
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      org_id TEXT NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (location_id, org_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_location_orgs_location ON location_organisations(location_id);
+    CREATE INDEX IF NOT EXISTS idx_location_orgs_org ON location_organisations(org_id);
+  `)
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name)
+  if (!userCols.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
+  if (!userCols.includes('previous_role_id')) db.exec('ALTER TABLE users ADD COLUMN previous_role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
+
+  // Backfill the junction from the original scalar relationship.
+  db.exec(`INSERT OR IGNORE INTO location_organisations (location_id, org_id)
+    SELECT id, org_id FROM locations WHERE org_id IS NOT NULL`)
+  const { ensureBuiltinRoles } = require('../utils/roles')
+  ensureBuiltinRoles()
+  console.log('✓ Roles and location organisation schema ready')
 }
 
 // Additive: location member assignment (safe on existing DBs)

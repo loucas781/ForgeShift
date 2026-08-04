@@ -11,6 +11,7 @@ const emailSvc = require('../email')
 const { authenticator } = require('otplib')
 const logger  = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
+const { rolePermissions, hasPermission, canGrantRole, canManageUserRole } = require('../utils/roles')
 
 const TWO_FA_TRUST_COOKIE = 'fs_2fa_trust'
 const TWO_FA_TRUST_DAYS = 30
@@ -21,6 +22,15 @@ function hashToken(raw) {
 const COLORS = ['#4f46e5','#059669','#7c3aed','#dc2626','#d97706','#0891b2','#db2777','#065f46','#1d4ed8','#9333ea']
 function getInitials(name) {
   return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+function addRoleMetadata(user) {
+  if (!user) return user
+  const role = db.prepare('SELECT id, name, color, permissions, is_builtin, is_system FROM roles WHERE id = ?').get(user.role_id)
+  user.role_id = user.role_id || null
+  user.role_name = role?.name || null
+  user.role_color = role?.color || null
+  user.permissions = rolePermissions(role || { role: user.role })
+  return user
 }
 function isHttpsRequest(req) {
   if (!req) return true
@@ -182,9 +192,9 @@ router.post('/signup', async (req, res) => {
     const hash = await hashPassword(password)
     const id   = uuidv4()
     const role = userCount === 0 ? 'admin' : 'member'
-    db.prepare('INSERT INTO users (id, name, email, password, initials, color, role) VALUES (?,?,?,?,?,?,?)')
-      .run(id, name.trim(), norm, hash, getInitials(name), COLORS[userCount % COLORS.length], role)
-    const user = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(id)
+    db.prepare('INSERT INTO users (id, name, email, password, initials, color, role, role_id) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, name.trim(), norm, hash, getInitials(name), COLORS[userCount % COLORS.length], role, `builtin-${role.replace('_', '-')}`)
+    const user = addRoleMetadata(db.prepare('SELECT id, name, email, initials, color, avatar, role, role_id FROM users WHERE id = ?').get(id))
     const sessionId = createSession(req, user.id)
     res.cookie('token', makeToken(user, sessionId), cookieOpts(req))
     audit(user.id, 'user.signup', 'user', user.id, user.name)
@@ -209,6 +219,7 @@ router.post('/login', async (req, res) => {
     if (user.totp_enabled) {
       if (hasValidTrusted2FA(req, user)) {
         const { password: _, ...pubTrusted } = user
+        addRoleMetadata(pubTrusted)
         const trustedSessionId = createSession(req, pubTrusted.id)
         res.cookie('token', makeToken(pubTrusted, trustedSessionId), cookieOpts(req))
         const trustedIp = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
@@ -227,6 +238,7 @@ router.post('/login', async (req, res) => {
       return res.json({ ok: true, requiresTOTP: true, pendingToken })
     }
     const { password: _, ...pub } = user
+    addRoleMetadata(pub)
     const sessionId = createSession(req, pub.id)
     res.cookie('token', makeToken(pub, sessionId), cookieOpts(req))
     const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
@@ -250,11 +262,12 @@ router.post('/2fa/login', async (req, res) => {
     if (!payload.totp_pending || !payload.uid)
       return res.status(401).json({ error: 'Invalid token.' })
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.uid)
-    if (!user || !user.totp_enabled || !user.totp_secret)
+    if (!user || !user.is_active || !user.totp_enabled || !user.totp_secret)
       return res.status(401).json({ error: 'Invalid token.' })
     const isValid = verifyTotpWithGrace(user.totp_secret, code)
     if (!isValid) return res.status(401).json({ error: 'Invalid authentication code.' })
     const { password: _, ...pub } = user
+    addRoleMetadata(pub)
     const sessionId = createSession(req, pub.id)
     res.cookie('token', makeToken(pub, sessionId), cookieOpts(req))
     if (rememberDevice) {
@@ -281,7 +294,7 @@ router.post('/logout', (req, res) => {
 
 // ── GET /api/auth/me ───────────────────────────────────────────────────────────
 router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT id, name, email, initials, color, avatar, role, is_active, created_at FROM users WHERE id = ?').get(req.user.id)
+  const user = addRoleMetadata(db.prepare(`SELECT id, name, email, initials, color, avatar, role, role_id, is_active, created_at FROM users WHERE id = ?`).get(req.user.id))
   if (!user) return res.status(404).json({ error: 'User not found' })
   res.json(user)
 })
@@ -313,7 +326,7 @@ router.patch('/profile', requireAuth, async (req, res) => {
       updates.push('password = ?'); vals.push(await hashPassword(newPassword))
     }
     if (updates.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...vals) }
-    const updated = db.prepare('SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = ?').get(user.id)
+    const updated = addRoleMetadata(db.prepare('SELECT id, name, email, initials, color, avatar, role, role_id FROM users WHERE id = ?').get(user.id))
     // Rotate session: delete old, create new so the session list stays accurate
     if (req.user?.sid) db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.user.sid)
     const newSid = createSession(req, updated.id)
@@ -428,10 +441,11 @@ router.post('/forgot-password', async (req, res) => {
 // ── GET /api/auth/admin/reset-link/:userId ────────────────────────────────────
 // Admin-only. Generates a one-time reset URL — the only way to reset when SMTP is off.
 router.get('/admin/reset-link/:userId', requireAuth, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_users')) return res.status(403).json({ error: 'Admin only' })
   try {
-    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(req.params.userId)
+    const user = db.prepare('SELECT id, name, email, role, role_id FROM users WHERE id = ?').get(req.params.userId)
     if (!user) return res.status(404).json({ error: 'User not found' })
+    if (!canManageUserRole(req, user)) return res.status(403).json({ error: 'You cannot manage a user with permissions above your own.' })
     db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(user.id)
     const rawToken  = crypto.randomBytes(32).toString('hex')
     const tokenHash = hashToken(rawToken)
@@ -448,13 +462,14 @@ router.get('/admin/reset-link/:userId', requireAuth, async (req, res) => {
 // ── POST /api/auth/admin/reset-link/:userId/send ─────────────────────────────
 // Admin-only. Generates a one-time reset URL and emails it directly to the user.
 router.post('/admin/reset-link/:userId/send', requireAuth, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_users')) return res.status(403).json({ error: 'Admin only' })
   try {
     const smtp = emailSvc.getSmtpConfig()
     if (!smtp.enabled) return res.status(400).json({ error: 'SMTP is not configured.' })
 
-    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(req.params.userId)
+    const user = db.prepare('SELECT id, name, email, role, role_id FROM users WHERE id = ?').get(req.params.userId)
     if (!user) return res.status(404).json({ error: 'User not found' })
+    if (!canManageUserRole(req, user)) return res.status(403).json({ error: 'You cannot manage a user with permissions above your own.' })
 
     db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(user.id)
     const rawToken  = crypto.randomBytes(32).toString('hex')
@@ -519,8 +534,8 @@ router.post('/reset-password', async (req, res) => {
 
 // ── POST /api/auth/invite — admin creates account (works when signup disabled) ──
 router.post('/invite', requireAuth, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
-  const { name, email: emailAddr, role = 'member' } = req.body
+  if (!hasPermission(req, 'manage_users')) return res.status(403).json({ error: 'Admin only' })
+  const { name, email: emailAddr, role = 'member', role_id } = req.body
   if (!name?.trim() || !emailAddr?.trim()) return res.status(400).json({ error: 'Name and email required.' })
   if (name.trim().length > 100) return res.status(400).json({ error: 'Name must be 100 characters or fewer.' })
   if (emailAddr.trim().length > 254) return res.status(400).json({ error: 'Email address is too long.' })
@@ -532,8 +547,16 @@ router.post('/invite', requireAuth, async (req, res) => {
     const count = db.prepare('SELECT COUNT(*) as c FROM users').get().c
     const tempPassword = crypto.randomBytes(8).toString('base64url') + 'A1!'
     const id = uuidv4()
-    db.prepare('INSERT INTO users (id, name, email, password, initials, color, role) VALUES (?,?,?,?,?,?,?)')
-      .run(id, name.trim(), norm, await hashPassword(tempPassword), getInitials(name.trim()), COLORS[count % COLORS.length], ['admin','manager','shift_lead','member'].includes(role) ? role : 'member')
+    const selectedRole = role_id
+      ? db.prepare('SELECT * FROM roles WHERE id = ?').get(role_id)
+      : db.prepare('SELECT * FROM roles WHERE id = ?').get(`builtin-${role.replace('_', '-')}`)
+    const resolvedRole = selectedRole && !selectedRole.is_system ? selectedRole : db.prepare("SELECT * FROM roles WHERE id='builtin-member'").get()
+    if (!canGrantRole(req, resolvedRole)) return res.status(403).json({ error: 'You cannot assign a role with permissions you do not have.' })
+    const legacyRole = resolvedRole.id.startsWith('builtin-')
+      ? resolvedRole.id.slice('builtin-'.length).replaceAll('-', '_')
+      : 'member'
+    db.prepare('INSERT INTO users (id, name, email, password, initials, color, role, role_id) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, name.trim(), norm, await hashPassword(tempPassword), getInitials(name.trim()), COLORS[count % COLORS.length], legacyRole, resolvedRole.id)
 
     // Send invite email if SMTP is configured
     const smtp = emailSvc.getSmtpConfig()

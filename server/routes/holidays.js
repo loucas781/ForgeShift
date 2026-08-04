@@ -1,7 +1,7 @@
 'use strict'
 const router = require('express').Router()
 const db     = require('../db/connection')
-const { requireAuth, requireAdmin } = require('../middleware/auth')
+const { requireAuth, requirePermission } = require('../middleware/auth')
 const audit  = require('../audit')
 const logger = require('../utils/logger')
 
@@ -51,7 +51,7 @@ const SOURCES = [
 
 // ── GET /api/holidays/status ──────────────────────────────────────────────────
 // Returns last-fetched timestamp and count of stored override dates (admin only)
-router.get('/status', requireAuth, requireAdmin, (req, res) => {
+router.get('/status', requireAuth, requirePermission('manage_holidays'), (req, res) => {
   try {
     const lastFetchedRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'holiday_last_fetched'").get()
     const overridesRow   = db.prepare("SELECT value FROM app_preferences WHERE key = 'holiday_overrides'").get()
@@ -70,7 +70,7 @@ router.get('/status', requireAuth, requireAdmin, (req, res) => {
 // ── POST /api/holidays/fetch ──────────────────────────────────────────────────
 // Fetches live data from all supported sources and merges into stored overrides.
 // Admin only. Uses Node 18+ native fetch.
-router.post('/fetch', requireAuth, requireAdmin, async (req, res) => {
+router.post('/fetch', requireAuth, requirePermission('manage_holidays'), async (req, res) => {
   try {
     // Load existing overrides so we merge rather than overwrite
     const overridesRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'holiday_overrides'").get()
@@ -135,7 +135,7 @@ router.post('/fetch', requireAuth, requireAdmin, async (req, res) => {
 
 // ── DELETE /api/holidays/overrides ────────────────────────────────────────────
 // Clears all fetched overrides, reverting to calculated-only data. Admin only.
-router.delete('/overrides', requireAuth, requireAdmin, (req, res) => {
+router.delete('/overrides', requireAuth, requirePermission('manage_holidays'), (req, res) => {
   try {
     const now = new Date().toISOString()
     db.prepare(`

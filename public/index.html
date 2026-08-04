@@ -349,8 +349,26 @@
 'use strict'
 
 let cfg = null
-// Helper: true for admin, manager, and shift_lead (all can manage shifts/assignments)
-function canManage() { return cfg && (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') }
+function hasPermission(permission) {
+  if (cfg?.user?.role === 'admin') return true
+  let permissions = cfg?.user?.permissions || []
+  if (typeof permissions === 'string') {
+    try { permissions = JSON.parse(permissions) } catch { permissions = [] }
+  }
+  return Array.isArray(permissions) && permissions.includes(permission)
+}
+function canViewOtherRotas() { return hasPermission('view_other_rotas') }
+function canManageTasks() { return hasPermission('manage_tasks') }
+function canTargetOtherUsers() {
+  return canViewOtherRotas() || ['add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)
+}
+function canManage() {
+  return ['add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)
+}
+function canAddShiftFor(userId = cfg?.user?.id) { return userId === cfg?.user?.id ? hasPermission('add_own_shifts') : hasPermission('add_other_shifts') }
+function canEditShift(shift) { return shift?.user_id === cfg?.user?.id ? hasPermission('edit_own_shifts') : hasPermission('edit_other_shifts') }
+function canDeleteShift(shift) { return shift?.user_id === cfg?.user?.id ? hasPermission('delete_own_shifts') : hasPermission('delete_other_shifts') }
+function canAddShiftInCurrentScope() { return canAddShiftFor(getCalendarContextUserId()) }
 let prefs = null
 let view = 'month'
 let currentDate = new Date()
@@ -382,7 +400,7 @@ function getTaskBannerPresentation(taskAssignment, alpha = '22') {
 
 function renderTaskDots(dayAssignments, dateStr, className = '') {
   if (!cfg.featureTasks || !dayAssignments.length) return ''
-  const clickAttr = canManage()
+  const clickAttr = canManageTasks()
     ? `onclick="event.stopPropagation();openTaskAssignModal('${dateStr}')"`
     : ''
   const count = dayAssignments.length
@@ -393,7 +411,7 @@ function renderTaskDots(dayAssignments, dateStr, className = '') {
   const title = dayAssignments.map(a =>
     `${a.task_list_name || 'Task'}${a.user_name ? ' • ' + a.user_name : ''}`
   ).join('\n')
-  return `<div class="cal-task-dots${canManage() ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canManage() ? clickAttr : ''} title="${escHtml(title)}">` +
+  return `<div class="cal-task-dots${canManageTasks() ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canManageTasks() ? clickAttr : ''} title="${escHtml(title)}">` +
     `<span class="cal-task-dot-row">${dotsHtml}</span>` +
     `<span class="cal-task-dot-label">${count} task list${count === 1 ? '' : 's'}</span>` +
   `</div>`
@@ -530,7 +548,7 @@ async function init() {
   view = ['month', 'week', 'agenda'].includes(prefs.defaultView) ? prefs.defaultView : 'month'
   syncViewTabs()
 
-  if (cfg.user.role === 'admin' || cfg.user.role === 'manager' || cfg.user.role === 'shift_lead') {
+  if (canTargetOtherUsers()) {
     document.getElementById('adminUserField').style.display = 'block'
   } else {
     document.getElementById('shiftAssignmentSection').style.display = 'none'
@@ -595,16 +613,9 @@ async function loadLocations() {
 }
 
 async function loadUsers() {
-  if (cfg.user.role === 'member') { users = [cfg.user]; return }
-  // admin and shift_lead both load users — backend scopes appropriately for shift_lead via teams
-  const allUsers = await api('/api/users')
-  if (cfg.user.role === 'shift_lead') {
-    // Get team members from the shift_lead's own teams (loaded in loadTeams)
-    // We'll populate after teams load; for now load all active members + leads
-    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.role === 'shift_lead'))
-  } else {
-    users = allUsers
-  }
+  if (!canTargetOtherUsers()) { users = [cfg.user]; return }
+  // The backend applies team/permission scope; do not duplicate role rules here.
+  users = await api('/api/users')
   const msel = document.getElementById('modalUser')
   const tasel = document.getElementById('taUser')
   const mFrag = document.createDocumentFragment()
@@ -621,37 +632,13 @@ async function loadUsers() {
 
 let teams = []
 async function loadTeams() {
-  if (cfg.user.role === 'member') return
+  if (!canTargetOtherUsers()) return
   try { teams = await api('/api/teams') } catch { teams = [] }
-
-  // For shift_lead: refine the user list to only themselves + their team members
-  if (cfg.user.role === 'shift_lead') {
-    const teamMemberIds = new Set()
-    teamMemberIds.add(cfg.user.id)
-    teams.forEach(t => (t.members || []).forEach(m => { if (m.is_active) teamMemberIds.add(m.id) }))
-    // Re-filter users to only those in scope, and repopulate selects
-    const allUsers = users  // already loaded in loadUsers
-    users = allUsers.filter(u => teamMemberIds.has(u.id))
-    const msel = document.getElementById('modalUser')
-    const tasel = document.getElementById('taUser')
-    const mFrag2 = document.createDocumentFragment()
-    const taFrag2 = document.createDocumentFragment()
-    users.forEach(u => {
-      const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
-      mFrag2.appendChild(o)
-      const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
-      taFrag2.appendChild(o2)
-    })
-    msel.innerHTML = ''
-    msel.appendChild(mFrag2)
-    tasel.innerHTML = ''
-    tasel.appendChild(taFrag2)
-  }
 
   const sel = document.getElementById('teamFilter')
   if (!sel) return
   while (sel.options.length > 1) sel.remove(1)
-  if (cfg.user.role !== 'member') {
+  if (canTargetOtherUsers()) {
     const all = document.createElement('option'); all.value = 'all'; all.textContent = 'All visible'; sel.appendChild(all)
     const teamOptions = teams.filter(t => t && t.id && Array.isArray(t.members))
     if (teamOptions.length) {
@@ -860,11 +847,9 @@ async function loadShifts() {
   if (view === 'week' || view === 'agenda') queryStart.setDate(queryStart.getDate() - 1)
   const params = new URLSearchParams({ start: toDateStr(queryStart), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
-  const role = cfg.user.role
-
-  if (role === 'member') {
+  if (!canViewOtherRotas()) {
     params.set('user_id', cfg.user.id)
-  } else if (role === 'admin' || role === 'manager' || role === 'shift_lead') {
+  } else {
     if (filterVal === '' ) {
       // No filter selected — show own shifts only
       params.set('user_id', cfg.user.id)
@@ -880,9 +865,8 @@ async function loadTaskAssignments() {
   const { start, end } = getViewDateRange()
   const params = new URLSearchParams({ start: toDateStr(start), end: toDateStr(end) })
   const filterVal = document.getElementById('teamFilter')?.value || ''
-  const role = cfg.user.role
-  if (role === 'member') {
-    // Members always see only their own tasks
+  if (!canViewOtherRotas()) {
+    // Users without cross-rota visibility always see only their own tasks.
     params.set('user_id', cfg.user.id)
   } else {
     // Admins and shift_leads: scope tasks to match the current shift view
@@ -952,13 +936,13 @@ async function renderView() {
   if (view === 'week') _initDragDrop()
   // CSV export button visibility (managers only)
   const csvBtn = document.getElementById('csvExportBtn')
-  if (csvBtn) csvBtn.style.display = canManage() ? 'inline-flex' : 'none'
+  if (csvBtn) csvBtn.style.display = canViewOtherRotas() ? 'inline-flex' : 'none'
   // Copy week button: week view + managers only
   const copyBtn = document.getElementById('copyWeekBtn')
-  if (copyBtn) copyBtn.style.display = (view === 'week' && canManage()) ? 'inline-flex' : 'none'
+  if (copyBtn) copyBtn.style.display = (view === 'week' && canAddShiftInCurrentScope()) ? 'inline-flex' : 'none'
   // Mobile FAB — mirrors the copy-week button
   const fabBtn = document.getElementById('copyWeekFab')
-  if (fabBtn) fabBtn.style.display = (view === 'week' && canManage()) ? 'flex' : 'none'
+  if (fabBtn) fabBtn.style.display = (view === 'week' && canAddShiftInCurrentScope()) ? 'flex' : 'none'
 }
 
 function updateTitle() {
@@ -988,7 +972,7 @@ function updateTitle() {
 
 function isMultiStaffScope() {
   const scope = getScopeValue()
-  return cfg.user.role !== 'member' && scope !== '' && !scope.startsWith('user:')
+  return canViewOtherRotas() && scope !== '' && !scope.startsWith('user:')
 }
 
 function getCoverageBreakdown(shiftRows) {
@@ -1037,7 +1021,7 @@ function renderMonth() {
   const year       = currentDate.getFullYear()
   const month      = currentDate.getMonth()
   const _fv        = document.getElementById('teamFilter')?.value || ''
-  const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
+  const isSingleUserView = !canViewOtherRotas() || _fv === '' || _fv.startsWith('user:')
   const first      = new Date(year, month, 1)
   const last       = new Date(year, month + 1, 0)
   const weekStart  = prefs?.weekStartDay ?? 1
@@ -1092,12 +1076,12 @@ function renderMonth() {
     // Task indicator — compact dots keeps month view clean.
     let taskBannerHtml = ''
     if (cfg.featureTasks && taskLists.length) {
-      const clickAttr = canManage()
+      const clickAttr = canManageTasks()
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       if (dayAssignments.length) {
         taskBannerHtml = renderTaskDots(dayAssignments, ds)
-      } else if (canManage() && isSingleUserView) {
+      } else if (canManageTasks() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
     }
@@ -1112,9 +1096,9 @@ function renderMonth() {
       (selectedCalendarDate === ds ? ' selected-day' : '') +
       (dayHols.length ? ' is-holiday' : '') +
       (hasPaste ? ' can-paste' : '') +
-      (isEmpty && canManage() ? ' can-add' : '') +
+      (isEmpty && canAddShiftInCurrentScope() ? ' can-add' : '') +
       '" data-date="' + ds + '" onclick="handleCellClick(\'' + ds + '\')"' +
-      (canManage() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
+      (canAddShiftInCurrentScope() && isEmpty ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showEmptyCellMenu(event,\'' + ds + '\')"' : '') + '>'
     html += '<button type="button" class="cal-cell-date" aria-label="Open ' + ds + '" onclick="event.stopPropagation();handleCellClick(\'' + ds + '\')">' + d.getDate() + '</button>'
     // Holiday label(s) — pinned, non-interactive, behind shifts
     if (dayHols.length) {
@@ -1139,7 +1123,7 @@ function renderMonth() {
     chipsToShow.forEach((s, chipIndex) => {
       const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
-      const name  = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      const name  = canViewOtherRotas() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       // Duration badge
       let durBadge = ''
       if (!s.is_off && s.start_time && s.end_time) {
@@ -1156,7 +1140,7 @@ function renderMonth() {
         ' title="' + escHtml(titleStr) + '"' +
         ' role="button" tabindex="0" aria-label="' + escHtml(titleStr) + '" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openShiftPanel(\'' + escHtml(s.id) + '\')}"' +
         ' onclick="event.stopPropagation();openShiftPanel(\'' + escHtml(s.id) + '\')"' +
-        (canManage() ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + escHtml(s.id) + '\')"' : '') +
+        ((canEditShift(s) || canDeleteShift(s) || canAddShiftFor(s.user_id)) ? ' oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,\'' + escHtml(s.id) + '\')"' : '') +
         ' data-shift-id="' + escHtml(s.id) + '"' + '>' +
         escHtml(name) + escHtml(label) + durBadge + '</div>'
     })
@@ -1185,7 +1169,7 @@ function renderMonth() {
   if (banner) {
     if (!hasShiftsThisMonth) {
       bannerMsg.textContent = 'No shifts this month.'
-      if (canManage()) {
+      if (canAddShiftInCurrentScope()) {
         bannerBtn.textContent = '+ Add first shift'
         bannerBtn.onclick = () => openCreateModal(toDateStr(new Date()))
         bannerBtn.style.display = ''
@@ -1234,7 +1218,7 @@ function renderWeek() {
   const weekStart = prefs?.weekStartDay ?? 1
   const ws        = startOfWeek(currentDate, weekStart)
   const _fv       = document.getElementById('teamFilter')?.value || ''
-  const isSingleUserView = cfg.user.role === 'member' || _fv === '' || _fv.startsWith('user:')
+  const isSingleUserView = !canViewOtherRotas() || _fv === '' || _fv.startsWith('user:')
 
   const shiftMap = {}
   shifts.forEach(s => {
@@ -1301,19 +1285,19 @@ function renderWeek() {
   html += `</div>` // end header-row
 
   // ── Task row (optional, sits between header and time body) ───────────────────
-  if (cfg.featureTasks && (weekHasTasks || canManage())) {
+  if (cfg.featureTasks && (weekHasTasks || canManageTasks())) {
     html += `<div class="cal-week-task-row">`
     html += `<div class="cal-week-task-gutter" aria-hidden="true"></div>` // gutter spacer
     days.forEach(d => {
       const ds = toDateStr(d)
       const dayAssignments = taskMap[ds] || []
-      const clickAttr = canManage() && taskLists.length
+      const clickAttr = canManageTasks() && taskLists.length
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       html += `<div class="cal-week-task-cell">`
       if (dayAssignments.length) {
         html += renderTaskDots(dayAssignments, ds, 'week-task-dots')
-      } else if (canManage() && taskLists.length && isSingleUserView) {
+      } else if (canManageTasks() && taskLists.length && isSingleUserView) {
         html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
       html += `</div>`
@@ -1365,10 +1349,10 @@ function renderWeek() {
       const s = entry.shift
       const color = getShiftDisplayColour(s)
       const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
-      const prefix = canManage() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
+      const prefix = canViewOtherRotas() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       const safeId = escHtml(s.id)
       const clickFn = `openShiftPanel('${safeId}')`
-      const ctxAttr = canManage()
+      const ctxAttr = canEditShift(s) || canDeleteShift(s) || canAddShiftFor(s.user_id)
         ? `oncontextmenu="event.preventDefault();event.stopPropagation();showShiftContextMenu(event,'${safeId}')"`
         : ''
 
@@ -1387,7 +1371,7 @@ function renderWeek() {
           <div class="shift-loc">${escHtml(prefix)}${escHtml(label)}</div>
           ${showTime ? `<div class="shift-time">${escHtml(timeStr)}</div>` : ''}
           ${showNotes ? `<div class="shift-notes">${escHtml(s.notes.slice(0, 50))}${s.notes.length > 50 ? '…' : ''}</div>` : ''}
-          ${canManage() ? '<div class="shift-resize-handle"></div>' : ''}
+          ${canEditShift(s) ? '<div class="shift-resize-handle"></div>' : ''}
         </div>`
       } else {
         // No time — floating all-day chip near top (below holiday label if present)
@@ -1431,7 +1415,7 @@ function renderAgenda() {
     const weekdayLabel = d.toLocaleDateString(undefined, { weekday:'long' })
     const dateLabel = d.toLocaleDateString(undefined, { month:'short', day:'numeric' })
     html += `<section class="cal-agenda-day${isToday ? ' today' : ''}" aria-labelledby="agenda-${ds}">`
-    html += `<header class="cal-agenda-day-header"><div class="cal-agenda-date-block"><h3 id="agenda-${ds}"><time datetime="${ds}" aria-label="${escHtml(fullDateLabel)}"><span class="cal-agenda-weekday">${escHtml(weekdayLabel)}</span><span class="cal-agenda-date">${escHtml(dateLabel)}</span></time></h3>${coverageLabel ? `<span class="cal-agenda-coverage">${escHtml(coverageLabel)}</span>` : ''}${hols.length ? `<span class="cal-agenda-holiday">${escHtml(hols.map(h => h.emoji + ' ' + h.name).join(' · '))}</span>` : ''}</div>${canManage() ? `<button class="btn btn-secondary btn-sm cal-agenda-add" onclick="openCreateModal('${ds}')" aria-label="Add shift on ${ds}">+ Shift</button>` : ''}</header>`
+    html += `<header class="cal-agenda-day-header"><div class="cal-agenda-date-block"><h3 id="agenda-${ds}"><time datetime="${ds}" aria-label="${escHtml(fullDateLabel)}"><span class="cal-agenda-weekday">${escHtml(weekdayLabel)}</span><span class="cal-agenda-date">${escHtml(dateLabel)}</span></time></h3>${coverageLabel ? `<span class="cal-agenda-coverage">${escHtml(coverageLabel)}</span>` : ''}${hols.length ? `<span class="cal-agenda-holiday">${escHtml(hols.map(h => h.emoji + ' ' + h.name).join(' · '))}</span>` : ''}</div>${canAddShiftInCurrentScope() ? `<button class="btn btn-secondary btn-sm cal-agenda-add" onclick="openCreateModal('${ds}')" aria-label="Add shift on ${ds}">+ Shift</button>` : ''}</header>`
     if (dayShifts.length) dayShifts.forEach(s => {
       const label = s.is_off ? 'Day off' : (s.location_name || 'Shift')
       const meta = [s.user_name, s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day', s.is_oncall ? 'On-call' : ''].filter(Boolean).join(' · ')
@@ -1545,7 +1529,7 @@ function copyShift(id) {
     note_color:  s.note_color,
     is_off:      s.is_off,
   }
-  if (canManage()) copiedShift.user_id = s.user_id
+  if (canAddShiftFor(s.user_id)) copiedShift.user_id = s.user_id
   updatePasteHint()
   renderView()
   toast('Shift copied — click an empty day to paste', 'success', 2500)
@@ -1588,29 +1572,31 @@ function updatePasteHint() {
 // ── Context menu ───────────────────────────────────────────────────────────────
 function showShiftContextMenu(e, id) {
   dismissContextMenu()
+  const shift = shifts.find(item => item.id === id)
+  if (!shift) return
   const menu = document.createElement('div')
   menu.id = 'shiftContextMenu'
   menu.className = 'cal-context-menu'
   menu.style.top  = e.clientY + 'px'
   menu.style.left = e.clientX + 'px'
   menu.innerHTML = `
-    <button class="ctx-item" onclick="copyShift('${id}');dismissContextMenu()">
+    ${canAddShiftFor(shift.user_id) ? `<button class="ctx-item" onclick="copyShift('${id}');dismissContextMenu()">
       <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
       Copy shift
     </button>
     <button class="ctx-item" onclick="dismissContextMenu();openDuplicateModal('${id}')">
       <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/></svg>
       Duplicate to…
-    </button>
-    <button class="ctx-item" onclick="openEditModal('${id}');dismissContextMenu()">
+    </button>` : ''}
+    ${canEditShift(shift) ? `<button class="ctx-item" onclick="openEditModal('${id}');dismissContextMenu()">
       <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
       Edit shift
-    </button>
-    <div class="ctx-sep"></div>
+    </button>` : ''}
+    ${canDeleteShift(shift) ? `<div class="ctx-sep"></div>
     <button class="ctx-item ctx-danger" onclick="quickDeleteShift('${id}');dismissContextMenu()">
       <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
       Delete shift
-    </button>`
+    </button>` : ''}`
   document.body.appendChild(menu)
   // Nudge if off-screen
   const r = menu.getBoundingClientRect()
@@ -1624,7 +1610,7 @@ function dismissContextMenu() {
 
 async function quickDeleteShift(id) {
   const s = shifts.find(x => x.id === id)
-  if (!s) return
+  if (!s || !canDeleteShift(s)) return
   try {
     await api(`/api/shifts/${id}`, { method: 'DELETE' })
     renderView()
@@ -1636,13 +1622,15 @@ async function quickDeleteShift(id) {
 function openDuplicateModal(id) {
   const s = shifts.find(x => x.id === id)
   if (!s) return
+  const eligibleUsers = users.filter(user => user.is_active && canAddShiftFor(user.id))
+  if (!eligibleUsers.length) { toast('You do not have permission to add this shift', 'error'); return }
   const existing = document.getElementById('duplicateShiftModal')
   if (existing) existing.remove()
-  const userRows = canManage() ? `
+  const userRows = eligibleUsers.length > 1 ? `
     <div class="form-group">
       <label class="form-label">Team member</label>
       <select class="form-select" id="dupUser">${
-        users.filter(u => u.is_active).map(u =>
+        eligibleUsers.map(u =>
           `<option value="${u.id}"${u.id === s.user_id ? ' selected' : ''}>${u.name}${u.id === cfg.user.id ? ' (me)' : ''}</option>`
         ).join('')
       }</select>
@@ -1681,7 +1669,7 @@ async function saveDuplicate(sourceId) {
   const date = document.getElementById('dupDate').value
   const errEl = document.getElementById('dupError')
   if (!date) { errEl.style.display = 'block'; errEl.textContent = 'Please select a target date.'; return }
-  const user_id = canManage() ? document.getElementById('dupUser').value : cfg.user.id
+  const user_id = document.getElementById('dupUser')?.value || (canAddShiftFor(s.user_id) ? s.user_id : cfg.user.id)
   const saveBtn = document.querySelector('#duplicateShiftModal .btn-primary')
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Duplicating…' }
   try {
@@ -1711,7 +1699,7 @@ async function saveDuplicate(sourceId) {
 
 function getCalendarContextUserId() {
   const filterVal = document.getElementById('teamFilter')?.value || ''
-  if (cfg.user.role === 'member') return cfg.user.id
+  if (!canViewOtherRotas()) return cfg.user.id
   if (filterVal.startsWith('user:')) return filterVal.slice(5)
   return cfg.user.id
 }
@@ -1791,7 +1779,7 @@ function setTemplateQuickApplyVisibility(visible, dateStr = '') {
   const btn = document.getElementById('applyTemplateBtn')
   if (!wrap || !btn) return
 
-  if (!visible || !canManage()) {
+  if (!visible || !canAddShiftFor(getSelectedModalUserId())) {
     wrap.style.display = 'none'
     btn.style.display = 'none'
     btn.disabled = true
@@ -1837,7 +1825,7 @@ function updateTemplateQuickApplyState() {
 }
 
 async function applyTemplateFromModal() {
-  if (!canManage()) return
+  if (!canAddShiftFor(getSelectedModalUserId())) return
   const templateId = document.getElementById('modalTemplateSelect').value
   const dateStr = document.getElementById('modalDate').value
   const userId = getSelectedModalUserId()
@@ -1943,6 +1931,8 @@ function updateShiftModalSubtitle() {
 }
 
 function openCreateModal(date, returnFocus = null) {
+  const targetUserId = getCalendarContextUserId()
+  if (!canAddShiftFor(targetUserId)) { toast('You do not have permission to add shifts here', 'error'); return }
   _previousShiftFocus = returnFocus || document.activeElement
   editingShiftId = null
   selectedColour = '#4f46e5'
@@ -1957,7 +1947,7 @@ function openCreateModal(date, returnFocus = null) {
   document.getElementById('modalIsOff').checked = false
   document.getElementById('modalIsOncall').checked = !!_lastShiftPreset?.is_oncall
   document.getElementById('deleteShiftBtn').style.display = 'none'
-  if (canManage()) document.getElementById('modalUser').value = getCalendarContextUserId()
+  if (canManage()) document.getElementById('modalUser').value = targetUserId
   document.getElementById('modalTemplateSelect').value = ''
   document.getElementById('modalTemplateSkipHolidays').checked = true
   setupColourPicker()
@@ -1972,7 +1962,7 @@ function openCreateModal(date, returnFocus = null) {
 
 function openEditModal(id, returnFocus = null) {
   const s = shifts.find(x => x.id === id)
-  if (!s) return
+  if (!s || !canEditShift(s)) { if (s) toast('You do not have permission to edit this shift', 'error'); return }
   _previousShiftFocus = returnFocus || document.activeElement
   editingShiftId = id
   selectedColour = resolveColourValue(s.note_color, '#4f46e5')
@@ -1984,7 +1974,7 @@ function openEditModal(id, returnFocus = null) {
   document.getElementById('modalNotes').value = s.notes || ''
   document.getElementById('modalIsOff').checked = !!s.is_off
   document.getElementById('modalIsOncall').checked = !!s.is_oncall
-  document.getElementById('deleteShiftBtn').style.display = 'flex'
+  document.getElementById('deleteShiftBtn').style.display = canDeleteShift(s) ? 'flex' : 'none'
   if (canManage()) document.getElementById('modalUser').value = s.user_id
   setupColourPicker()
   const rdw = document.getElementById('repeatDaysWrap')
@@ -2441,7 +2431,7 @@ document.addEventListener('keydown', e => {
       if (!modalOpen) openCreateModal(toDateStr(new Date()))
       break
     case 'c': case 'C':
-      if (!modalOpen && view === 'week' && canManage()) copyWeekToNext()
+      if (!modalOpen && view === 'week' && canAddShiftInCurrentScope()) copyWeekToNext()
       break
     case 'p': case 'P':
       if (!modalOpen) window.print()
@@ -2517,7 +2507,7 @@ function openShiftPanel(shiftId) {
 
   // Edit button (managers only)
   const editBtn = document.getElementById('shiftPanelEditBtn')
-  editBtn.style.display = canManage() ? '' : 'none'
+  editBtn.style.display = canEditShift(s) ? '' : 'none'
   document.getElementById('shiftPanelDayAddBtn').style.display = 'none'
 
   // Body
@@ -2588,7 +2578,7 @@ function openDayPanel(dateStr) {
   document.getElementById('shiftPanelTitle').textContent = dateLabel
 
   document.getElementById('shiftPanelEditBtn').style.display = 'none'
-  document.getElementById('shiftPanelDayAddBtn').style.display = canManage() ? '' : 'none'
+  document.getElementById('shiftPanelDayAddBtn').style.display = canAddShiftInCurrentScope() ? '' : 'none'
 
   const dayTasks = taskAssignments.filter(a => a.date === dateStr)
 
@@ -2650,7 +2640,7 @@ function shiftPanelEdit() {
 }
 
 function shiftPanelAddForDay() {
-  if (!canManage() || !_shiftPanelDay) return
+  if (!canAddShiftInCurrentScope() || !_shiftPanelDay) return
   const date = _shiftPanelDay
   const returnFocus = closeShiftPanel(false)
   openCreateModal(date, returnFocus)
@@ -2785,6 +2775,11 @@ async function saveShift() {
     is_oncall:   document.getElementById('modalIsOncall').checked,
   }
   if (canManage()) baseBody.user_id = getSelectedModalUserId()
+  const existingShift = editingShiftId ? shifts.find(shift => shift.id === editingShiftId) : null
+  if (editingShiftId ? !canEditShift(existingShift) : !canAddShiftFor(baseBody.user_id || cfg.user.id)) {
+    toast('You do not have permission to save this shift', 'error')
+    return
+  }
 
   document.getElementById('conflictWarning')?.remove()
 
@@ -2899,7 +2894,7 @@ function _initDragDrop() {
 
     const shiftId = idMatch[1]
     const shift = shifts.find(s => s.id === shiftId)
-    if (!shift || !shift.start_time) return
+    if (!shift || !shift.start_time || !canEditShift(shift)) return
     const start = _timeToMins(shift.start_time)
     const end = _timeToMins(shift.end_time || shift.start_time)
     if (start !== null && end !== null && end < start) return
@@ -3099,7 +3094,7 @@ async function copyWeekToNext() {
   const filterVal = document.getElementById('teamFilter')?.value || ''
   // Determine which user IDs we're copying for
   let targetUserIds = []
-  if (cfg.user.role === 'member' || filterVal === '') {
+  if (!canViewOtherRotas() || filterVal === '') {
     targetUserIds = [cfg.user.id]
   } else if (filterVal.startsWith('user:')) {
     targetUserIds = [filterVal.slice(5)]
@@ -3149,7 +3144,8 @@ async function copyWeekToNext() {
 
 // ── Mark day off / empty cell context menu ─────────────────────────────────────
 async function markDayOff(date, userId) {
-  const uid = userId || (canManage() ? null : cfg.user.id) || cfg.user.id
+  const uid = userId || cfg.user.id
+  if (!canAddShiftFor(uid)) return
   try {
     await api('/api/shifts', {
       method: 'POST',
