@@ -271,8 +271,13 @@ function migrateAdditive() {
           created_at   TEXT NOT NULL DEFAULT (datetime('now')),
           UNIQUE (user_id, task_list_id, date)
         )`)
+        // Some early task-assignment databases only stored the assignment
+        // relationship and week_start.  Use safe defaults when the audit
+        // metadata columns were introduced later than that schema.
+        const createdByExpr = taskAssignCols.includes('created_by') ? 'created_by' : 'NULL'
+        const createdAtExpr = taskAssignCols.includes('created_at') ? 'created_at' : "datetime('now')"
         db.exec(`INSERT INTO task_assignments_new (id, user_id, task_list_id, date, created_by, created_at)
-          SELECT id, user_id, task_list_id, week_start, created_by, created_at FROM task_assignments`)
+          SELECT id, user_id, task_list_id, week_start, ${createdByExpr}, ${createdAtExpr} FROM task_assignments`)
         db.exec(`DROP TABLE task_assignments`)
         db.exec(`ALTER TABLE task_assignments_new RENAME TO task_assignments`)
         db.exec(`CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id)`)
@@ -520,16 +525,28 @@ function migrateAdditive() {
   console.log('✓ Email change tokens schema ready')
 }
 
+const migrationSteps = [
+  ['core schema', migrate],
+  ['additive schema', migrateAdditive],
+  ['teams schema', migrateTeams],
+  ['holiday settings', migrateHolidays],
+  ['location members', migrateLocationMembers],
+  ['organisations', migrateOrganisations],
+  ['roles', migrateRoles],
+]
+
 try {
-  migrate()
-  migrateAdditive()
-  migrateTeams()
-  migrateHolidays()
-  migrateLocationMembers()
-  migrateOrganisations()
-  migrateRoles()
+  for (const [name, run] of migrationSteps) {
+    try {
+      run()
+    } catch (err) {
+      err.message = `${name}: ${err.message}`
+      throw err
+    }
+  }
 } catch (err) {
   console.error('Migration failed:', err.message)
+  if (err.stack) console.error(err.stack)
   process.exit(1)
 }
 
@@ -636,6 +653,17 @@ function migrateRoles() {
     CREATE INDEX IF NOT EXISTS idx_location_orgs_location ON location_organisations(location_id);
     CREATE INDEX IF NOT EXISTS idx_location_orgs_org ON location_organisations(org_id);
   `)
+  // Roles were introduced before system/inactive roles.  CREATE TABLE IF NOT
+  // EXISTS does not upgrade that earlier table, so add each persisted field
+  // before ensureBuiltinRoles() seeds the protected roles.
+  const roleCols = db.prepare('PRAGMA table_info(roles)').all().map(c => c.name)
+  if (!roleCols.includes('color')) db.exec("ALTER TABLE roles ADD COLUMN color TEXT NOT NULL DEFAULT '#0052cc'")
+  if (!roleCols.includes('permissions')) db.exec("ALTER TABLE roles ADD COLUMN permissions TEXT NOT NULL DEFAULT '[]'")
+  if (!roleCols.includes('is_builtin')) db.exec('ALTER TABLE roles ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0')
+  if (!roleCols.includes('is_system')) db.exec('ALTER TABLE roles ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0')
+  if (!roleCols.includes('created_by')) db.exec('ALTER TABLE roles ADD COLUMN created_by TEXT REFERENCES users(id) ON DELETE SET NULL')
+  if (!roleCols.includes('created_at')) db.exec("ALTER TABLE roles ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))")
+  if (!roleCols.includes('updated_at')) db.exec("ALTER TABLE roles ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
   const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name)
   if (!userCols.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
   if (!userCols.includes('previous_role_id')) db.exec('ALTER TABLE users ADD COLUMN previous_role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
