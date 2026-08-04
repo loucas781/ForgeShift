@@ -134,7 +134,9 @@ function ensureBuiltinRoles() {
     VALUES (@id,@name,@color,@permissions,@is_builtin,@is_system)
     ON CONFLICT(id) DO UPDATE SET name=excluded.name, color=excluded.color,
       permissions=excluded.permissions, is_builtin=excluded.is_builtin, is_system=excluded.is_system`)
-  for (const role of Object.values(BUILTIN)) stmt.run({ ...role, permissions: JSON.stringify(role.permissions) })
+  for (const role of Object.values(BUILTIN)) {
+    stmt.run({ ...role, is_system: role.is_system || 0, permissions: JSON.stringify(role.permissions) })
+  }
   // Legacy accounts receive a stable role_id. Do not overwrite custom choices.
   const users = db.prepare('SELECT id, role, role_id, previous_role_id, is_active FROM users').all()
   const updateActive = db.prepare('UPDATE users SET role_id = ? WHERE id = ? AND (role_id IS NULL OR role_id = "")')
