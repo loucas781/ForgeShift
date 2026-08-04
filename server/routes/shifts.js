@@ -2,11 +2,12 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
-const { requireAuth, requireAdmin, requireShiftLead } = require('../middleware/auth')
+const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
 const { buildHolidayMapServer } = require('../holidays')
 const { getShiftLeadScope } = require('../utils/scope')
 const logger = require('../utils/logger')
+const { hasPermission } = require('../utils/roles')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 const {
   PATTERN_TEMPLATE_TYPE,
@@ -32,7 +33,7 @@ router.get('/', requireAuth, (req, res) => {
     if (end)     { sql += ' AND s.date <= ?'; params.push(end) }
     if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
 
-    if (req.user.role === 'admin' || req.user.role === 'manager') {
+    if (hasPermission(req, 'view_other_rotas') && req.user.role !== 'shift_lead') {
       // no extra filter — admins and managers see all shifts
     } else if (req.user.role === 'shift_lead') {
       // Always constrain to team scope whether or not a specific user_id was requested.
@@ -48,7 +49,9 @@ router.get('/', requireAuth, (req, res) => {
         params.push(...scope)
       }
     } else {
-      if (!user_id) { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
+      if (!hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'You do not have permission to view a rota.' })
+      if (user_id && user_id !== req.user.id) return res.status(403).json({ error: 'You can only view your own shifts.' })
+      sql += ' AND s.user_id = ?'; params.push(req.user.id)
     }
 
     sql += ' ORDER BY s.date, u.name'
@@ -63,14 +66,18 @@ router.get('/', requireAuth, (req, res) => {
 // ── GET /api/shifts/export/csv ────────────────────────────────────────────────
 router.get('/export/csv', requireAuth, (req, res) => {
   try {
+    const canViewOwn = hasPermission(req, 'view_own_rota')
+    const canViewOthers = hasPermission(req, 'view_other_rotas')
     const { start, end } = req.query
     let user_id = req.user.id
-    if ((req.user.role === 'admin' || req.user.role === 'manager') && req.query.user_id) {
+    if ((req.user.role === 'admin' || req.user.role === 'manager' || hasPermission(req, 'view_other_rotas')) && req.query.user_id) {
       user_id = req.query.user_id === 'all' ? null : req.query.user_id
     } else if (req.user.role === 'shift_lead' && req.query.user_id) {
       const scope = getShiftLeadScope(req.user.id)
       if (scope.has(req.query.user_id)) user_id = req.query.user_id
     }
+    if (user_id === req.user.id && !canViewOwn) return res.status(403).json({ error: 'You do not have permission to view your rota.' })
+    if (user_id !== req.user.id && !canViewOthers) return res.status(403).json({ error: 'You do not have permission to view other rotas.' })
 
     let sql = `
       SELECT s.*, u.name as user_name, l.name as location_name
@@ -83,7 +90,7 @@ router.get('/export/csv', requireAuth, (req, res) => {
     if (start)   { sql += ' AND s.date >= ?'; params.push(start) }
     if (end)     { sql += ' AND s.date <= ?'; params.push(end) }
     if (user_id) { sql += ' AND s.user_id = ?'; params.push(user_id) }
-    else if (req.user.role !== 'admin' && req.user.role !== 'manager') { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
+    else if (!(req.user.role === 'admin' || req.user.role === 'manager' || hasPermission(req, 'view_other_rotas'))) { sql += ' AND s.user_id = ?'; params.push(req.user.id) }
     sql += ' ORDER BY s.date, u.name'
 
     const rows = db.prepare(sql).all(...params)
@@ -116,36 +123,36 @@ router.get('/:id', requireAuth, (req, res) => {
     WHERE s.id = ?
   `).get(req.params.id)
   if (!shift) return res.status(404).json({ error: 'Shift not found' })
-  if (req.user.role === 'admin' || req.user.role === 'manager') { return res.json(shift) }
+  if (hasPermission(req, 'view_other_rotas') && req.user.role !== 'shift_lead') { return res.json(shift) }
   if (req.user.role === 'shift_lead') {
     const scope = getShiftLeadScope(req.user.id)
     if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     return res.json(shift)
   }
   if (shift.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' })
+  if (!hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'Forbidden' })
   res.json(shift)
 })
 
 // ── POST /api/shifts ──────────────────────────────────────────────────────────
 router.post('/', requireAuth, (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin' || req.user.role === 'manager'
+    const canAddOthers = hasPermission(req, 'add_other_shifts')
+    const canAddOwn = hasPermission(req, 'add_own_shifts')
     const isShiftLead = req.user.role === 'shift_lead'
     const { user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
 
     if (!date) return res.status(400).json({ error: 'Date is required.' })
 
-    let targetUserId
-    if (isAdmin && user_id) {
-      targetUserId = user_id
-    } else if (isShiftLead && user_id) {
+    const targetUserId = user_id || req.user.id
+    if (targetUserId === req.user.id) {
+      if (!canAddOwn) return res.status(403).json({ error: 'You do not have permission to create your own shifts.' })
+    } else if (isShiftLead) {
       // Verify target is in shift_lead's scope
       const scope = getShiftLeadScope(req.user.id)
-      if (!scope.has(user_id)) return res.status(403).json({ error: 'You can only assign shifts to members of your teams.' })
-      targetUserId = user_id
-    } else {
-      // Members cannot create shifts — read-only access
-      return res.status(403).json({ error: 'Members cannot create shifts. Contact your admin or shift lead.' })
+      if (!canAddOthers || !scope.has(targetUserId)) return res.status(403).json({ error: 'You can only assign shifts to members of your teams.' })
+    } else if (!canAddOthers) {
+      return res.status(403).json({ error: 'You do not have permission to create this shift.' })
     }
 
     let id, shift
@@ -191,14 +198,17 @@ router.put('/:id', requireAuth, (req, res) => {
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     if (!shift) return res.status(404).json({ error: 'Shift not found' })
 
-    if (req.user.role === 'admin' || req.user.role === 'manager') {
+    const canEditOthers = hasPermission(req, 'edit_other_shifts')
+    const canEditOwn = hasPermission(req, 'edit_own_shifts')
+    if (shift.user_id === req.user.id) {
+      if (!canEditOwn) return res.status(403).json({ error: 'You do not have permission to edit your own shifts.' })
+    } else if (canEditOthers && req.user.role !== 'shift_lead') {
       // full access
     } else if (req.user.role === 'shift_lead') {
       const scope = getShiftLeadScope(req.user.id)
-      if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
+      if (!canEditOthers || !scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     } else {
-      // Members are read-only — they cannot edit shifts
-      return res.status(403).json({ error: 'Members cannot edit shifts. Contact your admin or shift lead.' })
+      return res.status(403).json({ error: 'You do not have permission to edit this shift.' })
     }
 
     const { date: newDate, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
@@ -224,14 +234,17 @@ router.delete('/:id', requireAuth, (req, res) => {
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     if (!shift) return res.status(404).json({ error: 'Shift not found' })
 
-    if (req.user.role === 'admin' || req.user.role === 'manager') {
+    const canDeleteOthers = hasPermission(req, 'delete_other_shifts')
+    const canDeleteOwn = hasPermission(req, 'delete_own_shifts')
+    if (shift.user_id === req.user.id) {
+      if (!canDeleteOwn) return res.status(403).json({ error: 'You do not have permission to delete your own shifts.' })
+    } else if (canDeleteOthers && req.user.role !== 'shift_lead') {
       // full access
     } else if (req.user.role === 'shift_lead') {
       const scope = getShiftLeadScope(req.user.id)
-      if (!scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
+      if (!canDeleteOthers || !scope.has(shift.user_id)) return res.status(403).json({ error: 'Forbidden' })
     } else {
-      // Members cannot delete shifts
-      return res.status(403).json({ error: 'Members cannot delete shifts. Contact your admin or shift lead.' })
+      return res.status(403).json({ error: 'You do not have permission to delete this shift.' })
     }
 
     db.prepare('DELETE FROM shifts WHERE id = ?').run(req.params.id)
@@ -244,11 +257,15 @@ router.delete('/:id', requireAuth, (req, res) => {
 })
 
 // ── POST /api/shifts/apply-template ──────────────────────────────────────────
-router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
+router.post('/apply-template', requireAuth, (req, res) => {
   try {
     const { template_id, user_id, week_start, start_date, range_start, end_date, skip_holidays } = req.body
     if (!template_id || !user_id)
       return res.status(400).json({ error: 'template_id and user_id are required.' })
+    const canApply = user_id === req.user.id
+      ? hasPermission(req, 'add_own_shifts')
+      : hasPermission(req, 'add_other_shifts')
+    if (!canApply) return res.status(403).json({ error: 'You do not have permission to add shifts for this user.' })
 
     // shift_lead: verify target user is in their scope
     if (req.user.role === 'shift_lead') {
@@ -293,6 +310,28 @@ router.post('/apply-template', requireAuth, requireShiftLead, (req, res) => {
           const map = buildHolidayMapServer(yr, enabledSets, db)
           for (const dateStr of Object.keys(map)) bankHolidayDates.add(dateStr)
         }
+      }
+    }
+
+    const candidateDates = days.map(day => {
+      const target = new Date(sy, sm - 1, sd + day.day_index)
+      const yyyy = target.getFullYear()
+      const mm = String(target.getMonth() + 1).padStart(2, '0')
+      const dd = String(target.getDate()).padStart(2, '0')
+      return `${yyyy}-${mm}-${dd}`
+    }).filter(dateStr => {
+      if (rangeStartDate && dateStr < rangeStartDate) return false
+      if (rangeEndDate && dateStr > rangeEndDate) return false
+      return !(skip_holidays && bankHolidayDates.has(dateStr))
+    })
+    if (candidateDates.length) {
+      const existing = db.prepare(`SELECT 1 FROM shifts WHERE user_id = ? AND date IN (${candidateDates.map(() => '?').join(',')}) LIMIT 1`)
+        .get(user_id, ...candidateDates)
+      const canReplace = user_id === req.user.id
+        ? hasPermission(req, 'edit_own_shifts')
+        : hasPermission(req, 'edit_other_shifts')
+      if (existing && !canReplace) {
+        return res.status(403).json({ error: 'Applying this template would replace an existing shift, which you do not have permission to edit.' })
       }
     }
 

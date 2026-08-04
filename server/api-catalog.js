@@ -8,6 +8,7 @@ const ROUTE_GROUPS = [
   { id: 'auth', label: 'Authentication & account', file: 'routes/auth.js', receiver: 'router', prefix: '/api/auth', description: 'Sign-in, profile, preferences, sessions, passwords, and two-factor authentication.' },
   { id: 'passkeys', label: 'Passkeys', file: 'routes/passkeys.js', receiver: 'router', prefix: '/api/passkeys', description: 'WebAuthn registration and passwordless authentication.' },
   { id: 'users', label: 'Users', file: 'routes/users.js', receiver: 'router', prefix: '/api/users', description: 'User directory, account administration, and profile photos.' },
+  { id: 'roles', label: 'Roles & permissions', file: 'routes/roles.js', receiver: 'router', prefix: '/api/roles', description: 'Custom role definitions and the permission catalogue.' },
   { id: 'shifts', label: 'Shifts', file: 'routes/shifts.js', receiver: 'router', prefix: '/api/shifts', description: 'Shift reads, edits, exports, and template application.' },
   { id: 'locations', label: 'Locations', file: 'routes/locations.js', receiver: 'router', prefix: '/api/locations', description: 'Location records and their member visibility.' },
   { id: 'teams', label: 'Teams', file: 'routes/teams.js', receiver: 'router', prefix: '/api/teams', description: 'Teams, ownership, and membership.' },
@@ -66,14 +67,33 @@ const ACCESS_OVERRIDES = new Map([
   ['GET /api/config', 'Optional session'],
   ['GET /api/health', 'Public'],
   ['GET /api/ical/feed/:token', 'Feed token'],
-  ['GET /api/auth/admin/reset-link/:userId', 'Admin'],
-  ['POST /api/auth/admin/reset-link/:userId/send', 'Admin'],
-  ['POST /api/auth/invite', 'Admin'],
-  ['POST /api/shifts', 'Shift lead+'],
-  ['PUT /api/shifts/:id', 'Shift lead+'],
-  ['DELETE /api/shifts/:id', 'Shift lead+'],
-  ['GET /api/backup/export', 'Admin'],
-  ['POST /api/backup/restore', 'Admin'],
+  ['GET /api/auth/admin/reset-link/:userId', 'Permission: manage users'],
+  ['POST /api/auth/admin/reset-link/:userId/send', 'Permission: manage users'],
+  ['POST /api/auth/invite', 'Permission: manage users'],
+  ['POST /api/roles', 'Role manager'],
+  ['PATCH /api/roles/:id', 'Role manager'],
+  ['DELETE /api/roles/:id', 'Role manager'],
+  ['POST /api/shifts', 'Permission: add own/other shifts'],
+  ['PUT /api/shifts/:id', 'Permission: edit own/other shifts'],
+  ['DELETE /api/shifts/:id', 'Permission: delete own/other shifts'],
+  ['GET /api/shifts/export/csv', 'Permission: view own/other rotas'],
+  ['POST /api/shifts/apply-template', 'Permission: add/edit own/other shifts'],
+  ['GET /api/ical/token', 'Permission: view own rota'],
+  ['DELETE /api/passkeys/:id', 'Owner / permission: manage users'],
+  ['GET /api/backup/export', 'Permission: manage backups'],
+  ['POST /api/backup/restore', 'Permission: manage backups'],
+  ['GET /api/endpoints', 'Admin'],
+  ['GET /api/features', 'Permission: manage settings'],
+  ['PATCH /api/features', 'Permission: manage settings'],
+  ['PATCH /api/config', 'Permission: manage settings'],
+  ['PATCH /api/config/password-policy', 'Permission: manage settings'],
+  ['GET /api/audit', 'Permission: view audit'],
+  ['GET /api/audit/export', 'Permission: view audit'],
+  ['DELETE /api/audit', 'Permission: manage settings'],
+  ['GET /api/stats', 'Permission: manage settings'],
+  ['GET /api/config/email', 'Permission: manage settings'],
+  ['PATCH /api/config/email', 'Permission: manage settings'],
+  ['POST /api/config/email/test', 'Permission: manage settings'],
 ])
 
 const CORE_ADMIN_PATHS = new Set([
@@ -130,7 +150,9 @@ function inferAccess(group, method, routePath, declaration) {
   }
   if (declaration.includes('requireAdminOrManager')) return 'Admin / Manager'
   if (declaration.includes('requireShiftLead')) return 'Shift lead+'
-  if (declaration.includes('requireAdmin')) return 'Admin'
+  if (declaration.includes('requireAdmin')) return 'Permission: manage users'
+  const permission = declaration.match(/requirePermission\(\s*['"]([^'"]+)['"]\s*\)/)
+  if (permission) return `Permission: ${permission[1].replaceAll('_', ' ')}`
   if (declaration.includes('requireAuth')) return 'Signed in'
   if (group.id === 'backup') return 'Admin'
   return PUBLIC_GROUPS.has(group.id) ? 'Public' : 'Signed in'

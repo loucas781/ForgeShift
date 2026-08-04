@@ -2,8 +2,9 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db = require('../db/connection')
-const { requireAuth, requireAdmin, requireShiftLead, requireAdminOrManager } = require('../middleware/auth')
+const { requireAuth, requirePermission } = require('../middleware/auth')
 const audit = require('../audit')
+const { hasPermission } = require('../utils/roles')
 
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
@@ -11,7 +12,7 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 function canManageTeam(user, team) {
   if (user.role === 'admin' || user.role === 'manager') return true
   if (user.role === 'shift_lead') return team.owned_by === user.id || team.created_by === user.id
-  return false
+  return hasPermission(user, 'manage_teams')
 }
 
 // Can this user add/remove members from the team?
@@ -23,7 +24,7 @@ function canManageMembers(user, team, db) {
     const row = db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
     return !!row
   }
-  return false
+  return hasPermission(user, 'manage_teams')
 }
 
 // ── GET /api/teams ────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ router.get('/', requireAuth, (req, res) => {
   const { role, id: userId } = req.user
   let teams
 
-  if (role === 'admin' || role === 'manager') {
+  if (role === 'admin' || role === 'manager' || (role !== 'shift_lead' && hasPermission(req.user, 'manage_teams'))) {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
@@ -64,15 +65,29 @@ router.get('/', requireAuth, (req, res) => {
   if (teams.length) {
     const teamIds = teams.map(t => t.id)
     const members = db.prepare(`
-      SELECT tm.team_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.is_active
-      FROM team_members tm JOIN users u ON u.id = tm.user_id
+      SELECT tm.team_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.role_id,
+             r.name AS role_name, r.color AS role_color, u.is_active
+      FROM team_members tm
+      JOIN users u ON u.id = tm.user_id
+      LEFT JOIN roles r ON r.id = u.role_id
       WHERE tm.team_id IN (${teamIds.map(() => '?').join(',')})
       ORDER BY u.name
     `).all(...teamIds)
     const membersByTeam = {}
     members.forEach(m => {
       if (!membersByTeam[m.team_id]) membersByTeam[m.team_id] = []
-      membersByTeam[m.team_id].push({ id: m.id, name: m.name, initials: m.initials, color: m.color, avatar: m.avatar, role: m.role, is_active: m.is_active })
+      membersByTeam[m.team_id].push({
+        id: m.id,
+        name: m.name,
+        initials: m.initials,
+        color: m.color,
+        avatar: m.avatar,
+        role: m.role,
+        role_id: m.role_id,
+        role_name: m.role_name,
+        role_color: m.role_color,
+        is_active: m.is_active,
+      })
     })
     teams.forEach(t => { t.members = membersByTeam[t.id] || [] })
   } else {
@@ -82,7 +97,7 @@ router.get('/', requireAuth, (req, res) => {
 })
 
 // ── POST /api/teams — create (admin or manager only) ─────────────────────────
-router.post('/', requireAuth, requireAdminOrManager, (req, res) => {
+router.post('/', requireAuth, requirePermission('manage_teams'), (req, res) => {
   const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
 
@@ -98,7 +113,7 @@ router.post('/', requireAuth, requireAdminOrManager, (req, res) => {
 })
 
 // ── PATCH /api/teams/:id — rename / recolour / reassign org ──────────────────
-router.patch('/:id', requireAuth, requireShiftLead, (req, res) => {
+router.patch('/:id', requireAuth, requirePermission('manage_teams'), (req, res) => {
   const { name, color, org_id } = req.body
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
@@ -115,7 +130,7 @@ router.patch('/:id', requireAuth, requireShiftLead, (req, res) => {
 })
 
 // ── DELETE /api/teams/:id ─────────────────────────────────────────────────────
-router.delete('/:id', requireAuth, requireShiftLead, (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('manage_teams'), (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageTeam(req.user, team)) return res.status(403).json({ error: 'You can only delete your own teams' })
@@ -125,7 +140,7 @@ router.delete('/:id', requireAuth, requireShiftLead, (req, res) => {
 })
 
 // ── PUT /api/teams/:id/members — replace full member list ─────────────────────
-router.put('/:id/members', requireAuth, requireShiftLead, (req, res) => {
+router.put('/:id/members', requireAuth, requirePermission('manage_teams'), (req, res) => {
   const { user_ids } = req.body
   if (!Array.isArray(user_ids)) return res.status(400).json({ error: 'user_ids must be an array' })
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
@@ -149,7 +164,7 @@ router.put('/:id/members', requireAuth, requireShiftLead, (req, res) => {
 })
 
 // ── POST /api/teams/:id/members/:userId ───────────────────────────────────────
-router.post('/:id/members/:userId', requireAuth, requireShiftLead, (req, res) => {
+router.post('/:id/members/:userId', requireAuth, requirePermission('manage_teams'), (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageMembers(req.user, team, db)) return res.status(403).json({ error: 'You can only manage members of your own teams' })
@@ -166,7 +181,7 @@ router.post('/:id/members/:userId', requireAuth, requireShiftLead, (req, res) =>
 })
 
 // ── DELETE /api/teams/:id/members/:userId ─────────────────────────────────────
-router.delete('/:id/members/:userId', requireAuth, requireShiftLead, (req, res) => {
+router.delete('/:id/members/:userId', requireAuth, requirePermission('manage_teams'), (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageMembers(req.user, team, db)) return res.status(403).json({ error: 'You can only manage members of your own teams' })

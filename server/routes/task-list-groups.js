@@ -2,14 +2,15 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
-const { requireAuth, requireAdmin } = require('../middleware/auth')
+const { requireAuth, requirePermission } = require('../middleware/auth')
+const { hasPermission } = require('../utils/roles')
 const audit  = require('../audit')
 const logger = require('../utils/logger')
 
 // ── GET /api/task-list-groups ─────────────────────────────────────────────────
 // Admin: all groups with full member details. Others: only groups they belong to.
 router.get('/', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && !hasPermission(req, 'manage_tasks')) {
     const groups = db.prepare(`
       SELECT g.id, g.name, g.sort_order
       FROM task_list_groups g
@@ -46,7 +47,7 @@ router.get('/', requireAuth, (req, res) => {
 })
 
 // ── POST /api/task-list-groups ────────────────────────────────────────────────
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requirePermission('manage_tasks'), (req, res) => {
   try {
     const { name } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Group name is required.' })
@@ -68,7 +69,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── PATCH /api/task-list-groups/:id ──────────────────────────────────────────
-router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
+router.patch('/:id', requireAuth, requirePermission('manage_tasks'), (req, res) => {
   try {
     const group = db.prepare('SELECT * FROM task_list_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
@@ -83,7 +84,7 @@ router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── DELETE /api/task-list-groups/:id ─────────────────────────────────────────
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requirePermission('manage_tasks'), (req, res) => {
   try {
     const group = db.prepare('SELECT * FROM task_list_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
@@ -98,7 +99,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
 })
 
 // ── PUT /api/task-list-groups/:id/members — replace full member list ──────────
-router.put('/:id/members', requireAuth, requireAdmin, (req, res) => {
+router.put('/:id/members', requireAuth, requirePermission('manage_tasks'), (req, res) => {
   try {
     const group = db.prepare('SELECT * FROM task_list_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })

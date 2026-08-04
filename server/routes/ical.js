@@ -6,6 +6,7 @@ const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const logger = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
+const { hasPermission } = require('../utils/roles')
 
 function blockTokenDuringMaintenance(req, res, next) {
   const overrides = loadOverrides()
@@ -52,6 +53,7 @@ function sendIcal(res, lines, filename) {
 
 // ── GET /api/ical/token — get or create feed token for current user ───────────
 router.get('/token', requireAuth, blockTokenDuringMaintenance, (req, res) => {
+  if (!hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'You do not have permission to view your rota.' })
   let row = db.prepare('SELECT * FROM ical_tokens WHERE user_id = ?').get(req.user.id)
   if (!row) {
     const token = crypto.randomBytes(32).toString('hex')
@@ -152,8 +154,8 @@ router.get('/feed/:token', (req, res) => {
     const row = db.prepare('SELECT * FROM ical_tokens WHERE token = ?').get(tokenParam)
     if (!row) return res.status(404).end()
 
-    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(row.user_id)
-    if (!user) return res.status(404).end()
+    const user = db.prepare('SELECT id, name, email, is_active FROM users WHERE id = ?').get(row.user_id)
+    if (!user?.is_active || !hasPermission(user, 'view_own_rota')) return res.status(404).end()
 
     const now  = new Date()
     const past = new Date(now); past.setFullYear(past.getFullYear() - 1)
