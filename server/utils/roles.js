@@ -138,6 +138,13 @@ function ensureBuiltinRoles() {
     stmt.run({ ...role, is_system: role.is_system || 0, permissions: JSON.stringify(role.permissions) })
   }
   // Legacy accounts receive a stable role_id. Do not overwrite custom choices.
+  // Keep this helper safe when it is invoked against a partially migrated
+  // database (for example, an interrupted roles migration).
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name)
+  if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'")
+  if (!userCols.includes('is_active')) db.exec('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
+  if (!userCols.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
+  if (!userCols.includes('previous_role_id')) db.exec('ALTER TABLE users ADD COLUMN previous_role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
   const users = db.prepare('SELECT id, role, role_id, previous_role_id, is_active FROM users').all()
   const updateActive = db.prepare('UPDATE users SET role_id = ? WHERE id = ? AND (role_id IS NULL OR role_id = "")')
   const parkInactive = db.prepare(`UPDATE users SET role_id = ?, previous_role_id = COALESCE(previous_role_id, ?)
