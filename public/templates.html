@@ -278,7 +278,13 @@ async function init() {
   renderShell(cfg, 'templates')
   // loadUsers must complete before loadTeams — loadTeams filters users to team scope for shift_leads
   await loadUsers()
-  await Promise.all([loadLocations(), loadTeams(), loadGroups(), loadTemplates()])
+  // The template grid renders its organisation filter from both `groups` and
+  // `templates`. Loading them in one Promise.all introduced a race where the
+  // grid could render before organisations had arrived, hiding the filters
+  // until a later refresh. Resolve the supporting data first, then render the
+  // templates once with a deterministic filter set.
+  await Promise.all([loadLocations(), loadTeams(), loadGroups()])
+  await loadTemplates()
 
   if (canManageTemplates()) {
     document.getElementById('adminActions').innerHTML = `
