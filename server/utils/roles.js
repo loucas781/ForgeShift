@@ -146,9 +146,9 @@ function ensureBuiltinRoles() {
   if (!userCols.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
   if (!userCols.includes('previous_role_id')) db.exec('ALTER TABLE users ADD COLUMN previous_role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
   const users = db.prepare('SELECT id, role, role_id, previous_role_id, is_active FROM users').all()
-  const updateActive = db.prepare('UPDATE users SET role_id = ? WHERE id = ? AND (role_id IS NULL OR role_id = "")')
+  const updateActive = db.prepare("UPDATE users SET role_id = ? WHERE id = ? AND (role_id IS NULL OR role_id = '')")
   const parkInactive = db.prepare(`UPDATE users SET role_id = ?, previous_role_id = COALESCE(previous_role_id, ?)
-    WHERE id = ? AND (role_id IS NULL OR role_id = "" OR role_id != ?)`)
+    WHERE id = ? AND (role_id IS NULL OR role_id = '' OR role_id != ?)`)
   for (const user of users) {
     const legacyRoleId = BUILTIN[user.role]?.id || BUILTIN.member.id
     if (user.is_active) updateActive.run(legacyRoleId, user.id)
