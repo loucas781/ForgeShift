@@ -16,6 +16,7 @@
 - Added a compatibility migration for older `app_preferences` tables that predate the `updated_at` column used by holiday settings.
 - Hardened legacy task-assignment and roles upgrades when older databases lack newer columns, and now report the exact migration stage and stack when startup migration fails.
 - Made built-in role seeding recover safely from partially migrated users tables by creating missing legacy and role-link columns before backfilling accounts.
+- Fixed role backfill SQL treating an empty string as an identifier, which caused SQLite to report `no such column:` during startup.
 - Removed the obsolete npm `--unsafe-perm` option from Proxmox install and update helpers to avoid warnings and future npm incompatibility.
 - Fixed narrow desktop calendar toolbar overlap when the shift details panel is open by switching to a calendar-width-aware three-column layout; made Templates organisation filters deterministic; added complete role/catalogue fallbacks so protected roles retain their permissions when either roles endpoint is unavailable; aligned built-in role colours with ForgeShift's established Member, Shift Lead, Manager, and Admin palette across web and native API clients; removed the outdated Preferences/Agenda `New` markers; and bumped the API catalogue contract to v2.
 
