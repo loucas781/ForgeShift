@@ -59,7 +59,7 @@ msg_ok "ForgeShift cloned"
 
 # ── 5. npm install ─────────────────────────────────────────────────────────────
 msg_info "Updating npm to latest"
-HOME=/root npm install -g npm --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund --silent 2>&1 || true
+HOME=/root npm install -g npm --cache /tmp/npm-cache --no-audit --no-fund --silent 2>&1 || true
 msg_ok "npm $(npm --version) ready"
 
 msg_info "Installing Node.js dependencies"
@@ -71,7 +71,6 @@ chmod 777 /tmp/npm-cache /tmp/npm-tmp
 HOME=/root npm install \
   --omit=dev \
   --cache /tmp/npm-cache \
-  --unsafe-perm \
   --no-audit \
   --no-fund \
   2>&1 | tail -5 || msg_error "npm install failed — check output above"
@@ -189,11 +188,27 @@ git fetch origin
 git reset --hard origin/${TARGET_BRANCH}
 
 mkdir -p /tmp/npm-cache
-HOME=/root npm install --omit=dev --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund
+HOME=/root npm install --omit=dev --cache /tmp/npm-cache --no-audit --no-fund
 
 HOME=/root NODE_ENV=${APP_ENV} node server/db/migrate.js
 systemctl restart forgeshift
-echo "✓ ForgeShift updated to $(cat .version 2>/dev/null || echo 'unknown')"
+EXPECTED_VERSION=$(tr -d '[:space:]' < .version 2>/dev/null || true)
+EXPECTED_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
+SERVICE_PORT=$(sed -n 's/^PORT=//p' ".env.${APP_ENV}" 2>/dev/null | tail -1)
+SERVICE_PORT=${SERVICE_PORT:-3000}
+RUNNING_VERSION=""
+for _attempt in {1..15}; do
+  sleep 1
+  HEALTH_JSON=$(curl -fsS "http://127.0.0.1:${SERVICE_PORT}/api/health" 2>/dev/null || true)
+  RUNNING_VERSION=$(printf '%s' "$HEALTH_JSON" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{process.stdout.write(String(JSON.parse(s).version||''))}catch{}})" 2>/dev/null || true)
+  [[ -n "$RUNNING_VERSION" ]] && break
+done
+if [[ -z "$RUNNING_VERSION" || "$RUNNING_VERSION" != "$EXPECTED_VERSION" ]]; then
+  echo "⚠️  ForgeShift files are ${EXPECTED_VERSION:-unknown}, but the running service reports ${RUNNING_VERSION:-unavailable}."
+  echo "   Check: systemctl status forgeshift --no-pager; journalctl -u forgeshift -n 50 --no-pager"
+  exit 1
+fi
+echo "✓ ForgeShift updated to ${EXPECTED_VERSION} (commit ${EXPECTED_COMMIT})"
 UPDATEEOF
 chmod +x /opt/forgeshift/update-dev.sh
 

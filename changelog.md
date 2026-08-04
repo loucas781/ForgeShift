@@ -11,6 +11,9 @@
 - Fixed version metadata remaining stale in long-running development processes by reading the current version file for runtime responses and disabling config caching; compacted icon-only calendar view buttons so Agenda no longer leaves an empty label gap at smaller resolutions.
 - Prevented identical error toasts from stacking repeatedly, including repeated unavailable-role API messages while an older development server is being restarted.
 - Modernised the Your Profile page with a responsive two-column account layout, refreshed account header, elevated cards, and mobile-friendly spacing while preserving existing profile and security actions.
+- Hardened Proxmox update helpers to verify the running systemd service reports the same version as the updated checkout before declaring success.
+- Fixed startup migration failure for built-in roles by always binding the required `is_system` value when seeding Member, Shift Lead, Manager, Admin, and Inactive roles.
+- Removed the obsolete npm `--unsafe-perm` option from Proxmox install and update helpers to avoid warnings and future npm incompatibility.
 - Fixed narrow desktop calendar toolbar overlap when the shift details panel is open by switching to a calendar-width-aware three-column layout; made Templates organisation filters deterministic; added complete role/catalogue fallbacks so protected roles retain their permissions when either roles endpoint is unavailable; aligned built-in role colours with ForgeShift's established Member, Shift Lead, Manager, and Admin palette across web and native API clients; removed the outdated Preferences/Agenda `New` markers; and bumped the API catalogue contract to v2.
 
 ## 2026-08-01
