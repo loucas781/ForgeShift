@@ -188,6 +188,18 @@ const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday',
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const DEFAULT_TEMPLATE_COLOUR = '#4f46e5'
 
+function hasPermission(permission) {
+  if (cfg?.user?.role === 'admin') return true
+  let permissions = cfg?.user?.permissions || []
+  if (typeof permissions === 'string') {
+    try { permissions = JSON.parse(permissions) } catch { permissions = [] }
+  }
+  return Array.isArray(permissions) && permissions.includes(permission)
+}
+function canManageTemplates() { return hasPermission('manage_templates') }
+function canApplyTemplates() { return canManageTemplates() || hasPermission('add_own_shifts') || hasPermission('add_other_shifts') }
+function canViewOtherRotas() { return hasPermission('view_other_rotas') }
+
 function getTemplateType(value) {
   return value === TEMPLATE_TYPE_PATTERN ? TEMPLATE_TYPE_PATTERN : TEMPLATE_TYPE_WEEKLY
 }
@@ -268,7 +280,7 @@ async function init() {
   await loadUsers()
   await Promise.all([loadLocations(), loadTeams(), loadGroups(), loadTemplates()])
 
-  if (cfg.user.role === 'admin' || cfg.user.role === 'manager') {
+  if (canManageTemplates()) {
     document.getElementById('adminActions').innerHTML = `
       <button class="btn btn-primary" onclick="openCreateTmpl()">
         <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
@@ -288,21 +300,13 @@ async function loadLocations() {
 }
 
 async function loadUsers() {
-  if (cfg.user.role === 'member') { users = [cfg.user]; return }
-  const allUsers = await api('/api/users')
-  if (cfg.user.role === 'shift_lead') {
-    users = allUsers.filter(u => u.is_active && (u.role === 'member' || u.role === 'shift_lead'))
-  } else {
-    users = allUsers.filter(u => u.is_active)
-  }
+  if (!canViewOtherRotas()) { users = [cfg.user]; return }
+  users = (await api('/api/users')).filter(user => user.is_active)
 }
 
 async function loadTeams() {
-  if (cfg.user.role !== 'shift_lead') return
+  if (!canViewOtherRotas()) return
   try { teams = await api('/api/teams') } catch { teams = [] }
-  const teamMemberIds = new Set([cfg.user.id])
-  teams.forEach(t => (t.members || []).forEach(m => { if (m.is_active) teamMemberIds.add(m.id) }))
-  users = users.filter(u => teamMemberIds.has(u.id))
 }
 
 async function loadTemplates() {
@@ -326,7 +330,7 @@ function renderGroupFilterBar() {
   })
   // Add unassigned pill if any unassigned templates exist (admin only, informational)
   const ungroupedCount = templates.filter(t => !t.org_id).length
-  if ((cfg.user.role === 'admin' || cfg.user.role === 'manager') && ungroupedCount > 0) {
+  if (canManageTemplates() && ungroupedCount > 0) {
     pills.push({ id: 'ungrouped', name: 'Unassigned', count: ungroupedCount })
   }
 
@@ -402,7 +406,7 @@ function renderTemplateCard(t) {
       </span>`
     : ''
 
-  const adminBtns = (cfg.user.role === 'admin' || cfg.user.role === 'manager') ? `
+  const adminBtns = canManageTemplates() ? `
     <div style="display:flex;gap:4px">
       <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
       <button class="btn btn-ghost btn-sm btn-icon" onclick="duplicateTmpl('${t.id}')" title="Duplicate template">
@@ -414,7 +418,7 @@ function renderTemplateCard(t) {
       <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTmpl('${t.id}')" title="Delete" style="color:var(--red)">
         <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
       </button>
-    </div>` : cfg.user.role === 'shift_lead' ? `
+    </div>` : canApplyTemplates() ? `
     <div style="display:flex;gap:4px">
       <button class="btn btn-secondary btn-sm" onclick="openApplyTmpl('${t.id}')">Apply</button>
     </div>` : ''
@@ -463,7 +467,7 @@ function renderTemplateGrid() {
     grid.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12z"/></svg>
       <h3>No templates yet</h3>
-      <p>${(cfg.user.role==='admin'||cfg.user.role==='manager')?'Click "New Template" to get started':cfg.user.role==='shift_lead'?'No templates have been created yet — ask a manager or admin to create one':'No templates have been created yet'}</p>
+      <p>${canManageTemplates() ? 'Click "New Template" to get started' : canApplyTemplates() ? 'No templates have been created yet — ask someone with template access to create one' : 'No templates have been created yet'}</p>
     </div>`
     return
   }
@@ -526,7 +530,7 @@ function renderGroupSelect(selectedId) {
   const el  = document.getElementById('tmplGroup')
   if (!el || !row) return
   // Only admins can assign org; hide the field for others
-  if (cfg.user.role !== 'admin' || groups.length === 0) { row.style.display = 'none'; return }
+  if (!hasPermission('manage_organisations') || groups.length === 0) { row.style.display = 'none'; return }
   row.style.display = ''
   el.innerHTML = '<option value="">— None (visible to all) —</option>' +
     groups.map(g => `<option value="${g.id}"${g.id === selectedId ? ' selected' : ''}>${g.name}</option>`).join('')

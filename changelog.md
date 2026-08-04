@@ -2,6 +2,11 @@
 
 ## 2026-08-04
 
+- Added custom roles with selectable colours and granular rota, shift, task, template, team, location, organisation, user, settings, audit, backup and holiday permissions; Member, Shift Lead, Manager, Admin and the system Inactive role remain protected.
+- Added role metadata and permissions to authenticated web/mobile API payloads, permission-aware navigation and controls, accurate privacy-safe role assignment counts, and safeguards preventing delegated managers from granting or managing access above their own.
+- Added multi-organisation locations with backwards-compatible `org_id` responses, organisation-aware visibility, Settings multi-select controls, migration backfill and backup/restore support.
+- Changed inactive accounts to move automatically into the Inactive role, revoke existing sessions, retain their previous role, and restore that role when re-enabled.
+- Hardened role-aware rota exports, iCal feeds, user-directory projections and shift/template mutations so custom read/write permissions are enforced consistently without changing the 36-route native mobile contract.
 - Fixed the collapsed Search & Filters control being auto-placed into the mobile navigation grid on extra-small screens, restoring the intended title, calendar navigation, date, filter and summary rows.
 
 ## 2026-08-01

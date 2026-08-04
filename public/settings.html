@@ -936,6 +936,50 @@
     }
     .api-copy-btn { min-height:28px; padding:4px 7px; }
     .api-empty { padding:28px; color:var(--text-3); font-size:12px; text-align:center; }
+    .settings-multi-select {
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+      max-height:220px;
+      overflow-y:auto;
+      padding:10px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--surface-2);
+    }
+    .settings-multi-option {
+      display:flex;
+      align-items:center;
+      gap:9px;
+      min-width:0;
+      min-height:42px;
+      padding:8px 10px;
+      border:1px solid var(--border-2);
+      border-radius:9px;
+      background:var(--surface);
+      color:var(--text-2);
+      font-size:12px;
+      cursor:pointer;
+    }
+    .settings-multi-option input { width:16px; height:16px; flex:none; accent-color:var(--brand); }
+    .settings-multi-option-dot { width:9px; height:9px; flex:none; border-radius:50%; }
+    .settings-multi-option span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .settings-multi-empty { grid-column:1/-1; padding:10px; color:var(--text-3); font-size:12px; text-align:center; }
+    .role-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+    .role-card { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+    .role-card-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .role-card-title { display:flex; align-items:center; gap:9px; min-width:0; }
+    .role-colour-dot { width:13px; height:13px; border-radius:50%; box-shadow:0 0 0 3px color-mix(in srgb,currentColor 18%,transparent); flex:0 0 auto; }
+    .role-permission-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .role-permission-chip { padding:4px 7px; border-radius:999px; background:var(--surface-2); color:var(--text-2); font-size:10px; font-weight:650; line-height:1.2; }
+    .role-permission-groups { display:grid; gap:16px; }
+    .role-permission-group { border:1px solid var(--border); border-radius:var(--r-md); padding:12px; }
+    .role-permission-group h4 { margin:0 0 9px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+    .role-permission-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .role-permission-option { display:flex; gap:9px; align-items:flex-start; padding:9px; border-radius:var(--r-sm); background:var(--surface-2); font-size:12px; color:var(--text-2); cursor:pointer; }
+    .role-permission-option input { margin-top:1px; accent-color:var(--brand); }
+    .role-badge-inline { display:inline-flex; align-items:center; gap:6px; border:1px solid currentColor; border-radius:999px; padding:3px 8px; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; }
+    .location-org-badges { display:flex; flex-wrap:wrap; gap:5px; }
 
     @media(max-width:980px) {
       .settings-app-body { grid-template-columns:208px minmax(0, 1fr); }
@@ -972,6 +1016,8 @@
       .settings-form-grid { grid-template-columns:1fr; gap:12px; }
       .settings-field-wide { grid-column:auto; }
       .settings-colour-field .colour-swatch { width:32px; height:32px; }
+      .settings-multi-select { grid-template-columns:1fr; }
+      .role-permission-options { grid-template-columns:1fr; }
       .api-toolbar { grid-template-columns:1fr; }
       .api-method-filters { overflow-x:auto; padding-bottom:2px; }
       .api-method-filter { flex:1; }
@@ -1019,7 +1065,8 @@
       <div class="form-group"><label class="form-label">Full name</label><input type="text" class="form-input" id="euName"></div>
       <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="euEmail"></div>
       <div class="form-group"><label class="form-label">Role</label>
-        <select class="form-select" id="euRole"><option value="member">Member</option><option value="shift_lead">Shift Lead</option><option value="manager">Manager</option><option value="admin">Admin</option></select>
+        <select class="form-select" id="euRole"><option value="">Loading roles…</option></select>
+        <p style="margin:7px 0 0;color:var(--text-3);font-size:11px">Inactive accounts are temporarily moved to the protected Inactive role. Their previous role is restored when re-enabled.</p>
       </div>
       <div class="form-group">
         <div style="display:flex;align-items:center;gap:10px">
@@ -1112,7 +1159,11 @@
     </div>
     <div class="modal-body settings-form-grid">
       <div class="form-group"><label class="form-label" for="lName">Name</label><input type="text" class="form-input" id="lName" placeholder="e.g. Head Office"></div>
-      <div class="form-group"><label class="form-label" for="lOrg">Organisation <span class="settings-optional-label">Optional</span></label><select class="form-select" id="lOrg"><option value="">— None (visible to all) —</option></select></div>
+      <div class="form-group settings-field-wide">
+        <label class="form-label" id="lOrgLabel">Organisations <span class="settings-optional-label">Optional</span></label>
+        <div class="settings-multi-select" id="lOrgOptions" role="group" aria-labelledby="lOrgLabel"></div>
+        <p style="margin:7px 0 0;color:var(--text-3);font-size:11px">Select every organisation that should share this location. Leave all unselected to make it available workspace-wide.</p>
+      </div>
       <div class="form-group settings-field-wide"><label class="form-label" for="lAddress">Address <span class="settings-optional-label">Optional</span></label><input type="text" class="form-input" id="lAddress" placeholder="e.g. 123 Main St, London"></div>
       <div class="form-group settings-field-wide settings-colour-field"><label class="form-label">Calendar colour</label><div id="locColourPicker"></div></div>
     </div>
@@ -1128,12 +1179,58 @@
 <script>
 'use strict'
 
-let cfg = null, users = [], locations = [], orgs = []
+let cfg = null, users = [], locations = [], orgs = [], roles = [], rolePermissionCatalog = []
 let editingUserId = null, editingLocId = null, locColour = '#4f46e5'
+let editingRoleId = null, roleColour = '#6554c0'
 let euPwIndicator = null
 let isAdmin = false, isManager = false, isShiftLead = false
 let resetLinkDelegatedBound = false
 let settingsModalObserver = null
+
+function hasPermission(permission) {
+  if (cfg?.user?.role === 'admin') return true
+  let permissions = cfg?.user?.permissions || []
+  if (typeof permissions === 'string') {
+    try { permissions = JSON.parse(permissions) } catch { permissions = [] }
+  }
+  return Array.isArray(permissions) && permissions.includes(permission)
+}
+
+function roleForUser(user) {
+  if (!user) return null
+  return roles.find(role => role.id === user.role_id)
+    || roles.find(role => role.id === `builtin-${String(user.role || '').replaceAll('_', '-')}`)
+    || null
+}
+
+function roleNameForUser(user) {
+  return user?.role_name || roleForUser(user)?.name || ({ admin:'Admin', manager:'Manager', shift_lead:'Shift Lead', member:'Member' }[user?.role] || 'Member')
+}
+
+function roleColourForUser(user) {
+  return resolveColourValue(user?.role_color || roleForUser(user)?.color, '#64748b')
+}
+
+function roleBadgeForUser(user) {
+  const colour = roleColourForUser(user)
+  return `<span class="role-badge-inline" style="color:var(--text-2);border-color:color-mix(in srgb,${colour} 48%,var(--border));background:color-mix(in srgb,${colour} 12%,transparent)"><span class="role-colour-dot" style="width:7px;height:7px;color:${colour};background:${colour};box-shadow:none"></span>${escHtml(roleNameForUser(user))}</span>`
+}
+
+function assignableRoles() {
+  const ownPermissions = new Set(Array.isArray(cfg?.user?.permissions) ? cfg.user.permissions : [])
+  return roles.filter(role => !role.is_system && (isAdmin || (role.permissions || []).every(permission => ownPermissions.has(permission))))
+}
+
+function canManageRoleDefinition(role) {
+  return !!role && (isAdmin || (role.permissions || []).every(permission => hasPermission(permission)))
+}
+
+function populateRoleSelect(selectOrId, selectedRoleId) {
+  const select = typeof selectOrId === 'string' ? document.getElementById(selectOrId) : selectOrId
+  if (!select) return
+  select.innerHTML = assignableRoles().map(role => `<option value="${role.id}">${escHtml(role.name)}${role.is_builtin ? ' · built-in' : ''}</option>`).join('')
+  if (selectedRoleId && assignableRoles().some(role => role.id === selectedRoleId)) select.value = selectedRoleId
+}
 
 const SETTINGS_MODAL_PROFILES = [
   { match: /delete/i, tone: 'danger', mark: '!', kicker: 'Sensitive action', subtitle: 'Review the impact carefully before continuing.' },
@@ -1226,6 +1323,7 @@ async function init() {
   initSettingsModalSystem()
   // Load user prefs so the Preferences panel can show current values
   await loadPrefs()
+  await loadRoles()
 
   isAdmin = cfg.user.role === 'admin'
   isManager = cfg.user.role === 'manager'
@@ -1241,23 +1339,25 @@ async function init() {
     { id: 'my-teams', label: 'My Teams', roles: ['shift_lead'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
-    { id: 'team', label: 'Team', roles: ['admin','manager'],
+    { id: 'team', label: 'Team', roles: ['admin','manager'], permissions: ['manage_users','manage_teams'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
-    { id: 'organisations', label: 'Organisations', roles: ['admin'],
+    { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: ['admin'], permission: 'manage_roles',
+      icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>' },
+    { id: 'organisations', label: 'Organisations', roles: ['admin'], permission: 'manage_organisations',
       icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
-    { id: 'locations', label: 'Locations', roles: ['admin'],
+    { id: 'locations', label: 'Locations', roles: ['admin'], permission: 'manage_locations',
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
-    { id: 'features', label: 'Features', roles: ['admin'],
+    { id: 'features', label: 'Features', roles: ['admin'], permission: 'manage_settings',
       icon: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>' },
     { id: 'security', label: 'Security', roles: ['admin','manager','shift_lead','member'],
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
-    { id: 'email', label: 'Email', roles: ['admin'],
+    { id: 'email', label: 'Email', roles: ['admin'], permission: 'manage_settings',
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
     { id: 'api', label: 'API Reference', roles: ['admin'],
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'audit', label: 'Audit Log', roles: ['admin'],
+    { id: 'audit', label: 'Audit Log', roles: ['admin'], permission: 'view_audit',
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
-    { id: 'backup', label: 'Backup', roles: ['admin'],
+    { id: 'backup', label: 'Backup', roles: ['admin'], permission: 'manage_backups',
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
     { id: 'updates', label: 'Updates', roles: ['admin'],
       icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>' },
@@ -1270,13 +1370,13 @@ async function init() {
   const userRole = cfg.user.role
   const sectionByTab = {
     appearance: 'personal', preferences: 'personal', security: 'personal',
-    'my-teams': 'workspace', team: 'workspace', organisations: 'workspace', locations: 'workspace', features: 'workspace',
+    'my-teams': 'workspace', team: 'workspace', roles: 'workspace', organisations: 'workspace', locations: 'workspace', features: 'workspace',
     email: 'system', api: 'system', audit: 'system', backup: 'system', updates: 'system', buildinfo: 'system', about: 'system',
   }
   const sectionLabels = { personal: 'Personal', workspace: 'Workspace', system: 'System' }
   const sectionOrder = ['personal', 'workspace', 'system']
   const tabs = ALL_TABS
-    .filter(t => t.roles.includes(userRole))
+    .filter(t => t.roles.includes(userRole) || (t.permission && hasPermission(t.permission)) || (t.permissions || []).some(hasPermission))
     .sort((a, b) => sectionOrder.indexOf(sectionByTab[a.id]) - sectionOrder.indexOf(sectionByTab[b.id]))
 
   // Render grouped desktop navigation
@@ -1307,8 +1407,14 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  if (isAdmin || isManager) await Promise.all([loadUsers(), loadLocations(), loadOrgs()])
-  if (isShiftLead) await Promise.all([loadUsers()])
+  const canViewTeamPanel = isAdmin || isManager || hasPermission('manage_users') || hasPermission('manage_teams')
+  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_teams','manage_locations','manage_organisations','manage_tasks','view_other_rotas'].some(hasPermission)
+  const canViewRoles = isAdmin || hasPermission('manage_roles')
+  const canManageOrganisations = isAdmin || hasPermission('manage_organisations')
+  const canManageLocations = isAdmin || hasPermission('manage_locations')
+  if (canLoadUsers || canViewRoles) await loadUsers()
+  if (canManageLocations) await loadLocations()
+  if (canManageOrganisations || canManageLocations) await loadOrgs()
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
   // Wire password indicator for Edit User modal
@@ -1317,15 +1423,16 @@ async function init() {
     renderAppearancePanel(),
     renderPreferencesPanel(),
     isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
-    (isAdmin || isManager) ? renderTeamPanel() : Promise.resolve(),
-    isAdmin ? renderOrganisationsPanel() : Promise.resolve(),
-    isAdmin ? renderLocationsPanel() : Promise.resolve(),
-    isAdmin ? renderFeaturesPanel() : Promise.resolve(),
+    canViewTeamPanel ? renderTeamPanel() : Promise.resolve(),
+    canViewRoles ? renderRolesPanel() : Promise.resolve(),
+    canManageOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
+    canManageLocations ? renderLocationsPanel() : Promise.resolve(),
+    (isAdmin || hasPermission('manage_settings')) ? renderFeaturesPanel() : Promise.resolve(),
     renderSecurityPanel(),
-    isAdmin ? renderEmailPanel() : Promise.resolve(),
+    (isAdmin || hasPermission('manage_settings')) ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderApiPanel() : Promise.resolve(),
-    isAdmin ? renderAuditPanel() : Promise.resolve(),
-    isAdmin ? renderBackupPanel() : Promise.resolve(),
+    (isAdmin || hasPermission('view_audit')) ? renderAuditPanel() : Promise.resolve(),
+    (isAdmin || hasPermission('manage_backups')) ? renderBackupPanel() : Promise.resolve(),
     renderUpdatesPanel(),
     renderBuildInfoPanel(),
     renderAboutPanel(),
@@ -1663,7 +1770,22 @@ function showTab(id) {
   if (id === 'about') syncAboutIcon()
 }
 
-async function loadUsers() { users = await api('/api/users') }
+async function loadRoles() {
+  try {
+    const [roleRows, catalog] = await Promise.all([api('/api/roles'), api('/api/roles/catalog')])
+    roles = Array.isArray(roleRows) ? roleRows : (roleRows.roles || [])
+    rolePermissionCatalog = Array.isArray(catalog?.permissions) ? catalog.permissions : []
+  } catch {
+    roles = [
+      { id:'builtin-member', name:'Member', color:'#0052cc', permissions:['view_own_rota'], is_builtin:true },
+      { id:'builtin-shift-lead', name:'Shift Lead', color:'#6554c0', permissions:[], is_builtin:true },
+      { id:'builtin-manager', name:'Manager', color:'#00875a', permissions:[], is_builtin:true },
+      { id:'builtin-admin', name:'Admin', color:'#ff5630', permissions:[], is_builtin:true },
+    ]
+    rolePermissionCatalog = []
+  }
+}
+async function loadUsers() { try { users = await api('/api/users') } catch { users = [] } }
 async function loadLocations() { locations = await api('/api/locations') }
 async function loadOrgs() { try { orgs = await api('/api/organisations') } catch { orgs = [] } }
 
@@ -1848,7 +1970,7 @@ async function renderPreferencesPanel() {
         <p style="font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.5">
           Holiday data is built-in and works offline. Moveable feasts (Easter, bank holidays, lunar festivals) are calculated for each year. Data covers 2020–2035.
         </p>
-        ${cfg.user?.role === 'admin' ? `
+        ${hasPermission('manage_holidays') ? `
         <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
           <div style="font-size:13px;font-weight:600;margin-bottom:4px">Live data</div>
           <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;line-height:1.5">
@@ -2236,13 +2358,13 @@ async function renderTeamPanel() {
         <span class="admin-summary-pill">${users.filter(user => user.is_active).length} active account${users.filter(user => user.is_active).length === 1 ? '' : 's'}</span>
       </div>
     </div>
-    <div class="team-layout-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:24px;align-items:start">
+    <div class="team-layout-grid" style="display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start">
 
       <!-- Left column: all team content -->
       <div>
 
         <!-- Invite Member card (admin only) -->
-        ${isAdmin ? `<div class="card" style="margin-bottom:24px">
+        ${hasPermission('manage_users') ? `<div class="card" style="margin-bottom:24px">
           <div class="card-body">
             <h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Invite Member</h2>
             <p style="font-size:13px;color:var(--text-3);margin-bottom:20px">Create an account for a new team member. ${smtpNote}</p>
@@ -2259,10 +2381,7 @@ async function renderTeamPanel() {
             <div class="form-group" style="max-width:280px;margin-bottom:20px">
               <label class="form-label">Role</label>
               <select class="form-select" id="iRole">
-                <option value="member">Member</option>
-                <option value="shift_lead">Shift Lead</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                ${assignableRoles().map(role => `<option value="${role.id}">${escHtml(role.name)}${role.is_builtin ? ' · built-in' : ''}</option>`).join('')}
               </select>
             </div>
             <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
@@ -2278,7 +2397,7 @@ async function renderTeamPanel() {
               <span class="badge badge-${signupEnabled ? 'green' : 'red'}" style="font-size:11px">${signupEnabled ? 'Signup enabled' : 'Signup disabled'}</span>
             </div>
             <!-- Role tabs -->
-            <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px" id="roleTabBar"></div>
+            <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto" id="roleTabBar"></div>
             <!-- Tab description -->
             <p style="font-size:12px;color:var(--text-3);margin-bottom:12px" id="roleTabDesc"></p>
             <!-- Inactive toggle -->
@@ -2292,7 +2411,7 @@ async function renderTeamPanel() {
           </div>
         </div>
 
-        <div style="margin-top:32px">
+        ${hasPermission('manage_teams') ? `<div style="margin-top:32px">
           <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Teams</h2>
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
             Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
@@ -2303,9 +2422,9 @@ async function renderTeamPanel() {
           <div class="card" id="teamsCard">
             <div class="card-body" id="teamsListEl">Loading…</div>
           </div>
-        </div>
+        </div>` : ''}
 
-        <div style="margin-top:32px">
+        ${hasPermission('view_other_rotas') ? `<div style="margin-top:32px">
           <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Export Shifts</h2>
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Download shift data as a CSV file for reporting or integration with other tools.</p>
           <div class="card team-export-card">
@@ -2332,13 +2451,13 @@ async function renderTeamPanel() {
               </div>
             </div>
           </div>
-        </div>
+        </div>` : ''}
 
 
       </div>
 
       <!-- Right column: Role Permissions (sticky) -->
-      <div class="team-permissions-panel" style="position:sticky;top:24px">
+      <div class="team-permissions-panel" style="display:none" aria-hidden="true">
         <div class="card">
           <div class="card-body" style="padding:16px">
             <h3 style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text)">Role Permissions</h3>
@@ -2416,7 +2535,7 @@ async function renderTeamPanel() {
     </div>`
 
   renderTeamList()
-  await loadSettingsTeams()
+  if (hasPermission('manage_teams')) await loadSettingsTeams()
 
   // Pre-fill CSV date range (current month)
   const now   = new Date()
@@ -2449,7 +2568,125 @@ function doAdminCSVExport() {
   window.location.href = '/api/shifts/export/csv?' + params
 }
 
-let activeRoleTab = 'admin'
+async function renderRolesPanel() {
+  const el = document.getElementById('panel-roles')
+  if (!el) return
+  const assignedCounts = Object.fromEntries(roles.map(role => [role.id, Number(role.assigned_count || 0)]))
+  const permissionLabels = Object.fromEntries(rolePermissionCatalog.map(item => [item.key, item.label]))
+  el.innerHTML = `
+    <div class="admin-page-header">
+      <div class="admin-page-heading">
+        <span class="admin-page-eyebrow">Access control <span class="settings-new-badge">New</span></span>
+        <h2>Roles &amp; permissions</h2>
+        <p>Build roles around exactly what a person needs to see or change. Role colours follow users across the web and mobile API.</p>
+      </div>
+      <div class="admin-page-actions"><button class="btn btn-primary" onclick="openRoleModal()">+ Create role</button></div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" style="display:flex;align-items:flex-start;gap:12px">
+        <span aria-hidden="true" style="font-size:18px">🔒</span>
+        <div><strong style="font-size:13px">Built-in roles stay protected</strong><p style="margin:4px 0 0;color:var(--text-3);font-size:12px;line-height:1.55">Member, Shift Lead, Manager and Admin cannot be deleted. Inactive is a system role used automatically while an account is disabled.</p></div>
+      </div>
+    </div>
+    <div class="role-card-grid">
+      ${roles.map(role => {
+        const colour = resolveColourValue(role.color, '#64748b')
+        const permissionNames = (role.permissions || []).map(key => permissionLabels[key] || key)
+        const status = role.is_system ? 'System' : role.is_builtin ? 'Built-in' : 'Custom'
+        return `<article class="role-card">
+          <div class="role-card-header">
+            <div class="role-card-title">
+              <span class="role-colour-dot" style="color:${colour};background:${colour}"></span>
+              <div style="min-width:0"><h3 style="margin:0;font-size:15px;overflow-wrap:anywhere">${escHtml(role.name)}</h3><span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">${status}</span></div>
+            </div>
+            <span class="badge badge-gray" style="font-size:10px">${assignedCounts[role.id] || 0} user${assignedCounts[role.id] === 1 ? '' : 's'}</span>
+          </div>
+          <div class="role-permission-chips">
+            ${permissionNames.length ? permissionNames.slice(0, 6).map(label => `<span class="role-permission-chip">${escHtml(label)}</span>`).join('') : '<span style="font-size:11px;color:var(--text-3)">No application permissions</span>'}
+            ${permissionNames.length > 6 ? `<span class="role-permission-chip">+${permissionNames.length - 6} more</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:2px">
+            <span style="font-size:11px;color:var(--text-3)">${permissionNames.length} permission${permissionNames.length === 1 ? '' : 's'}</span>
+            ${role.deletable && canManageRoleDefinition(role) ? `<div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="openRoleModal('${role.id}')">Edit</button><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteRole('${role.id}')" ${assignedCounts[role.id] ? 'disabled title="Reassign users before deleting this role"' : ''}>Delete</button></div>` : `<span style="font-size:11px;color:var(--text-3)">${role.deletable ? 'Above your access' : 'Protected'}</span>`}
+          </div>
+        </article>`
+      }).join('')}
+    </div>`
+}
+
+function openRoleModal(id = null) {
+  const role = id ? roles.find(item => item.id === id) : null
+  if (role && (!role.deletable || !canManageRoleDefinition(role))) return
+  document.getElementById('roleModal')?.remove()
+  editingRoleId = role?.id || null
+  roleColour = resolveColourValue(role?.color, '#6554c0')
+  const selected = new Set(role?.permissions || ['view_own_rota'])
+  const availablePermissions = isAdmin ? rolePermissionCatalog : rolePermissionCatalog.filter(permission => hasPermission(permission.key))
+  const groups = availablePermissions.reduce((all, permission) => {
+    ;(all[permission.category || 'Other'] ||= []).push(permission)
+    return all
+  }, {})
+  const modal = document.createElement('div')
+  modal.className = 'modal-overlay'
+  modal.id = 'roleModal'
+  modal.innerHTML = `<div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <h3 class="modal-title">${role ? 'Edit role' : 'Create role'}</h3>
+      <button class="modal-close" onclick="document.getElementById('roleModal').remove()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-form-grid" style="margin-bottom:18px">
+        <div class="form-group"><label class="form-label" for="roleName">Role name</label><input class="form-input" id="roleName" maxlength="80" value="${escHtml(role?.name || '')}" placeholder="e.g. Rota viewer"></div>
+        <div class="form-group settings-colour-field"><label class="form-label">Role colour</label><div id="roleColourPicker"></div></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <div><strong style="font-size:13px">Permissions</strong><p style="margin:3px 0 0;color:var(--text-3);font-size:11px">The server checks these permissions on every protected request.</p></div>
+        <div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(true)">Select all</button><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(false)">Clear</button></div>
+      </div>
+      <div class="role-permission-groups">
+        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span>${escHtml(permission.label)}</span></label>`).join('')}</div></section>`).join('')}
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('roleModal').remove()">Cancel</button><button class="btn btn-primary" onclick="saveRole()">${role ? 'Save changes' : 'Create role'}</button></div>
+  </div>`
+  document.body.appendChild(modal)
+  modal.classList.add('open')
+  renderColourPicker(document.getElementById('roleColourPicker'), roleColour, value => { roleColour = value })
+  setTimeout(() => document.getElementById('roleName')?.focus(), 50)
+}
+
+function setAllRolePermissions(checked) {
+  document.querySelectorAll('#roleModal input[name="rolePermission"]').forEach(input => { input.checked = checked })
+}
+
+async function saveRole() {
+  const name = document.getElementById('roleName')?.value.trim()
+  if (!name) { toast('Enter a role name', 'error'); return }
+  const permissions = Array.from(document.querySelectorAll('#roleModal input[name="rolePermission"]:checked')).map(input => input.value)
+  try {
+    const path = editingRoleId ? `/api/roles/${editingRoleId}` : '/api/roles'
+    await api(path, { method: editingRoleId ? 'PATCH' : 'POST', body: { name, color: roleColour, permissions } })
+    document.getElementById('roleModal')?.remove()
+    await loadRoles()
+    renderRolesPanel()
+    renderTeamList()
+    toast(editingRoleId ? 'Role updated' : 'Role created', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function deleteRole(id) {
+  const role = roles.find(item => item.id === id)
+  if (!role?.deletable || Number(role.assigned_count || 0) > 0 || !canManageRoleDefinition(role) || !confirm(`Delete the custom role “${role.name}”?`)) return
+  try {
+    await api(`/api/roles/${id}`, { method: 'DELETE' })
+    await loadRoles()
+    renderRolesPanel()
+    renderTeamList()
+    toast('Role deleted', 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+let activeRoleTab = ''
 
 function renderTeamTabs() {
   const bar = document.getElementById('roleTabBar')
@@ -2457,18 +2694,24 @@ function renderTeamTabs() {
   const title = document.getElementById('teamMembersTitle')
   if (!bar) return
 
-  const roleCounts = { admin: 0, manager: 0, shift_lead: 0, member: 0 }
-  users.forEach(u => { if (roleCounts[u.role] !== undefined) roleCounts[u.role]++ })
-
-  const tabs = [
-    { key: 'admin',      label: 'Administrators', icon: '🛡', desc: 'Full access to all settings and shift management.' },
-    { key: 'manager',    label: 'Managers',       icon: '📋', desc: 'Can create templates and manage all teams and shifts.' },
-    { key: 'shift_lead', label: 'Shift Leads',    icon: '👥', desc: 'Can create and manage shifts for their assigned teams.' },
-    { key: 'member',     label: 'Members',        icon: '👤', desc: 'Can view their own schedule and manage their profile.' },
-  ]
+  const roleCounts = Object.fromEntries(roles.map(role => [role.id, 0]))
+  users.forEach(user => {
+    const roleId = user.role_id || roleForUser(user)?.id
+    if (roleId && roleCounts[roleId] !== undefined) roleCounts[roleId]++
+  })
+  const tabs = roles.map(role => ({
+    key: role.id,
+    label: role.name,
+    color: resolveColourValue(role.color, '#64748b'),
+    desc: role.is_system
+      ? 'Inactive accounts cannot sign in. Their previous role is restored when the account is re-enabled.'
+      : `${(role.permissions || []).length} permission${(role.permissions || []).length === 1 ? '' : 's'}${role.is_builtin ? ' · protected built-in role' : ' · custom role'}`,
+  }))
 
   // Ensure activeRoleTab is valid
-  if (!tabs.find(t => t.key === activeRoleTab)) activeRoleTab = 'admin'
+  if (!tabs.find(t => t.key === activeRoleTab)) {
+    activeRoleTab = tabs.find(t => t.key === 'builtin-member')?.key || tabs.find(t => !roles.find(role => role.id === t.key)?.is_system)?.key || tabs[0]?.key || ''
+  }
 
   bar.innerHTML = tabs.map(t => {
     const active = t.key === activeRoleTab
@@ -2480,9 +2723,8 @@ function renderTeamTabs() {
       border-bottom:2px solid ${active ? 'var(--blue)' : 'transparent'};
       margin-bottom:-1px;transition:color .15s,border-color .15s
     ">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">${t.key === 'admin' ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' : t.key === 'manager' ? '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><line x1="19" y1="8" x2="23" y2="8"/><line x1="21" y1="6" x2="21" y2="10"/>' : t.key === 'shift_lead' ? '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' : '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'}
-      </svg>
-      ${t.label} <span class="team-role-tab-count" style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${roleCounts[t.key]}</span>
+      <span class="role-colour-dot" style="width:9px;height:9px;color:${t.color};background:${t.color};box-shadow:none"></span>
+      ${escHtml(t.label)} <span class="team-role-tab-count" style="font-size:11px;padding:1px 6px;border-radius:20px;background:${active ? 'rgba(59,130,246,.15)' : 'var(--surface-2)'};color:${active ? 'var(--blue)' : 'var(--text-3)'}">${roleCounts[t.key]}</span>
     </button>`
   }).join('')
 
@@ -2502,9 +2744,11 @@ function renderTeamListFiltered() {
   const el = document.getElementById('teamList')
   if (!el) return
   const showInactive = document.getElementById('showInactive')?.checked ?? false
-  const filtered = users.filter(u => u.role === activeRoleTab && (showInactive || u.is_active))
+  const selectedRole = roles.find(role => role.id === activeRoleTab)
+  const filtered = users.filter(user => (user.role_id || roleForUser(user)?.id) === activeRoleTab && (selectedRole?.is_system || showInactive || user.is_active))
   if (!filtered.length) {
-    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${showInactive ? '' : 'active '}${activeRoleTab === 'shift_lead' ? 'shift leads' : activeRoleTab === 'manager' ? 'managers' : activeRoleTab + 's'} yet.</p>`
+    const role = roles.find(item => item.id === activeRoleTab)
+    el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${showInactive ? '' : 'active '}${escHtml(role?.name || 'users')} assigned yet.</p>`
     return
   }
   el.innerHTML = filtered.map(u => `
@@ -2513,7 +2757,7 @@ function renderTeamListFiltered() {
         ${_avatarHTML(u)}
         <div style="min-width:0">
           <div class="team-member-name">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
-          <div class="team-member-email">${u.email}</div>
+          <div class="team-member-email" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${u.email} ${roleBadgeForUser(u)}</div>
         </div>
       </div>
       <div class="team-member-status" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -2524,7 +2768,7 @@ function renderTeamListFiltered() {
           const safeName = JSON.stringify(u.name)
           const encName = encodeURIComponent(u.name || '')
           const encEmail = encodeURIComponent(u.email || '')
-          return isAdmin ? `
+          return hasPermission('manage_users') ? `
         <button type="button" class="btn btn-ghost btn-sm" onclick="openEditUser('${u.id}')">Edit</button>
         <button
           type="button"
@@ -2714,7 +2958,7 @@ function openTeamMembersModal(teamId) {
                 <div style="font-size:13px;font-weight:500">${u.name}</div>
                 <div class="team-modal-user-email">${u.email}</div>
               </div>
-              <span class="badge badge-${u.role === 'admin' ? 'blue' : u.role === 'manager' ? 'orange' : u.role === 'shift_lead' ? 'purple' : 'gray'}" style="font-size:10px">${u.role === 'shift_lead' ? 'Shift Lead' : u.role === 'manager' ? 'Manager' : u.role}</span>
+              ${roleBadgeForUser(u)}
             </label>`).join('')}
         </div>
         <div id="tmError" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
@@ -2908,7 +3152,7 @@ function openTmplGroupMembersModal(groupId) {
           ${_avatarHTML(u, 'md')}
           <div style="min-width:0">
             <div style="font-weight:600;font-size:13px">${u.name}</div>
-            <div style="font-size:11px;color:var(--text-3)">${u.email} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role === 'manager' ? 'Manager' : u.role}</span></div>
+            <div style="font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;flex-wrap:wrap">${u.email} ${roleBadgeForUser(u)}</div>
           </div>
         </label>`).join('')
     : '<p style="font-size:13px;color:var(--text-3);padding:8px 0">No members or shift leads to assign.</p>'
@@ -2950,12 +3194,14 @@ async function saveTmplGroupMembers(groupId) {
 async function doInviteInline() {
   const name  = document.getElementById('iName')?.value.trim()
   const email = document.getElementById('iEmail')?.value.trim()
-  const role  = document.getElementById('iRole')?.value
+  const role_id = document.getElementById('iRole')?.value
   const resultEl = document.getElementById('inviteResult')
   const submitBtn = document.getElementById('inviteSubmitBtn')
   if (!name || !email) { toast('Name and email are required', 'error'); return }
   try {
-    const r = await api('/api/auth/invite', { method: 'POST', body: { name, email, role } })
+    const selectedRole = roles.find(role => role.id === role_id)
+    const legacyRole = selectedRole?.id?.startsWith('builtin-') ? selectedRole.id.slice(8).replaceAll('-', '_') : 'member'
+    const r = await api('/api/auth/invite', { method: 'POST', body: { name, email, role_id, role: legacyRole } })
     if (r.emailSent) {
       resultEl.style.cssText = 'display:block;background:var(--green-subtle);border:1px solid color-mix(in srgb,var(--green) 35%,transparent);border-radius:var(--r-md);padding:12px 14px;font-size:13px;color:var(--green);margin-bottom:12px'
       resultEl.innerHTML = `✓ Account created for <strong>${escHtml(name)}</strong>. An invitation email has been sent to <strong>${escHtml(email)}</strong>.`
@@ -3022,7 +3268,7 @@ function openEditUser(id) {
   editingUserId = id
   document.getElementById('euName').value   = u.name
   document.getElementById('euEmail').value  = u.email
-  document.getElementById('euRole').value   = u.role
+  populateRoleSelect('euRole', u.is_active ? (u.role_id || roleForUser(u)?.id) : (u.previous_role_id || 'builtin-member'))
   document.getElementById('euActive').checked = !!u.is_active
   // Reset the set-password section
   document.getElementById('euSetPwToggle').checked = false
@@ -3095,7 +3341,7 @@ async function saveEditUser() {
     await api(`/api/users/${editingUserId}`, { method: 'PATCH', body: {
       name:      document.getElementById('euName').value.trim(),
       email:     document.getElementById('euEmail').value.trim(),
-      role:      document.getElementById('euRole').value,
+      role_id:   document.getElementById('euRole').value,
       is_active: document.getElementById('euActive').checked,
     }})
     document.getElementById('editUserModal').classList.remove('open')
@@ -3594,7 +3840,7 @@ function openTaskListGroupMembersModal(groupId) {
           ${_avatarHTML(u, 'md')}
           <div style="min-width:0">
             <div style="font-weight:600;font-size:13px">${u.name}</div>
-            <div style="font-size:11px;color:var(--text-3)">${u.email} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role === 'manager' ? 'Manager' : u.role}</span></div>
+            <div style="font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;flex-wrap:wrap">${u.email} ${roleBadgeForUser(u)}</div>
           </div>
         </label>`).join('')
     : '<p style="font-size:13px;color:var(--text-3);padding:8px 0">No members or shift leads to assign.</p>'
@@ -3817,7 +4063,7 @@ function openOrgMembersModal(orgId) {
           ${_avatarHTML(u, 'md')}
           <div style="min-width:0">
             <div style="font-weight:600;font-size:13px">${escHtml(u.name)}</div>
-            <div style="font-size:11px;color:var(--text-3)">${escHtml(u.email)} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role === 'manager' ? 'Manager' : u.role}</span></div>
+            <div style="font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;flex-wrap:wrap">${escHtml(u.email)} ${roleBadgeForUser(u)}</div>
           </div>
         </label>`).join('')
     : '<p style="font-size:13px;color:var(--text-3);padding:8px 0">No users found.</p>'
@@ -3863,7 +4109,7 @@ async function renderLocationsPanel() {
       <div class="admin-page-heading">
         <span class="admin-page-eyebrow">Workspace</span>
         <h2>Locations</h2>
-        <p>Maintain the places used by shifts and control which organisation each location belongs to.</p>
+        <p>Maintain the places used by shifts and share one location across any number of organisations without creating duplicates.</p>
       </div>
       <div class="admin-page-actions">
         <span class="admin-summary-pill" id="locationCountSummary">${locations.length} location${locations.length === 1 ? '' : 's'}</span>
@@ -3873,7 +4119,7 @@ async function renderLocationsPanel() {
     <div id="locOrgTabBar" class="admin-filter-strip"></div>
     <div class="card admin-table-card">
       <div class="table-wrap"><table>
-        <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Organisation</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Address</th><th>Colour</th><th>Organisations</th><th>Actions</th></tr></thead>
         <tbody id="locsBody"></tbody>
       </table></div>
     </div>`
@@ -3884,14 +4130,14 @@ async function renderLocationsPanel() {
 function renderLocOrgTabs() {
   const bar = document.getElementById('locOrgTabBar')
   if (!bar) return
-  const orgsWithLocs = orgs.filter(o => locations.some(l => l.org_id === o.id))
-  const hasUnassigned = locations.some(l => !l.org_id)
+  const orgsWithLocs = orgs.filter(o => locations.some(l => _locationOrgIds(l).includes(o.id)))
+  const hasUnassigned = locations.some(l => _locationOrgIds(l).length === 0)
   if (orgsWithLocs.length === 0 && !hasUnassigned) { bar.style.display = 'none'; return }
   bar.style.display = 'flex'
 
   const tabs = [{ key: 'all', label: 'All', count: locations.length }]
-  if (hasUnassigned) tabs.push({ key: 'unassigned', label: 'No Organisation', count: locations.filter(l => !l.org_id).length })
-  orgsWithLocs.forEach(o => tabs.push({ key: o.id, label: o.name, count: locations.filter(l => l.org_id === o.id).length }))
+  if (hasUnassigned) tabs.push({ key: 'unassigned', label: 'Workspace-wide', count: locations.filter(l => _locationOrgIds(l).length === 0).length })
+  orgsWithLocs.forEach(o => tabs.push({ key: o.id, label: o.name, count: locations.filter(l => _locationOrgIds(l).includes(o.id)).length }))
 
   if (!tabs.find(t => t.key === activeLocOrgTab)) activeLocOrgTab = 'all'
 
@@ -3916,33 +4162,60 @@ function renderLocsTable() {
   if (summary) summary.textContent = `${locations.length} location${locations.length === 1 ? '' : 's'}`
   if (!locations.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No locations yet</td></tr>'; return }
   let visible = locations
-  if (activeLocOrgTab === 'unassigned') visible = locations.filter(l => !l.org_id)
-  else if (activeLocOrgTab !== 'all') visible = locations.filter(l => l.org_id === activeLocOrgTab)
+  if (activeLocOrgTab === 'unassigned') visible = locations.filter(l => _locationOrgIds(l).length === 0)
+  else if (activeLocOrgTab !== 'all') visible = locations.filter(l => _locationOrgIds(l).includes(activeLocOrgTab))
   if (!visible.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:24px">No locations in this organisation</td></tr>'; return }
-  tbody.innerHTML = visible.map(l => `<tr>
+  tbody.innerHTML = visible.map(l => {
+    const linkedOrgs = _locationOrganisations(l)
+    return `<tr>
     <td style="font-weight:600">${escHtml(l.name)}</td>
     <td style="color:var(--text-3)">${l.address ? escHtml(l.address) : '—'}</td>
     <td>${renderInlineColourSwatch(l.color, { size: 20, title: pickColourValue(l.color) || 'No colour' })}</td>
-    <td>${l.org_name ? `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(l.org_name)}</span>` : '<span style="font-size:12px;color:var(--text-3)">Open to all</span>'}</td>
+    <td>${linkedOrgs.length
+      ? `<div class="location-org-badges">${linkedOrgs.map(org => `<span class="badge badge-gray" style="white-space:nowrap">${escHtml(org.name)}</span>`).join('')}</div>`
+      : '<span style="font-size:12px;color:var(--text-3)">Workspace-wide</span>'}</td>
     <td><div style="display:flex;gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="openEditLoc('${l.id}')">Edit</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteLoc('${l.id}','${escHtml(l.name).replace(/'/g,"\\'")}')">Delete</button>
     </div></td>
-  </tr>`).join('')
+  </tr>`
+  }).join('')
 }
 
-function _populateLocOrgSelect(selectedOrgId) {
-  const sel = document.getElementById('lOrg')
-  if (!sel) return
-  sel.innerHTML = '<option value="">— None (visible to all) —</option>' +
-    orgs.map(o => `<option value="${o.id}" ${o.id === selectedOrgId ? 'selected' : ''}>${escHtml(o.name)}</option>`).join('')
+function _locationOrgIds(location) {
+  if (Array.isArray(location?.organisation_ids)) return location.organisation_ids.filter(Boolean)
+  if (Array.isArray(location?.organisations)) return location.organisations.map(org => typeof org === 'string' ? org : org?.id).filter(Boolean)
+  return location?.org_id ? [location.org_id] : []
+}
+
+function _locationOrganisations(location) {
+  if (Array.isArray(location?.organisations)) {
+    return location.organisations
+      .map(org => typeof org === 'string' ? orgs.find(candidate => candidate.id === org) : org)
+      .filter(org => org?.id && org?.name)
+  }
+  return _locationOrgIds(location).map(id => orgs.find(org => org.id === id)).filter(Boolean)
+}
+
+function _populateLocOrgOptions(selectedOrgIds = []) {
+  const container = document.getElementById('lOrgOptions')
+  if (!container) return
+  const selected = new Set(selectedOrgIds)
+  container.innerHTML = orgs.length
+    ? orgs.map(org => `
+      <label class="settings-multi-option">
+        <input type="checkbox" value="${org.id}" ${selected.has(org.id) ? 'checked' : ''}>
+        <span class="settings-multi-option-dot" style="background:${resolveColourValue(org.color, '#64748b')}"></span>
+        <span>${escHtml(org.name)}</span>
+      </label>`).join('')
+    : '<div class="settings-multi-empty">Create an organisation first, or leave this location workspace-wide.</div>'
 }
 function openCreateLoc() {
   editingLocId = null; locColour = '#4f46e5'
   document.getElementById('locModalTitle').textContent = 'Add Location'
   document.getElementById('lName').value = ''
   document.getElementById('lAddress').value = ''
-  _populateLocOrgSelect(null)
+  _populateLocOrgOptions([])
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
   setTimeout(() => document.getElementById('lName')?.focus(), 50)
@@ -3953,7 +4226,7 @@ function openEditLoc(id) {
   document.getElementById('locModalTitle').textContent = 'Edit Location'
   document.getElementById('lName').value = l.name
   document.getElementById('lAddress').value = l.address || ''
-  _populateLocOrgSelect(l.org_id || null)
+  _populateLocOrgOptions(_locationOrgIds(l))
   setupLocColour()
   document.getElementById('locModal').classList.add('open')
   setTimeout(() => { const input = document.getElementById('lName'); input?.focus(); input?.select() }, 50)
@@ -3966,8 +4239,15 @@ function setupLocColour() {
 async function saveLoc() {
   const name = document.getElementById('lName').value.trim()
   if (!name) { toast('Name required', 'error'); return }
-  const org_id = document.getElementById('lOrg').value || null
-  const body = { name, address: document.getElementById('lAddress').value.trim() || null, color: locColour, org_id }
+  const organisation_ids = Array.from(document.querySelectorAll('#lOrgOptions input[type="checkbox"]:checked')).map(input => input.value)
+  const body = {
+    name,
+    address: document.getElementById('lAddress').value.trim() || null,
+    color: locColour,
+    organisation_ids,
+    // Preserve the legacy single-organisation field for older server/mobile clients.
+    org_id: organisation_ids[0] || null,
+  }
   try {
     if (editingLocId) await api(`/api/locations/${editingLocId}`, { method: 'PUT', body })
     else await api('/api/locations', { method: 'POST', body })
@@ -4003,7 +4283,7 @@ function openLocationMembersModal(locId) {
           ${_avatarHTML(u, 'md')}
           <div style="min-width:0">
             <div style="font-weight:600;font-size:13px">${escHtml(u.name)}</div>
-            <div style="font-size:11px;color:var(--text-3)">${escHtml(u.email)} &middot; <span style="text-transform:capitalize">${u.role === 'shift_lead' ? 'Shift Lead' : u.role === 'manager' ? 'Manager' : u.role}</span></div>
+            <div style="font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;flex-wrap:wrap">${escHtml(u.email)} ${roleBadgeForUser(u)}</div>
           </div>
         </label>`).join('')
     : '<p style="font-size:13px;color:var(--text-3);padding:8px 0">No members or shift leads to assign.</p>'
