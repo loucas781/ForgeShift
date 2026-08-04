@@ -559,6 +559,11 @@ function migrateTeams() {
 // Additive: holiday override storage (safe on existing DBs)
 function migrateHolidays() {
   const db = require('./connection')
+  const preferenceCols = db.prepare('PRAGMA table_info(app_preferences)').all().map(c => c.name)
+  if (!preferenceCols.includes('updated_at')) {
+    db.exec("ALTER TABLE app_preferences ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
+    console.log('✓ Added updated_at column to app_preferences')
+  }
   db.prepare(`
     INSERT OR IGNORE INTO app_preferences (key, value, updated_at)
     VALUES ('holiday_overrides', '{}', datetime('now'))
