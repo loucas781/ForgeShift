@@ -110,6 +110,7 @@ function validateTemplatePayload(body) {
 
 // ── GET /api/templates ────────────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
+  if (!hasPermission(req, 'view_templates') && !hasPermission(req, 'manage_templates')) return res.status(403).json({ error: 'You do not have permission to view templates.' })
   let templates
 
   if (req.user.role === 'admin' || req.user.role === 'manager' || hasPermission(req, 'manage_templates')) {
@@ -143,6 +144,7 @@ router.get('/', requireAuth, (req, res) => {
 
 // ── GET /api/templates/:id ────────────────────────────────────────────────────
 router.get('/:id', requireAuth, (req, res) => {
+  if (!hasPermission(req, 'view_templates') && !hasPermission(req, 'manage_templates')) return res.status(403).json({ error: 'You do not have permission to view templates.' })
   const template = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(req.params.id)
   if (!template) return res.status(404).json({ error: 'Template not found' })
   const serialized = serializeTemplate(template)
