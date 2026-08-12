@@ -13,6 +13,7 @@ const { hasPermission } = require('../utils/roles')
 // Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
 router.get('/lists', requireAuth, (req, res) => {
   try {
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     let lists
     if (req.user.role === 'admin' || hasPermission(req, 'manage_tasks')) {
       lists = db.prepare(`
@@ -125,6 +126,7 @@ router.delete('/lists/:id', requireAuth, requirePermission('manage_tasks'), (req
 // ── GET /api/tasks/assignments ────────────────────────────────────────────────
 router.get('/assignments', requireAuth, (req, res) => {
   try {
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     const { start, end, user_id, org_id, team_id } = req.query
     let sql = `
       SELECT a.*, u.name as user_name, u.initials as user_initials, u.color as user_color,

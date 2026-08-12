@@ -1,59 +1,40 @@
 # Changelog
 
+## 2026-08-12
+
+- Added section-level view permissions for Calendar, Shifts, Tasks, Templates, Teams, Locations, Organisations and Settings.
+- Added organisation-scoped team and user visibility for custom roles, with permissions shared through the existing web and mobile API payloads.
+- Added permission-aware navigation so users only see the workspace sections available to them.
+- Added `sectionAccess` to the configuration response so native clients can adapt navigation without a new API route or breaking contract.
+- Kept existing role permissions and mobile endpoints backward-compatible while enforcing view access for shifts, tasks, templates, locations and organisations.
+
 ## 2026-08-04
 
-- Added custom roles with selectable colours and granular rota, shift, task, template, team, location, organisation, user, settings, audit, backup and holiday permissions; Member, Shift Lead, Manager, Admin and the system Inactive role remain protected.
-- Added role metadata and permissions to authenticated web/mobile API payloads, permission-aware navigation and controls, accurate privacy-safe role assignment counts, and safeguards preventing delegated managers from granting or managing access above their own.
-- Added multi-organisation locations with backwards-compatible `org_id` responses, organisation-aware visibility, Settings multi-select controls, migration backfill and backup/restore support.
-- Changed inactive accounts to move automatically into the Inactive role, revoke existing sessions, retain their previous role, and restore that role when re-enabled.
-- Hardened role-aware rota exports, iCal feeds, user-directory projections and shift/template mutations so custom read/write permissions are enforced consistently without changing the 36-route native mobile contract.
-- Fixed the collapsed Search & Filters control being auto-placed into the mobile navigation grid on extra-small screens, restoring the intended title, calendar navigation, date, filter and summary rows.
-- Fixed version metadata remaining stale in long-running development processes by reading the current version file for runtime responses and disabling config caching; compacted icon-only calendar view buttons so Agenda no longer leaves an empty label gap at smaller resolutions.
-- Prevented identical error toasts from stacking repeatedly, including repeated unavailable-role API messages while an older development server is being restarted.
-- Modernised the Your Profile page with a responsive two-column account layout, refreshed account header, elevated cards, and mobile-friendly spacing while preserving existing profile and security actions.
-- Hardened Proxmox update helpers to verify the running systemd service reports the same version as the updated checkout before declaring success.
-- Fixed startup migration failure for built-in roles by always binding the required `is_system` value when seeding Member, Shift Lead, Manager, Admin, and Inactive roles.
-- Added a compatibility migration for older `app_preferences` tables that predate the `updated_at` column used by holiday settings.
-- Hardened legacy task-assignment and roles upgrades when older databases lack newer columns, and now report the exact migration stage and stack when startup migration fails.
-- Made built-in role seeding recover safely from partially migrated users tables by creating missing legacy and role-link columns before backfilling accounts.
-- Fixed role backfill SQL treating an empty string as an identifier, which caused SQLite to report `no such column:` during startup.
-- Removed the obsolete npm `--unsafe-perm` option from Proxmox install and update helpers to avoid warnings and future npm incompatibility.
-- Fixed narrow desktop calendar toolbar overlap when the shift details panel is open by switching to a calendar-width-aware three-column layout; made Templates organisation filters deterministic; added complete role/catalogue fallbacks so protected roles retain their permissions when either roles endpoint is unavailable; aligned built-in role colours with ForgeShift's established Member, Shift Lead, Manager, and Admin palette across web and native API clients; removed the outdated Preferences/Agenda `New` markers; and bumped the API catalogue contract to v2.
+- Added custom roles with selectable colours and granular permissions. Built-in roles remain protected.
+- Added multi-organisation locations and automatic handling of inactive accounts.
+- Added a View organisation team members permission for custom roles, with web and mobile team visibility limited to the organisations the user belongs to and without exposing private account details.
+- Added role-aware permissions across the web app and native mobile API, including safer rota, user, shift and export access.
+- Added an administrator API Reference with the v2 endpoint catalogue; all existing mobile routes remain compatible.
+- Modernised the calendar toolbar, profile page, Settings pages, templates, dialogs and responsive navigation.
+- Improved theme-aware branding and readability across Light, Dark, OLED and mobile layouts.
+- Fixed narrow-screen calendar overlap, search/filter layout, template filters, role fallbacks and repeated error notifications.
+- Fixed startup migrations for older databases, including roles, task assignments, holiday preferences and SQLite empty-string handling.
+- Hardened Proxmox updates and removed the obsolete npm `--unsafe-perm` option.
 
 ## 2026-08-01
 
-- Fixed the mobile shift-details flow moving the outer Safari viewport and hiding the ForgeShift navigation by preserving calendar scroll position and using no-scroll focus restoration.
-- Added consistent spacing between task-list cards in the shift and day detail panel across desktop and mobile.
-- Replaced the always-expanded mobile search and filter shelf with a compact accessible disclosure that defaults closed, shows the active-filter count, expands for the `/` shortcut, and leaves the desktop search workflow unchanged.
+- Fixed mobile shift details hiding the navigation and added spacing between task lists.
+- Made mobile Search & Filters collapsible while keeping desktop search unchanged.
 
 ## 2026-07-30
 
-- Fixed the mobile calendar being cut off and unable to scroll by giving the page one touch-friendly vertical scroller, allowing readable Month rows to extend naturally, and retaining the fitted non-scrolling calendar layout on desktop.
+- Fixed mobile calendar scrolling and clipping while keeping the desktop Month view fitted and non-scrolling.
 
 ## 2026-07-29
 
-- Modernised every custom Settings dialog with contextual headers, clearer hierarchy, theme-safe form surfaces, responsive actions and accessible dialog labelling; refined Location and Task List editors into responsive field grids and brought the legacy password-reset popup into the shared dialog system.
-- Fixed Organisation Edit and Delete actions failing when their inline button markup embedded an organisation name, and made both actions resolve the current organisation safely by ID.
-- Modernised popup menus across Calendar, Templates, Settings, and Profile with a consistent theme-safe backdrop, elevated dialog shell, clearer headers, roomier controls, and pinned responsive actions; rebuilt the template editor as grouped details and responsive day cards so it no longer relies on a sprawling horizontal scroller.
-- Restored the complete non-scrolling Month view while keeping busy dates contained through viewport-fitted week rows, compact mobile indicators, and day-panel overflow actions.
-- Fixed modern Month view rows collapsing around task, coverage, and shift content, which allowed shift chips to render underneath the following calendar row.
-- Modernised Month, Week, and Agenda calendars across desktop and mobile with a calmer responsive toolbar, card-based month days, clearer current-day and weekend treatments, roomier shift chips, a refined week timeline, streamlined mobile overflow, polished agenda rows, and theme-safe loading/detail surfaces.
-- Centred repeat-day button labels throughout the shift editor so weekday controls remain visually balanced at every responsive width.
-- Modernised shift creation, shift editing, and task assignment with contextual headers, card-based sections, clearer scheduling controls, refined status choices, cleaner day pickers, responsive action bars, and more useful date/week context.
-- Centralised theme-aware ForgeShift artwork so topbar, Settings About, authentication pages, every favicon variant, Apple touch icons, browser theme colour, and PWA manifests all stay in sync across Light, Dark, OLED, System, OS-driven, and cross-tab theme changes.
-- Modernised the complete authentication journey with a responsive split-screen presentation, clearer form hierarchy, larger controls, improved recovery states, and a focused mobile layout for sign-in, sign-up, forgot-password, and reset-password screens.
-- Audited Light, Dark, and OLED styling across the web app; defined missing shared colour aliases, added accessible theme-specific brand and status colours, and corrected unreadable success, warning, active-control, and destructive-action treatments.
-- Added an administrator-only API Reference in Settings with a live catalogue of every available endpoint, method and access level, plus search, method filters, mobile-route filtering, and copyable URLs.
-- Added a mobile API contract guard covering 36 native-client routes; the admin catalogue is additive and existing endpoint methods, paths, handlers, and response shapes remain unchanged.
-- Reworked Settings into grouped Personal, Workspace, and System navigation with a responsive sidebar, cleaner admin page headers, calmer record rows, more consistent action placement, refined data tables, and roomier editing dialogs.
-- Polished the calendar toolbar with a compact filter shelf, a dedicated search treatment, and a `/` shortcut that focuses calendar search without letting the field dominate the full toolbar width.
-- Added clearly scoped `NEW` markers in Settings for the recently introduced Agenda preference, including a Preferences navigation cue and the Agenda choice itself.
-- Enlarged the shift and task assignment editors on desktop, introduced a two-column shift layout where space allows, and improved the task dialog with accessible day controls, focus trapping, and focus restoration.
-- Refreshed the calendar UI with responsive scope, location, type, search, and date controls; a seven-day Agenda view; clearer daily and period coverage summaries; improved shift overflow details; and a more structured shift editor with live duration, previous-day copying, and remembered session defaults.
-- Added Agenda as a saved default calendar view and improved calendar accessibility with complete tab semantics, keyboard navigation, focus restoration, larger mobile controls, visible focus states, and reduced-motion support.
-- Made CSV downloads match the currently displayed calendar filters and corrected keyboard activation, empty-state transitions, editor focus handoff, and overnight daily coverage in the refreshed views.
-- Hardened calendar data loading and rendering: parallel, latest-request-wins loading with recoverable errors; escaped calendar, shell, and iCal preview values; correct adjacent-year holidays; and non-stacking drag listeners.
-- Reduced SSE event payloads to event metadata and fixed the `/calendar.html` alias.
-- Added shift date/time validation, overnight CSV duration handling, and clear duplicate-date conflicts on update.
-- Restricted member shift/task reads and user directory reads to authorised scopes.
-- Removed the obsolete version bump script, unused `ical-generator` dependency and stale tech-stack label, plus dead tracked backup/metadata artifacts.
+- Modernised calendars, shift/task editors, templates, Settings dialogs, authentication screens and popup menus.
+- Added responsive calendar views, Agenda, improved accessibility, keyboard navigation and reduced-motion support.
+- Added theme-safe logos, status colours and form surfaces across the application.
+- Added the administrator API Reference and mobile API contract checks.
+- Improved calendar filtering, CSV exports, shift validation, task visibility and organisation editing.
+- Removed unused dependencies, obsolete scripts and stale tracked metadata.

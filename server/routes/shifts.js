@@ -58,7 +58,7 @@ router.get('/', requireAuth, (req, res) => {
         params.push(...scope)
       }
     } else {
-      if (!hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'You do not have permission to view a rota.' })
+      if (!hasPermission(req, 'view_shifts') && !hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'You do not have permission to view shifts.' })
       if (user_id && user_id !== req.user.id) return res.status(403).json({ error: 'You can only view your own shifts.' })
       sql += ' AND s.user_id = ?'; params.push(req.user.id)
     }
@@ -139,7 +139,7 @@ router.get('/:id', requireAuth, (req, res) => {
     return res.json(shift)
   }
   if (shift.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' })
-  if (!hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'Forbidden' })
+  if (!hasPermission(req, 'view_shifts') && !hasPermission(req, 'view_own_rota')) return res.status(403).json({ error: 'Forbidden' })
   res.json(shift)
 })
 

@@ -5,8 +5,16 @@ const db = require('../db/connection')
 // Keep permission identifiers stable: they are persisted in custom role JSON and
 // consumed by both the web and native clients.
 const PERMISSION_CATALOG = [
+  { key: 'view_calendar', label: 'View calendar', category: 'Workspace' },
+  { key: 'view_shifts', label: 'View shifts', category: 'Workspace' },
+  { key: 'view_tasks', label: 'View tasks', category: 'Workspace' },
+  { key: 'view_templates', label: 'View shift templates', category: 'Workspace' },
   { key: 'view_own_rota', label: 'View own rota', category: 'Rota' },
   { key: 'view_other_rotas', label: 'View other users’ rotas', category: 'Rota' },
+  { key: 'view_teams', label: 'View organisation team members', category: 'Teams' },
+  { key: 'view_locations', label: 'View locations', category: 'Workspace' },
+  { key: 'view_organisations', label: 'View organisations', category: 'Workspace' },
+  { key: 'view_settings', label: 'View settings', category: 'Workspace' },
   { key: 'add_own_shifts', label: 'Add own shifts', category: 'Shifts' },
   { key: 'edit_own_shifts', label: 'Edit own shifts', category: 'Shifts' },
   { key: 'delete_own_shifts', label: 'Delete own shifts', category: 'Shifts' },
@@ -30,15 +38,15 @@ const ALL_PERMISSIONS = PERMISSION_CATALOG.map(p => p.key)
 const BUILTIN = {
   member: {
     id: 'builtin-member', name: 'Member', color: '#059669', is_builtin: 1,
-    permissions: ['view_own_rota'],
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_settings', 'view_own_rota'],
   },
   shift_lead: {
     id: 'builtin-shift-lead', name: 'Shift Lead', color: '#2563eb', is_builtin: 1,
-    permissions: ['view_own_rota', 'view_other_rotas', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_tasks', 'manage_teams'],
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_teams', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_tasks', 'manage_teams'],
   },
   manager: {
     id: 'builtin-manager', name: 'Manager', color: '#d97706', is_builtin: 1,
-    permissions: ['view_own_rota', 'view_other_rotas', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_tasks', 'manage_templates', 'manage_teams'],
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_tasks', 'manage_templates', 'manage_teams'],
   },
   admin: {
     id: 'builtin-admin', name: 'Admin', color: '#4f46e5', is_builtin: 1,

@@ -43,6 +43,7 @@ function setOrganisationIds(locationId, ids) {
 // Others: locations with no members (open to all) + locations they're a member of.
 router.get('/', requireAuth, (req, res) => {
   try {
+    if (!hasPermission(req, 'view_locations') && !hasPermission(req, 'manage_locations')) return res.status(403).json({ error: 'You do not have permission to view locations.' })
     if (req.user.role === 'admin' || hasPermission(req, 'manage_locations')) {
       const locs = db.prepare(`
         SELECT l.*, o.name AS org_name

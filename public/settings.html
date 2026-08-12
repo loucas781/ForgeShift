@@ -1192,8 +1192,16 @@ let settingsModalObserver = null
 // upgraded. These values intentionally mirror server/utils/roles.js so a
 // partial roles API response can never make protected roles appear empty.
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
+  { key:'view_calendar', label:'View calendar', category:'Workspace' },
+  { key:'view_shifts', label:'View shifts', category:'Workspace' },
+  { key:'view_tasks', label:'View tasks', category:'Workspace' },
+  { key:'view_templates', label:'View shift templates', category:'Workspace' },
   { key:'view_own_rota', label:'View own rota', category:'Rota' },
   { key:'view_other_rotas', label:'View other users’ rotas', category:'Rota' },
+  { key:'view_teams', label:'View organisation team members', category:'Teams' },
+  { key:'view_locations', label:'View locations', category:'Workspace' },
+  { key:'view_organisations', label:'View organisations', category:'Workspace' },
+  { key:'view_settings', label:'View settings', category:'Workspace' },
   { key:'add_own_shifts', label:'Add own shifts', category:'Shifts' },
   { key:'edit_own_shifts', label:'Edit own shifts', category:'Shifts' },
   { key:'delete_own_shifts', label:'Delete own shifts', category:'Shifts' },
@@ -1213,9 +1221,9 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'manage_holidays', label:'Manage holidays', category:'Administration' },
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
-  { id:'builtin-member', name:'Member', color:'#059669', permissions:['view_own_rota'], is_builtin:true, is_system:false },
-  { id:'builtin-shift-lead', name:'Shift Lead', color:'#2563eb', permissions:['view_own_rota','view_other_rotas','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-manager', name:'Manager', color:'#d97706', permissions:['view_own_rota','view_other_rotas','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_templates','manage_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-member', name:'Member', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
+  { id:'builtin-shift-lead', name:'Shift Lead', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_templates','manage_teams'], is_builtin:true, is_system:false },
   { id:'builtin-admin', name:'Admin', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
   { id:'system-inactive', name:'Inactive', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
@@ -1399,13 +1407,13 @@ async function init() {
     { id: 'my-teams', label: 'My Teams', roles: ['shift_lead'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
-    { id: 'team', label: 'Team', roles: ['admin','manager'], permissions: ['manage_users','manage_teams'],
+    { id: 'team', label: 'Team', roles: ['admin','manager'], permissions: ['view_teams','manage_users','manage_teams'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
     { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: ['admin'], permission: 'manage_roles',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>' },
-    { id: 'organisations', label: 'Organisations', roles: ['admin'], permission: 'manage_organisations',
+    { id: 'organisations', label: 'Organisations', roles: ['admin'], permissions: ['view_organisations','manage_organisations'],
       icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
-    { id: 'locations', label: 'Locations', roles: ['admin'], permission: 'manage_locations',
+    { id: 'locations', label: 'Locations', roles: ['admin'], permissions: ['view_locations','manage_locations'],
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
     { id: 'features', label: 'Features', roles: ['admin'], permission: 'manage_settings',
       icon: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>' },
@@ -1467,14 +1475,16 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  const canViewTeamPanel = isAdmin || isManager || hasPermission('manage_users') || hasPermission('manage_teams')
-  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_teams','manage_locations','manage_organisations','manage_tasks','view_other_rotas'].some(hasPermission)
+  const canViewTeamPanel = isAdmin || isManager || hasPermission('view_teams') || hasPermission('manage_users') || hasPermission('manage_teams')
+  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_teams','manage_locations','manage_organisations','manage_tasks','view_other_rotas','view_teams'].some(hasPermission)
   const canViewRoles = isAdmin || hasPermission('manage_roles')
   const canManageOrganisations = isAdmin || hasPermission('manage_organisations')
   const canManageLocations = isAdmin || hasPermission('manage_locations')
+  const canViewOrganisations = canManageOrganisations || hasPermission('view_organisations')
+  const canViewLocations = canManageLocations || hasPermission('view_locations')
   if (canLoadUsers || canViewRoles) await loadUsers()
-  if (canManageLocations) await loadLocations()
-  if (canManageOrganisations || canManageLocations) await loadOrgs()
+  if (canViewLocations) await loadLocations()
+  if (canViewOrganisations || canViewLocations) await loadOrgs()
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
   // Wire password indicator for Edit User modal
@@ -1485,8 +1495,8 @@ async function init() {
     isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
     canViewTeamPanel ? renderTeamPanel() : Promise.resolve(),
     canViewRoles ? renderRolesPanel() : Promise.resolve(),
-    canManageOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
-    canManageLocations ? renderLocationsPanel() : Promise.resolve(),
+    canViewOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
+    canViewLocations ? renderLocationsPanel() : Promise.resolve(),
     (isAdmin || hasPermission('manage_settings')) ? renderFeaturesPanel() : Promise.resolve(),
     renderSecurityPanel(),
     (isAdmin || hasPermission('manage_settings')) ? renderEmailPanel() : Promise.resolve(),
@@ -2855,7 +2865,7 @@ function renderTeamListFiltered() {
         ${_avatarHTML(u)}
         <div style="min-width:0">
           <div class="team-member-name">${u.name} ${u.id===cfg.user.id?'<span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>
-          <div class="team-member-email" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${u.email} ${roleBadgeForUser(u)}</div>
+          <div class="team-member-email" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${u.email || 'Organisation member'} ${roleBadgeForUser(u)}</div>
         </div>
       </div>
       <div class="team-member-status" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -3987,7 +3997,7 @@ async function renderOrganisationsPanel() {
       </div>
       <div class="admin-page-actions">
         <span class="admin-summary-pill" id="orgCountSummary">${orgs.length} organisation${orgs.length === 1 ? '' : 's'}</span>
-        <button class="btn btn-primary btn-sm" onclick="openCreateOrgModal()">+ Create organisation</button>
+        ${hasPermission('manage_organisations') ? '<button class="btn btn-primary btn-sm" onclick="openCreateOrgModal()">+ Create organisation</button>' : ''}
       </div>
     </div>
     <div class="card">
@@ -4211,7 +4221,7 @@ async function renderLocationsPanel() {
       </div>
       <div class="admin-page-actions">
         <span class="admin-summary-pill" id="locationCountSummary">${locations.length} location${locations.length === 1 ? '' : 's'}</span>
-        <button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add location</button>
+        ${hasPermission('manage_locations') ? '<button class="btn btn-primary btn-sm" onclick="openCreateLoc()">+ Add location</button>' : ''}
       </div>
     </div>
     <div id="locOrgTabBar" class="admin-filter-strip"></div>

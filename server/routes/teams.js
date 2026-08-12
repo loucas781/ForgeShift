@@ -33,7 +33,9 @@ router.get('/', requireAuth, (req, res) => {
   const { role, id: userId } = req.user
   let teams
 
-  if (role === 'admin' || role === 'manager' || (role !== 'shift_lead' && hasPermission(req.user, 'manage_teams'))) {
+  const canManageAllTeams = role === 'admin' || role === 'manager' || (role !== 'shift_lead' && hasPermission(req.user, 'manage_teams'))
+  const canViewOrganisationTeams = role !== 'shift_lead' && hasPermission(req.user, 'view_teams')
+  if (canManageAllTeams) {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
@@ -51,6 +53,17 @@ router.get('/', requireAuth, (req, res) => {
          OR t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
       GROUP BY t.id ORDER BY t.name
     `).all(userId, userId, userId, userId)
+  } else if (canViewOrganisationTeams) {
+    // Custom roles with view_teams can see teams and members only inside
+    // organisations they belong to. They receive no management capability.
+    teams = db.prepare(`
+      SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
+             COUNT(tm.user_id) AS member_count
+      FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
+      WHERE t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
+         OR t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
+      GROUP BY t.id ORDER BY t.name
+    `).all(userId, userId)
   } else {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,

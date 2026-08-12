@@ -50,6 +50,7 @@ function serializeUser(user, req) {
 function canListUsers(req) {
   return [
     'view_other_rotas',
+    'view_teams',
     'add_other_shifts',
     'edit_other_shifts',
     'delete_other_shifts',
@@ -61,9 +62,24 @@ function canListUsers(req) {
   ]
     .some(permission => hasPermission(req, permission))
 }
+
+function getOrganisationUserScope(req) {
+  if (!hasPermission(req, 'view_teams') || req.user.role === 'admin' || req.user.role === 'manager') return null
+  const visibleIds = new Set([req.user.id])
+  db.prepare(`
+    SELECT DISTINCT om2.user_id
+    FROM organisation_members om1
+    JOIN organisation_members om2 ON om2.org_id = om1.org_id
+    WHERE om1.user_id = ?
+  `).all(req.user.id).forEach(row => visibleIds.add(row.user_id))
+  return visibleIds
+}
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
 function canViewUser(req, userId) {
+  if (hasPermission(req, 'view_teams') && req.user.role !== 'admin' && req.user.role !== 'manager') {
+    return getOrganisationUserScope(req)?.has(userId) || userId === req.user.id
+  }
   if (canListUsers(req)) return true
   if (req.user.role === 'shift_lead') return getShiftLeadScope(req.user.id).has(userId)
   return userId === req.user.id
@@ -73,7 +89,9 @@ function canViewUser(req, userId) {
 // Supports optional ?limit=N&offset=N pagination. Without these params returns all users.
 router.get('/', requireAuth, (req, res) => {
   res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
-  const visibleIds = (req.user.role === 'shift_lead') ? getShiftLeadScope(req.user.id) : null
+  const visibleIds = (req.user.role === 'shift_lead')
+    ? getShiftLeadScope(req.user.id)
+    : getOrganisationUserScope(req)
   const isPrivileged = canListUsers(req) && req.user.role !== 'shift_lead'
   if (!isPrivileged && req.user.role !== 'shift_lead') {
     const user = db.prepare(

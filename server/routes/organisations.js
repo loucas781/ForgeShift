@@ -15,6 +15,7 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 // Others: orgs they belong to (name + id only).
 router.get('/', requireAuth, (req, res) => {
   try {
+    if (!hasPermission(req, 'view_organisations') && !hasPermission(req, 'manage_organisations')) return res.status(403).json({ error: 'You do not have permission to view organisations.' })
     const canManageOrganisations = req.user.role === 'admin' || hasPermission(req, 'manage_organisations')
     const needsOrganisationOptions = req.user.role === 'manager' || [
       'manage_locations',
