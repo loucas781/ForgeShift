@@ -2,9 +2,17 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db = require('../db/connection')
-const { requireAuth, requirePermission } = require('../middleware/auth')
+const { requireAuth } = require('../middleware/auth')
 const audit = require('../audit')
 const { hasPermission } = require('../utils/roles')
+
+function canManageTeams(userOrReq) {
+  return hasPermission(userOrReq, 'manage_teams') || hasPermission(userOrReq, 'manage_own_teams') || hasPermission(userOrReq, 'manage_all_teams')
+}
+function requireTeamManagement(req, res, next) {
+  if (!canManageTeams(req)) return res.status(403).json({ error: 'Insufficient permissions', permission: 'manage_teams' })
+  next()
+}
 
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
@@ -12,7 +20,11 @@ const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00
 function canManageTeam(user, team) {
   if (user.role === 'admin' || user.role === 'manager') return true
   if (user.role === 'shift_lead') return team.owned_by === user.id || team.created_by === user.id
-  return hasPermission(user, 'manage_teams')
+  if (hasPermission(user, 'manage_all_teams') || hasPermission(user, 'manage_teams')) return true
+  if (hasPermission(user, 'manage_own_teams')) {
+    return team.owned_by === user.id || team.created_by === user.id || !!db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
+  }
+  return false
 }
 
 // Can this user add/remove members from the team?
@@ -24,7 +36,11 @@ function canManageMembers(user, team, db) {
     const row = db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
     return !!row
   }
-  return hasPermission(user, 'manage_teams')
+  if (hasPermission(user, 'manage_all_teams') || hasPermission(user, 'manage_teams')) return true
+  if (hasPermission(user, 'manage_own_teams')) {
+    return team.owned_by === user.id || team.created_by === user.id || !!db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
+  }
+  return false
 }
 
 // ── GET /api/teams ────────────────────────────────────────────────────────────
@@ -33,8 +49,8 @@ router.get('/', requireAuth, (req, res) => {
   const { role, id: userId } = req.user
   let teams
 
-  const canManageAllTeams = role === 'admin' || role === 'manager' || (role !== 'shift_lead' && hasPermission(req.user, 'manage_teams'))
-  const canViewOrganisationTeams = role !== 'shift_lead' && hasPermission(req.user, 'view_teams')
+  const canManageAllTeams = role === 'admin' || role === 'manager' || (role !== 'shift_lead' && (hasPermission(req.user, 'manage_all_teams') || hasPermission(req.user, 'manage_teams')))
+  const canViewOrganisationTeams = role !== 'shift_lead' && (hasPermission(req.user, 'view_teams') || hasPermission(req.user, 'manage_own_teams'))
   if (canManageAllTeams) {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
@@ -56,14 +72,21 @@ router.get('/', requireAuth, (req, res) => {
   } else if (canViewOrganisationTeams) {
     // Custom roles with view_teams can see teams and members only inside
     // organisations they belong to. They receive no management capability.
+    const orgTeamClause = hasPermission(req.user, 'view_teams')
+      ? 't.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)'
+      : '0'
+    const ownedTeamClause = hasPermission(req.user, 'manage_own_teams')
+      ? '(t.owned_by = ? OR t.created_by = ?)'
+      : '0'
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
              COUNT(tm.user_id) AS member_count
       FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
-      WHERE t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
+      WHERE (${orgTeamClause})
          OR t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
+         OR ${ownedTeamClause}
       GROUP BY t.id ORDER BY t.name
-    `).all(userId, userId)
+    `).all(...(hasPermission(req.user, 'view_teams') ? [userId] : []), userId, ...(hasPermission(req.user, 'manage_own_teams') ? [userId, userId] : []))
   } else {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
@@ -109,8 +132,59 @@ router.get('/', requireAuth, (req, res) => {
   res.json(teams)
 })
 
+// ── GET /api/teams/:id/members — list members for native clients ─────────────
+// The iOS Team screen uses this as a fallback when a teams response does not
+// include embedded members. Keep the same visibility rules as GET /api/teams.
+router.get('/:id/members', requireAuth, (req, res) => {
+  const team = db.prepare('SELECT id, org_id, owned_by, created_by FROM teams WHERE id = ?').get(req.params.id)
+  if (!team) return res.status(404).json({ error: 'Team not found' })
+
+  const { role, id: userId } = req.user
+  let visible = role === 'admin' || role === 'manager' || hasPermission(req.user, 'manage_teams')
+  if (!visible && role === 'shift_lead') {
+    visible = team.owned_by === userId || team.created_by === userId || !!db.prepare(
+      'SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?'
+    ).get(team.id, userId) || !!db.prepare(
+      'SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?'
+    ).get(team.org_id, userId)
+  }
+  if (!visible && hasPermission(req.user, 'view_teams')) {
+    visible = !!db.prepare(
+      'SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?'
+    ).get(team.org_id, userId) || !!db.prepare(
+      'SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?'
+    ).get(team.id, userId)
+  }
+  if (!visible) {
+    visible = !!db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, userId)
+  }
+  if (!visible) return res.status(403).json({ error: 'You do not have access to this team' })
+
+  const members = db.prepare(`
+    SELECT u.id, u.name, u.initials, u.color, u.avatar, u.role, u.role_id,
+           r.name AS role_name, r.color AS role_color, u.is_active
+    FROM team_members tm
+    JOIN users u ON u.id = tm.user_id
+    LEFT JOIN roles r ON r.id = u.role_id
+    WHERE tm.team_id = ?
+    ORDER BY u.name
+  `).all(team.id)
+  res.json(members.map(member => ({
+    id: member.id,
+    name: member.name,
+    initials: member.initials,
+    color: member.color,
+    avatar: member.avatar,
+    role: member.role,
+    role_id: member.role_id,
+    role_name: member.role_name,
+    role_color: member.role_color,
+    is_active: member.is_active,
+  })))
+})
+
 // ── POST /api/teams — create (admin or manager only) ─────────────────────────
-router.post('/', requireAuth, requirePermission('manage_teams'), (req, res) => {
+router.post('/', requireAuth, requireTeamManagement, (req, res) => {
   const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
 
@@ -126,7 +200,7 @@ router.post('/', requireAuth, requirePermission('manage_teams'), (req, res) => {
 })
 
 // ── PATCH /api/teams/:id — rename / recolour / reassign org ──────────────────
-router.patch('/:id', requireAuth, requirePermission('manage_teams'), (req, res) => {
+router.patch('/:id', requireAuth, requireTeamManagement, (req, res) => {
   const { name, color, org_id } = req.body
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
@@ -143,7 +217,7 @@ router.patch('/:id', requireAuth, requirePermission('manage_teams'), (req, res) 
 })
 
 // ── DELETE /api/teams/:id ─────────────────────────────────────────────────────
-router.delete('/:id', requireAuth, requirePermission('manage_teams'), (req, res) => {
+router.delete('/:id', requireAuth, requireTeamManagement, (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageTeam(req.user, team)) return res.status(403).json({ error: 'You can only delete your own teams' })
@@ -153,7 +227,7 @@ router.delete('/:id', requireAuth, requirePermission('manage_teams'), (req, res)
 })
 
 // ── PUT /api/teams/:id/members — replace full member list ─────────────────────
-router.put('/:id/members', requireAuth, requirePermission('manage_teams'), (req, res) => {
+router.put('/:id/members', requireAuth, requireTeamManagement, (req, res) => {
   const { user_ids } = req.body
   if (!Array.isArray(user_ids)) return res.status(400).json({ error: 'user_ids must be an array' })
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
@@ -177,7 +251,7 @@ router.put('/:id/members', requireAuth, requirePermission('manage_teams'), (req,
 })
 
 // ── POST /api/teams/:id/members/:userId ───────────────────────────────────────
-router.post('/:id/members/:userId', requireAuth, requirePermission('manage_teams'), (req, res) => {
+router.post('/:id/members/:userId', requireAuth, requireTeamManagement, (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageMembers(req.user, team, db)) return res.status(403).json({ error: 'You can only manage members of your own teams' })
@@ -194,7 +268,7 @@ router.post('/:id/members/:userId', requireAuth, requirePermission('manage_teams
 })
 
 // ── DELETE /api/teams/:id/members/:userId ─────────────────────────────────────
-router.delete('/:id/members/:userId', requireAuth, requirePermission('manage_teams'), (req, res) => {
+router.delete('/:id/members/:userId', requireAuth, requireTeamManagement, (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageMembers(req.user, team, db)) return res.status(403).json({ error: 'You can only manage members of your own teams' })

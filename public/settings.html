@@ -1198,6 +1198,8 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_templates', label:'View shift templates', category:'Workspace' },
   { key:'view_own_rota', label:'View own rota', category:'Rota' },
   { key:'view_other_rotas', label:'View other users’ rotas', category:'Rota' },
+  { key:'view_team_rotas', label:'View team rotas', category:'Rota', scope:'Organisation/team members only' },
+  { key:'view_all_rotas', label:'View all rotas', category:'Rota', scope:'All active users' },
   { key:'view_teams', label:'View organisation team members', category:'Teams' },
   { key:'view_locations', label:'View locations', category:'Workspace' },
   { key:'view_organisations', label:'View organisations', category:'Workspace' },
@@ -1208,9 +1210,15 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'add_other_shifts', label:'Add shifts for other users', category:'Shifts' },
   { key:'edit_other_shifts', label:'Edit shifts for other users', category:'Shifts' },
   { key:'delete_other_shifts', label:'Delete shifts for other users', category:'Shifts' },
+  { key:'manage_team_shifts', label:'Manage shifts for your teams', category:'Shifts', scope:'Organisation/team members only' },
+  { key:'manage_all_shifts', label:'Manage all shifts', category:'Shifts', scope:'All active users' },
   { key:'manage_tasks', label:'Manage tasks and assignments', category:'Administration' },
+  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Administration', scope:'Organisation/team members only' },
+  { key:'manage_all_tasks', label:'Manage all tasks', category:'Administration', scope:'All active users' },
   { key:'manage_templates', label:'Manage shift templates', category:'Administration' },
   { key:'manage_teams', label:'Manage teams', category:'Administration' },
+  { key:'manage_own_teams', label:'Manage assigned teams', category:'Administration', scope:'Owned or assigned teams' },
+  { key:'manage_all_teams', label:'Manage all teams', category:'Administration', scope:'All teams' },
   { key:'manage_locations', label:'Manage locations', category:'Administration' },
   { key:'manage_organisations', label:'Manage organisations', category:'Administration' },
   { key:'manage_users', label:'Manage users', category:'Administration' },
@@ -1222,8 +1230,8 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
   { id:'builtin-member', name:'Member', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
-  { id:'builtin-shift-lead', name:'Shift Lead', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-manager', name:'Manager', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_tasks','manage_templates','manage_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-shift-lead', name:'Shift Lead', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_all_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_all_shifts','manage_tasks','manage_all_tasks','manage_templates','manage_teams','manage_all_teams'], is_builtin:true, is_system:false },
   { id:'builtin-admin', name:'Admin', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
   { id:'system-inactive', name:'Inactive', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
@@ -1263,6 +1271,7 @@ function hasPermission(permission) {
   }
   return Array.isArray(permissions) && permissions.includes(permission)
 }
+function canManageTeams() { return hasPermission('manage_teams') || hasPermission('manage_own_teams') || hasPermission('manage_all_teams') }
 
 function roleForUser(user) {
   if (!user) return null
@@ -1404,10 +1413,10 @@ async function init() {
     { id: 'preferences', label: 'Preferences', roles: ['admin','manager','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
-    { id: 'my-teams', label: 'My Teams', roles: ['shift_lead'],
+    { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams',
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
-    { id: 'team', label: 'Team', roles: ['admin','manager'], permissions: ['view_teams','manage_users','manage_teams'],
+    { id: 'team', label: 'People & Teams', roles: ['admin','manager'], permissions: ['view_teams','manage_users','manage_teams'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
     { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: ['admin'], permission: 'manage_roles',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>' },
@@ -1475,8 +1484,8 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  const canViewTeamPanel = isAdmin || isManager || hasPermission('view_teams') || hasPermission('manage_users') || hasPermission('manage_teams')
-  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_teams','manage_locations','manage_organisations','manage_tasks','view_other_rotas','view_teams'].some(hasPermission)
+  const canViewTeamPanel = isAdmin || isManager || hasPermission('view_teams') || hasPermission('manage_users') || canManageTeams()
+  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','view_other_rotas','view_teams'].some(hasPermission)
   const canViewRoles = isAdmin || hasPermission('manage_roles')
   const canManageOrganisations = isAdmin || hasPermission('manage_organisations')
   const canManageLocations = isAdmin || hasPermission('manage_locations')
@@ -1492,7 +1501,7 @@ async function init() {
   await Promise.all([
     renderAppearancePanel(),
     renderPreferencesPanel(),
-    isShiftLead ? renderMyTeamsPanel() : Promise.resolve(),
+    hasPermission('view_teams') ? renderMyTeamsPanel() : Promise.resolve(),
     canViewTeamPanel ? renderTeamPanel() : Promise.resolve(),
     canViewRoles ? renderRolesPanel() : Promise.resolve(),
     canViewOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
@@ -2262,14 +2271,14 @@ async function regenerateIcal() {
 // ── Team panel ─────────────────────────────────────────────────────────────────
 let settingsTeams = []
 
-// ── My Teams panel (shift_lead) ────────────────────────────────────────────────
+// ── My Team panel (view_teams) ────────────────────────────────────────────────
 let myTeams = []
 let editingMyTeamId = null
 
 async function renderMyTeamsPanel() {
   const el = document.getElementById('panel-my-teams')
   el.innerHTML = `
-    <h2 style="font-size:18px;font-weight:800;margin-bottom:4px">My Teams</h2>
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:4px">My Team</h2>
     <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">View the teams you have been assigned to. You can assign shifts to members of your teams from the Calendar.</p>
     <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:20px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="flex-shrink:0;margin-top:1px;color:var(--blue)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -2303,7 +2312,7 @@ function renderMyTeamsList() {
           <span class="badge badge-gray">${t.member_count} member${t.member_count !== 1 ? 's' : ''}</span>
           ${!isOwner ? '<span class="badge badge-gray" style="opacity:0.7">Assigned by admin</span>' : ''}
         </div>
-        ${isOwner ? `<div style="display:flex;gap:4px">
+        ${isOwner && canManageTeams() ? `<div style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick="openEditMyTeam('${t.id}')">Edit</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMyTeam('${t.id}','${t.name}')">Delete</button>
         </div>` : ''}
@@ -2315,10 +2324,10 @@ function renderMyTeamsList() {
             `<div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 4px">
               ${_avatarHTML(m, 'sm')}
               <span style="font-size:12px;font-weight:500">${m.name}</span>
-              ${!isShiftLead || (m.id !== cfg.user.id && m.role !== 'shift_lead') ? `<button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>` : ''}
+              ${canManageTeams() && (!isShiftLead || (m.id !== cfg.user.id && m.role !== 'shift_lead')) ? `<button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>` : ''}
             </div>`
           ).join('')}
-          <button class="btn btn-ghost btn-sm" onclick="openAddMember('${t.id}')" style="border-style:dashed">+ Add member</button>
+          ${canManageTeams() ? `<button class="btn btn-ghost btn-sm" onclick="openAddMember('${t.id}')" style="border-style:dashed">+ Add member</button>` : ''}
         </div>
       </div>
     </div>`
@@ -2501,7 +2510,7 @@ async function renderTeamPanel() {
           </div>
         </div>
 
-        ${hasPermission('manage_teams') ? `<div style="margin-top:32px">
+        ${canManageTeams() ? `<div style="margin-top:32px">
           <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Teams</h2>
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">
             Optional. Create a team to group users — members can then filter the calendar by team to view and manage everyone's shifts in one view.
@@ -2625,7 +2634,7 @@ async function renderTeamPanel() {
     </div>`
 
   renderTeamList()
-  if (hasPermission('manage_teams')) await loadSettingsTeams()
+  if (canManageTeams()) await loadSettingsTeams()
 
   // Pre-fill CSV date range (current month)
   const now   = new Date()
@@ -2663,6 +2672,9 @@ async function renderRolesPanel() {
   if (!el) return
   const assignedCounts = Object.fromEntries(roles.map(role => [role.id, Number(role.assigned_count || 0)]))
   const permissionLabels = Object.fromEntries(rolePermissionCatalog.map(item => [item.key, item.label]))
+  const knownRoleIds = new Set(roles.map(role => role.id))
+  const legacyRoleNames = new Set(['admin', 'manager', 'shift_lead', 'member', 'inactive'])
+  const unresolvedUsers = users.filter(user => user.is_active && ((!user.role_id && !legacyRoleNames.has(user.role)) || (user.role_id && !knownRoleIds.has(user.role_id))))
   el.innerHTML = `
     <div class="admin-page-header">
       <div class="admin-page-heading">
@@ -2670,7 +2682,7 @@ async function renderRolesPanel() {
         <h2>Roles &amp; permissions</h2>
         <p>Build roles around exactly what a person needs to see or change. Role colours follow users across the web and mobile API.</p>
       </div>
-      <div class="admin-page-actions"><button class="btn btn-primary" onclick="openRoleModal()">+ Create role</button></div>
+      <div class="admin-page-actions"><button class="btn btn-secondary" onclick="openRoleComparison()">Compare roles</button><button class="btn btn-primary" onclick="openRoleModal()">+ Create role</button></div>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-body" style="display:flex;align-items:flex-start;gap:12px">
@@ -2678,6 +2690,14 @@ async function renderRolesPanel() {
         <div><strong style="font-size:13px">Built-in roles stay protected</strong><p style="margin:4px 0 0;color:var(--text-3);font-size:12px;line-height:1.55">Member, Shift Lead, Manager and Admin cannot be deleted. Inactive is a system role used automatically while an account is disabled.</p></div>
       </div>
     </div>
+    ${unresolvedUsers.length ? `<div class="card" style="margin-bottom:16px;border-color:color-mix(in srgb,var(--orange) 55%,var(--border))">
+      <div class="card-body" style="display:flex;align-items:flex-start;gap:12px">
+        <span aria-hidden="true" style="font-size:18px">⚠️</span>
+        <div><strong style="font-size:13px">${unresolvedUsers.length} user${unresolvedUsers.length === 1 ? '' : 's'} need role review</strong>
+          <p style="margin:4px 0 0;color:var(--text-3);font-size:12px;line-height:1.55">These accounts have a missing or unknown role assignment and may be falling back to Member permissions: ${unresolvedUsers.slice(0, 5).map(user => escHtml(user.name || user.email || user.id)).join(', ')}${unresolvedUsers.length > 5 ? '…' : ''}</p>
+        </div>
+      </div>
+    </div>` : ''}
     <div class="role-card-grid">
       ${roles.map(role => {
         const colour = resolveColourValue(role.color, '#64748b')
@@ -2702,6 +2722,27 @@ async function renderRolesPanel() {
         </article>`
       }).join('')}
     </div>`
+}
+
+function openRoleComparison() {
+  document.getElementById('roleCompareModal')?.remove()
+  const options = roles.map(role => `<option value="${escHtml(role.id)}">${escHtml(role.name)}</option>`).join('')
+  const modal = document.createElement('div')
+  modal.className = 'modal-overlay'; modal.id = 'roleCompareModal'
+  modal.innerHTML = `<div class="modal" style="max-width:820px"><div class="modal-header"><h3 class="modal-title">Compare roles</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button></div><div class="modal-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><select class="form-select" id="compareRoleA" onchange="renderRoleComparison()">${options}</select><select class="form-select" id="compareRoleB" onchange="renderRoleComparison()">${options}</select></div><div id="roleCompareBody"></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Close</button></div></div>`
+  document.body.appendChild(modal); modal.classList.add('open')
+  const custom = roles.find(role => !role.is_builtin && !role.is_system)
+  if (custom) document.getElementById('compareRoleB').value = custom.id
+  renderRoleComparison()
+}
+
+function renderRoleComparison() {
+  const a = roles.find(role => role.id === document.getElementById('compareRoleA')?.value) || roles[0]
+  const b = roles.find(role => role.id === document.getElementById('compareRoleB')?.value) || roles[1]
+  if (!a || !b) return
+  const aSet = new Set(a.permissions || []), bSet = new Set(b.permissions || [])
+  const keys = rolePermissionCatalog.map(permission => permission.key)
+  document.getElementById('roleCompareBody').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Permission</th><th>${escHtml(a.name)}</th><th>${escHtml(b.name)}</th></tr></thead><tbody>${keys.map(key => { const permission = rolePermissionCatalog.find(p => p.key === key); const label = permission?.label || key; const scope = permission?.scope ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px">${escHtml(permission.scope)}</div>` : ''; return `<tr><td>${escHtml(label)}${scope}</td><td>${aSet.has(key) ? '✓' : '—'}</td><td>${bSet.has(key) ? '✓' : '—'}</td></tr>` }).join('')}</tbody></table></div>`
 }
 
 function openRoleModal(id = null) {
@@ -5283,6 +5324,14 @@ const AUDIT_ACTION_META = {
   'location.create':         { icon: '📍', label: 'Location created' },
   'location.update':         { icon: '📍', label: 'Location updated' },
   'location.delete':         { icon: '🗑️', label: 'Location deleted' },
+  'location.members_updated': { icon: '📍', label: 'Location members updated' },
+  'org.create':              { icon: '🏢', label: 'Organisation created' },
+  'org.update':              { icon: '🏢', label: 'Organisation updated' },
+  'org.delete':              { icon: '🗑️', label: 'Organisation deleted' },
+  'org.members_update':      { icon: '🏢', label: 'Organisation members updated' },
+  'role.create':             { icon: '🛡️', label: 'Role created' },
+  'role.update':             { icon: '🛡️', label: 'Role updated' },
+  'role.delete':             { icon: '🗑️', label: 'Role deleted' },
   'template.create':         { icon: '📋', label: 'Template created' },
   'template.update':         { icon: '📋', label: 'Template updated' },
   'template.delete':         { icon: '🗑️', label: 'Template deleted' },

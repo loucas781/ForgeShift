@@ -54,6 +54,7 @@ const MOBILE_API_CONTRACT = [
   'DELETE /api/shifts/:id',
   'GET /api/locations',
   'GET /api/teams',
+  'GET /api/teams/:id/members',
   'GET /api/organisations',
   'GET /api/templates',
   'GET /api/templates/:id',
@@ -124,6 +125,7 @@ const SUMMARY_OVERRIDES = new Map([
   ['DELETE /api/shifts/:id', 'Delete a shift'],
   ['GET /api/locations', 'List locations visible to the account'],
   ['GET /api/teams', 'List teams visible to the account'],
+  ['GET /api/teams/:id/members', 'List members for a visible team'],
   ['GET /api/tasks/lists', 'List visible task lists'],
   ['GET /api/tasks/assignments', 'List visible task assignments'],
 ])
