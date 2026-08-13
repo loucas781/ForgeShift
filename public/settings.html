@@ -977,6 +977,8 @@
     .role-permission-group h4 { margin:0 0 9px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
     .role-permission-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .role-permission-option { display:flex; gap:9px; align-items:flex-start; padding:9px; border-radius:var(--r-sm); background:var(--surface-2); font-size:12px; color:var(--text-2); cursor:pointer; }
+    .role-permission-option-copy { display:grid; gap:2px; min-width:0; }
+    .role-permission-option-copy small { color:var(--text-3); font-size:10px; line-height:1.35; }
     .role-permission-option input { margin-top:1px; accent-color:var(--brand); }
     .role-badge-inline { display:inline-flex; align-items:center; gap:6px; border:1px solid currentColor; border-radius:999px; padding:3px 8px; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; }
     .location-org-badges { display:flex; flex-wrap:wrap; gap:5px; }
@@ -1197,7 +1199,7 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_tasks', label:'View tasks', category:'Workspace' },
   { key:'view_templates', label:'View shift templates', category:'Workspace' },
   { key:'view_own_rota', label:'View own rota', category:'Rota' },
-  { key:'view_other_rotas', label:'View other users’ rotas', category:'Rota' },
+  { key:'view_other_rotas', label:'View other users’ rotas', description:'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category:'Legacy', legacy:true },
   { key:'view_team_rotas', label:'View team rotas', category:'Rota', scope:'Organisation/team members only' },
   { key:'view_all_rotas', label:'View all rotas', category:'Rota', scope:'All active users' },
   { key:'view_teams', label:'View organisation team members', category:'Teams' },
@@ -2777,7 +2779,7 @@ function openRoleModal(id = null) {
         <div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(true)">Select all</button><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(false)">Clear</button></div>
       </div>
       <div class="role-permission-groups">
-        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span>${escHtml(permission.label)}</span></label>`).join('')}</div></section>`).join('')}
+        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}${category === 'Legacy' ? ' <span style="font-weight:600;letter-spacing:0;text-transform:none">(compatibility only)</span>' : ''}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span class="role-permission-option-copy"><span>${escHtml(permission.label)}</span>${permission.description ? `<small>${escHtml(permission.description)}</small>` : ''}${permission.scope ? `<small>Scope: ${escHtml(permission.scope)}</small>` : ''}</span></label>`).join('')}</div></section>`).join('')}
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('roleModal').remove()">Cancel</button><button class="btn btn-primary" onclick="saveRole()">${role ? 'Save changes' : 'Create role'}</button></div>
