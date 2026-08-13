@@ -2,6 +2,7 @@
 
 ## 2026-08-13
 
+- Aligned the development release metadata back to the 2.1.3 development line.
 - Added descriptions for every role permission and separated legacy compatibility permissions into a clearly labelled Legacy section.
 - Restored the development release metadata to the 2.1.3 line to match staging.
 - Restored built-in role descriptions when older or partially migrated role APIs return empty descriptions.
