@@ -14,6 +14,10 @@
 - Added scope descriptions to role comparison so administrators can distinguish team-level and global access.
 - Removed duplicated task-route permission middleware in favour of one shared capability check.
 - Applied the new assigned-team and all-team permissions to team management endpoints while preserving the legacy `manage_teams` permission.
+- Changed Manager defaults from global rota access to organisation/team-scoped rota viewing and editing; only Admin retains global rota permissions.
+- Made global rota visibility require the explicit `view_all_rotas` permission (or Admin), so legacy `view_other_rotas` cannot bypass organisation boundaries.
+- Separated Manager and Shift Lead rota permissions: Managers use organisation-level shift management, while Shift Leads use team-level shift management.
+- Added clear administrator-facing descriptions for Member, Shift Lead, Manager, Admin and Inactive roles.
 - Added the native Team screen’s member fallback endpoint (`GET /api/teams/:id/members`) with the same role and organisation visibility rules as the main teams feed.
 - Fixed Manager organisation views so assigned members are shown directly instead of appearing undefined.
 - Added a shared My Team view for any role with team-view permission, while keeping team editing controls restricted to team managers.

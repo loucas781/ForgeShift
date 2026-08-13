@@ -24,15 +24,21 @@ function isValidDate(value) {
 }
 function isValidTime(value) { return value == null || value === '' || TIME_RE.test(String(value)) }
 function canViewAllRotas(req) {
-  return hasPermission(req, 'view_all_rotas') || (hasPermission(req, 'view_other_rotas') && !hasPermission(req, 'view_team_rotas') && req.user.role !== 'shift_lead')
+  // Global rota visibility is deliberately explicit. The legacy
+  // view_other_rotas permission is retained for team-scoped compatibility but
+  // cannot by itself bypass organisation boundaries.
+  return req.user.role === 'admin' || hasPermission(req, 'view_all_rotas')
 }
 function isTeamScoped(req) {
   return req.user.role === 'shift_lead'
     || hasPermission(req, 'view_team_rotas')
     || hasPermission(req, 'manage_team_shifts')
+    || hasPermission(req, 'manage_org_shifts')
 }
 function getTeamScope(req) {
-  return req.user.role === 'shift_lead' ? getShiftLeadScope(req.user.id) : getOrganisationScope(req.user.id)
+  return req.user.role === 'shift_lead' && !hasPermission(req, 'manage_org_shifts')
+    ? getShiftLeadScope(req.user.id)
+    : getOrganisationScope(req.user.id)
 }
 
 // ── GET /api/shifts ───────────────────────────────────────────────────────────
@@ -157,10 +163,10 @@ router.get('/:id', requireAuth, (req, res) => {
 // ── POST /api/shifts ──────────────────────────────────────────────────────────
 router.post('/', requireAuth, (req, res) => {
   try {
-    const canAddOthers = hasPermission(req, 'add_other_shifts') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_all_shifts')
+    const canAddOthers = hasPermission(req, 'add_other_shifts') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts')
     const canAddOwn = hasPermission(req, 'add_own_shifts')
     const isShiftLead = req.user.role === 'shift_lead'
-    const teamScoped = hasPermission(req, 'manage_team_shifts') || isShiftLead
+    const teamScoped = hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || isShiftLead
     const globalShiftManagement = hasPermission(req, 'manage_all_shifts') || hasPermission(req, 'add_other_shifts')
     const { user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
 
@@ -222,7 +228,7 @@ router.put('/:id', requireAuth, (req, res) => {
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     if (!shift) return res.status(404).json({ error: 'Shift not found' })
 
-    const canEditOthers = hasPermission(req, 'edit_other_shifts') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_all_shifts')
+    const canEditOthers = hasPermission(req, 'edit_other_shifts') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts')
     const canEditOwn = hasPermission(req, 'edit_own_shifts')
     if (shift.user_id === req.user.id) {
       if (!canEditOwn) return res.status(403).json({ error: 'You do not have permission to edit your own shifts.' })
@@ -262,7 +268,7 @@ router.delete('/:id', requireAuth, (req, res) => {
     const shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     if (!shift) return res.status(404).json({ error: 'Shift not found' })
 
-    const canDeleteOthers = hasPermission(req, 'delete_other_shifts') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_all_shifts')
+    const canDeleteOthers = hasPermission(req, 'delete_other_shifts') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts')
     const canDeleteOwn = hasPermission(req, 'delete_own_shifts')
     if (shift.user_id === req.user.id) {
       if (!canDeleteOwn) return res.status(403).json({ error: 'You do not have permission to delete your own shifts.' })
