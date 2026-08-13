@@ -978,6 +978,8 @@
     .role-permission-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .role-permission-option { display:flex; gap:9px; align-items:flex-start; padding:9px; border-radius:var(--r-sm); background:var(--surface-2); font-size:12px; color:var(--text-2); cursor:pointer; }
     .role-permission-option input { margin-top:1px; accent-color:var(--brand); }
+    .role-permission-option-copy { display:grid; gap:2px; min-width:0; }
+    .role-permission-option-copy small { color:var(--text-3); font-size:10px; line-height:1.35; }
     .role-badge-inline { display:inline-flex; align-items:center; gap:6px; border:1px solid currentColor; border-radius:999px; padding:3px 8px; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; }
     .location-org-badges { display:flex; flex-wrap:wrap; gap:5px; }
 
@@ -1192,41 +1194,41 @@ let settingsModalObserver = null
 // upgraded. These values intentionally mirror server/utils/roles.js so a
 // partial roles API response can never make protected roles appear empty.
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
-  { key:'view_calendar', label:'View calendar', category:'Workspace' },
-  { key:'view_shifts', label:'View shifts', category:'Workspace' },
-  { key:'view_tasks', label:'View tasks', category:'Workspace' },
-  { key:'view_templates', label:'View shift templates', category:'Workspace' },
-  { key:'view_own_rota', label:'View own rota', category:'Rota' },
-  { key:'view_other_rotas', label:'View other users’ rotas', category:'Rota' },
-  { key:'view_team_rotas', label:'View team rotas', category:'Rota', scope:'Organisation/team members only' },
-  { key:'view_all_rotas', label:'View all rotas', category:'Rota', scope:'All active users' },
-  { key:'view_teams', label:'View organisation team members', category:'Teams' },
-  { key:'view_locations', label:'View locations', category:'Workspace' },
-  { key:'view_organisations', label:'View organisations', category:'Workspace' },
-  { key:'view_settings', label:'View settings', category:'Workspace' },
-  { key:'add_own_shifts', label:'Add own shifts', category:'Shifts' },
-  { key:'edit_own_shifts', label:'Edit own shifts', category:'Shifts' },
-  { key:'delete_own_shifts', label:'Delete own shifts', category:'Shifts' },
-  { key:'add_other_shifts', label:'Add shifts for other users', category:'Shifts' },
-  { key:'edit_other_shifts', label:'Edit shifts for other users', category:'Shifts' },
-  { key:'delete_other_shifts', label:'Delete shifts for other users', category:'Shifts' },
-  { key:'manage_team_shifts', label:'Manage shifts for your teams', category:'Shifts', scope:'Organisation/team members only' },
-  { key:'manage_all_shifts', label:'Manage all shifts', category:'Shifts', scope:'All active users' },
-  { key:'manage_tasks', label:'Manage tasks and assignments', category:'Administration' },
-  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Administration', scope:'Organisation/team members only' },
-  { key:'manage_all_tasks', label:'Manage all tasks', category:'Administration', scope:'All active users' },
-  { key:'manage_templates', label:'Manage shift templates', category:'Administration' },
-  { key:'manage_teams', label:'Manage teams', category:'Administration' },
-  { key:'manage_own_teams', label:'Manage assigned teams', category:'Administration', scope:'Owned or assigned teams' },
-  { key:'manage_all_teams', label:'Manage all teams', category:'Administration', scope:'All teams' },
-  { key:'manage_locations', label:'Manage locations', category:'Administration' },
-  { key:'manage_organisations', label:'Manage organisations', category:'Administration' },
-  { key:'manage_users', label:'Manage users', category:'Administration' },
-  { key:'manage_roles', label:'Manage roles', category:'Administration' },
-  { key:'manage_settings', label:'Manage settings', category:'Administration' },
-  { key:'view_audit', label:'View audit log', category:'Administration' },
-  { key:'manage_backups', label:'Manage backups', category:'Administration' },
-  { key:'manage_holidays', label:'Manage holidays', category:'Administration' },
+  { key:'view_calendar', label:'View calendar', description:'Open the calendar and switch between month, week and agenda views.', category:'Workspace' },
+  { key:'view_shifts', label:'View shifts', description:'Read shift details that the account is allowed to access.', category:'Workspace' },
+  { key:'view_tasks', label:'View tasks', description:'Read task lists and assigned task details within the account scope.', category:'Workspace' },
+  { key:'view_templates', label:'View shift templates', description:'Browse saved shift templates available to the account.', category:'Workspace' },
+  { key:'view_own_rota', label:'View own rota', description:'View the signed-in user’s own shifts and rota.', category:'Rota' },
+  { key:'view_other_rotas', label:'View other users’ rotas', description:'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category:'Legacy', legacy:true },
+  { key:'view_team_rotas', label:'View team rotas', description:'View rotas for members of the user’s assigned teams or organisation scope.', category:'Rota', scope:'Organisation/team members only' },
+  { key:'view_all_rotas', label:'View all rotas', description:'View rotas for every active user across the instance.', category:'Rota', scope:'All active users' },
+  { key:'view_teams', label:'View organisation team members', description:'See team membership and people in organisations the user can access.', category:'Teams' },
+  { key:'view_locations', label:'View locations', description:'Read configured work locations and their organisation links.', category:'Workspace' },
+  { key:'view_organisations', label:'View organisations', description:'Read organisation details and assigned members.', category:'Workspace' },
+  { key:'view_settings', label:'View settings', description:'Open the settings area permitted for the account.', category:'Workspace' },
+  { key:'add_own_shifts', label:'Add own shifts', description:'Create shifts for the signed-in user.', category:'Shifts' },
+  { key:'edit_own_shifts', label:'Edit own shifts', description:'Change shifts belonging to the signed-in user.', category:'Shifts' },
+  { key:'delete_own_shifts', label:'Delete own shifts', description:'Remove shifts belonging to the signed-in user.', category:'Shifts' },
+  { key:'add_other_shifts', label:'Add shifts for other users', description:'Create shifts for another user within the account scope.', category:'Shifts' },
+  { key:'edit_other_shifts', label:'Edit shifts for other users', description:'Change another user’s shifts within the account scope.', category:'Shifts' },
+  { key:'delete_other_shifts', label:'Delete shifts for other users', description:'Remove another user’s shifts within the account scope.', category:'Shifts' },
+  { key:'manage_team_shifts', label:'Manage shifts for your teams', description:'Add, edit and remove shifts for assigned teams.', category:'Shifts', scope:'Organisation/team members only' },
+  { key:'manage_all_shifts', label:'Manage all shifts', description:'Add, edit and remove shifts for any active user.', category:'Shifts', scope:'All active users' },
+  { key:'manage_tasks', label:'Manage tasks and assignments', description:'Create, edit and assign task lists within the account scope.', category:'Administration' },
+  { key:'manage_team_tasks', label:'Manage tasks for your teams', description:'Manage task lists and assignments for assigned teams.', category:'Administration', scope:'Organisation/team members only' },
+  { key:'manage_all_tasks', label:'Manage all tasks', description:'Manage task lists and assignments across the instance.', category:'Administration', scope:'All active users' },
+  { key:'manage_templates', label:'Manage shift templates', description:'Create, edit, apply and remove saved shift templates.', category:'Administration' },
+  { key:'manage_teams', label:'Manage teams', description:'Create and maintain teams and their membership.', category:'Administration' },
+  { key:'manage_own_teams', label:'Manage assigned teams', description:'Manage only teams assigned to or owned by the user.', category:'Administration', scope:'Owned or assigned teams' },
+  { key:'manage_all_teams', label:'Manage all teams', description:'Manage every team in the instance.', category:'Administration', scope:'All teams' },
+  { key:'manage_locations', label:'Manage locations', description:'Create, edit and remove work locations.', category:'Administration' },
+  { key:'manage_organisations', label:'Manage organisations', description:'Create, edit and manage organisation membership.', category:'Administration' },
+  { key:'manage_users', label:'Manage users', description:'Invite, edit, deactivate and assign roles to users.', category:'Administration' },
+  { key:'manage_roles', label:'Manage roles', description:'Create and maintain custom roles and their permissions.', category:'Administration' },
+  { key:'manage_settings', label:'Manage settings', description:'Change application and workspace settings.', category:'Administration' },
+  { key:'view_audit', label:'View audit log', description:'Read the record of administrative and security actions.', category:'Administration' },
+  { key:'manage_backups', label:'Manage backups', description:'Create, restore and manage application backups.', category:'Administration' },
+  { key:'manage_holidays', label:'Manage holidays', description:'Configure bank holidays and holiday overrides.', category:'Administration' },
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
   { id:'builtin-member', name:'Member', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
@@ -2775,7 +2777,7 @@ function openRoleModal(id = null) {
         <div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(true)">Select all</button><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(false)">Clear</button></div>
       </div>
       <div class="role-permission-groups">
-        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span>${escHtml(permission.label)}</span></label>`).join('')}</div></section>`).join('')}
+        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}${category === 'Legacy' ? ' <span style="font-weight:600;letter-spacing:0;text-transform:none">(compatibility only)</span>' : ''}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span class="role-permission-option-copy"><span>${escHtml(permission.label)}</span>${permission.description ? `<small>${escHtml(permission.description)}</small>` : ''}${permission.scope ? `<small>Scope: ${escHtml(permission.scope)}</small>` : ''}</span></label>`).join('')}</div></section>`).join('')}
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('roleModal').remove()">Cancel</button><button class="btn btn-primary" onclick="saveRole()">${role ? 'Save changes' : 'Create role'}</button></div>
