@@ -1874,7 +1874,7 @@ async function loadRoles() {
       try { permissions = JSON.parse(permissions || '[]') } catch { permissions = [] }
     }
     return fallback
-      ? { ...fallback, ...role, color:fallback.color, permissions:fallback.permissions.slice(), is_builtin:true, is_system:!!fallback.is_system }
+      ? { ...fallback, ...role, description: role?.description || fallback.description, color:fallback.color, permissions:fallback.permissions.slice(), is_builtin:true, is_system:!!fallback.is_system }
       : { ...role, permissions: Array.isArray(permissions) ? permissions : [] }
   })
   for (const fallback of BUILTIN_ROLE_FALLBACK) {

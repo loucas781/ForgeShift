@@ -2,6 +2,7 @@
 
 ## 2026-08-13
 
+- Restored built-in role descriptions when older or partially migrated role APIs return empty descriptions.
 - Restored the staging release candidate metadata to 2.1.3-rc.
 - Hardened task-list and template-group reads so view-only roles require the matching section permission and only receive groups assigned to them.
 - Added scoped role permissions for team rotas, all rotas, team shifts, all shifts, team tasks, all tasks, and team administration.
