@@ -39,4 +39,22 @@ function getShiftLeadScope(userId) {
   return ids
 }
 
-module.exports = { getShiftLeadScope }
+// Scope used by custom roles that explicitly receive team-level permissions.
+// It follows the same organisation-first, team-membership fallback as the
+// historical Shift Lead scope without depending on a literal role name.
+function getOrganisationScope(userId) {
+  const orgRows = db.prepare('SELECT org_id FROM organisation_members WHERE user_id = ?').all(userId)
+  if (orgRows.length) {
+    const placeholders = orgRows.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT DISTINCT user_id FROM organisation_members WHERE org_id IN (${placeholders})`).all(...orgRows.map(row => row.org_id))
+    const ids = new Set(rows.map(row => row.user_id)); ids.add(userId); return ids
+  }
+  const rows = db.prepare(`
+    SELECT DISTINCT tm2.user_id
+    FROM team_members tm1 JOIN team_members tm2 ON tm2.team_id = tm1.team_id
+    WHERE tm1.user_id = ?
+  `).all(userId)
+  const ids = new Set(rows.map(row => row.user_id)); ids.add(userId); return ids
+}
+
+module.exports = { getShiftLeadScope, getOrganisationScope }

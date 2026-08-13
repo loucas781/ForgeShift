@@ -10,6 +10,9 @@ const logger = require('../utils/logger')
 // ── GET /api/task-list-groups ─────────────────────────────────────────────────
 // Admin: all groups with full member details. Others: only groups they belong to.
 router.get('/', requireAuth, (req, res) => {
+  if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks')) {
+    return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+  }
   if (req.user.role !== 'admin' && !hasPermission(req, 'manage_tasks')) {
     const groups = db.prepare(`
       SELECT g.id, g.name, g.sort_order

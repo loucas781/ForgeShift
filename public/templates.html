@@ -198,7 +198,7 @@ function hasPermission(permission) {
 }
 function canManageTemplates() { return hasPermission('manage_templates') }
 function canApplyTemplates() { return canManageTemplates() || hasPermission('add_own_shifts') || hasPermission('add_other_shifts') }
-function canViewOtherRotas() { return hasPermission('view_other_rotas') }
+function canViewOtherRotas() { return hasPermission('view_all_rotas') || (hasPermission('view_other_rotas') && !hasPermission('view_team_rotas')) }
 
 function getTemplateType(value) {
   return value === TEMPLATE_TYPE_PATTERN ? TEMPLATE_TYPE_PATTERN : TEMPLATE_TYPE_WEEKLY

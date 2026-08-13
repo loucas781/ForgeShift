@@ -182,9 +182,9 @@ app.get('/api/config', optionalAuth, (req, res) => {
     platform:       process.platform,
     user,
     sectionAccess: user ? {
-      calendar: hasPermission(req, 'view_calendar') || hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota'),
-      shifts: hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota'),
-      tasks: hasPermission(req, 'view_tasks') || hasPermission(req, 'manage_tasks'),
+      calendar: hasPermission(req, 'view_calendar') || hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas'),
+      shifts: hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas'),
+      tasks: hasPermission(req, 'view_tasks') || hasPermission(req, 'manage_tasks') || hasPermission(req, 'manage_team_tasks') || hasPermission(req, 'manage_all_tasks'),
       templates: hasPermission(req, 'view_templates') || hasPermission(req, 'manage_templates'),
       teams: hasPermission(req, 'view_teams') || hasPermission(req, 'manage_teams'),
       locations: hasPermission(req, 'view_locations') || hasPermission(req, 'manage_locations'),

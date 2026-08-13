@@ -22,14 +22,37 @@ router.get('/', requireAuth, (req, res) => {
       'manage_templates',
       'manage_tasks',
       'manage_teams',
+      'view_teams',
+      'view_organisations',
     ].some(permission => hasPermission(req, permission))
 
     if (!canManageOrganisations && needsOrganisationOptions) {
-      const orgs = db.prepare(`
-        SELECT o.id, o.name, o.color
-        FROM organisations o
-        ORDER BY o.name
-      `).all()
+      const canViewAllOrganisationOptions = req.user.role === 'manager' || [
+        'manage_locations', 'manage_templates', 'manage_tasks', 'manage_teams'
+      ].some(permission => hasPermission(req, permission))
+      const orgs = canViewAllOrganisationOptions
+        ? db.prepare('SELECT o.id, o.name, o.color FROM organisations o ORDER BY o.name').all()
+        : db.prepare(`
+            SELECT o.id, o.name, o.color
+            FROM organisations o JOIN organisation_members om ON om.org_id = o.id
+            WHERE om.user_id = ? ORDER BY o.name
+          `).all(req.user.id)
+      if (hasPermission(req, 'view_teams') || hasPermission(req, 'manage_teams')) {
+        const ids = orgs.map(org => org.id)
+        const members = ids.length ? db.prepare(`
+          SELECT om.org_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.role_id,
+                 r.name AS role_name, r.color AS role_color, u.is_active
+          FROM organisation_members om JOIN users u ON u.id = om.user_id
+          LEFT JOIN roles r ON r.id = u.role_id
+          WHERE om.org_id IN (${ids.map(() => '?').join(',')}) ORDER BY u.name
+        `).all(...ids) : []
+        const byOrg = {}
+        members.forEach(member => {
+          if (!byOrg[member.org_id]) byOrg[member.org_id] = []
+          byOrg[member.org_id].push({ id: member.id, name: member.name, initials: member.initials, color: member.color, avatar: member.avatar, role: member.role, role_id: member.role_id, role_name: member.role_name, role_color: member.role_color, is_active: member.is_active })
+        })
+        orgs.forEach(org => { org.members = byOrg[org.id] || [] })
+      }
       return res.json(orgs)
     }
 
