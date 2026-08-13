@@ -24,6 +24,7 @@ const PERMISSION_CATALOG = [
   { key: 'edit_other_shifts', label: 'Edit shifts for other users', category: 'Shifts' },
   { key: 'delete_other_shifts', label: 'Delete shifts for other users', category: 'Shifts' },
   { key: 'manage_team_shifts', label: 'Manage shifts for your teams', category: 'Shifts', scope: 'Organisation/team members only' },
+  { key: 'manage_org_shifts', label: 'Manage shifts across your organisation', category: 'Shifts', scope: 'Organisation members only' },
   { key: 'manage_all_shifts', label: 'Manage all shifts', category: 'Shifts', scope: 'All active users' },
   { key: 'manage_tasks', label: 'Manage tasks and assignments', category: 'Administration' },
   { key: 'manage_team_tasks', label: 'Manage tasks for your teams', category: 'Administration', scope: 'Organisation/team members only' },
@@ -45,23 +46,23 @@ const ALL_PERMISSIONS = PERMISSION_CATALOG.map(p => p.key)
 
 const BUILTIN = {
   member: {
-    id: 'builtin-member', name: 'Member', color: '#059669', is_builtin: 1,
+    id: 'builtin-member', name: 'Member', description: 'Personal access to your own calendar, shifts, tasks and settings.', color: '#059669', is_builtin: 1,
     permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_settings', 'view_own_rota'],
   },
   shift_lead: {
-    id: 'builtin-shift-lead', name: 'Shift Lead', color: '#2563eb', is_builtin: 1,
+    id: 'builtin-shift-lead', name: 'Shift Lead', description: 'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color: '#2563eb', is_builtin: 1,
     permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_team_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_teams', 'manage_own_teams'],
   },
   manager: {
-    id: 'builtin-manager', name: 'Manager', color: '#d97706', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_all_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_all_shifts', 'manage_tasks', 'manage_all_tasks', 'manage_templates', 'manage_teams', 'manage_all_teams'],
+    id: 'builtin-manager', name: 'Manager', description: 'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color: '#d97706', is_builtin: 1,
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_org_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_templates', 'manage_teams', 'manage_own_teams'],
   },
   admin: {
-    id: 'builtin-admin', name: 'Admin', color: '#4f46e5', is_builtin: 1,
+    id: 'builtin-admin', name: 'Admin', description: 'Full instance access, including global rotas, users, roles, settings and backups.', color: '#4f46e5', is_builtin: 1,
     permissions: ALL_PERMISSIONS,
   },
   inactive: {
-    id: 'system-inactive', name: 'Inactive', color: '#6b7280', is_builtin: 1, is_system: 1,
+    id: 'system-inactive', name: 'Inactive', description: 'System role for disabled accounts. Cannot sign in until re-enabled.', color: '#6b7280', is_builtin: 1, is_system: 1,
     permissions: [],
   },
 }
@@ -108,8 +109,9 @@ function hasPermission(userOrReq, permission) {
 
 function serializeRole(role) {
   if (!role) return null
+  const builtin = Object.values(BUILTIN).find(item => item.id === role.id)
   return {
-    id: role.id, name: role.name, color: role.color,
+    id: role.id, name: role.name, description: role.description || builtin?.description || null, color: role.color,
     permissions: rolePermissions(role),
     is_builtin: !!role.is_builtin, is_system: !!role.is_system,
     deletable: !role.is_builtin && !role.is_system,
