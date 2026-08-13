@@ -2,6 +2,7 @@
 
 ## 2026-08-13
 
+- Restored the development release metadata to the 2.1.3 line to match staging.
 - Hardened task-list and template-group reads so view-only roles require the matching section permission and only receive groups assigned to them.
 - Added scoped role permissions for team rotas, all rotas, team shifts, all shifts, team tasks, all tasks, and team administration.
 - Updated the iOS built-in-role fallback catalogue so older servers and offline role data understand the new scopes.
