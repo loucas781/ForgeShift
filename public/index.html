@@ -357,17 +357,18 @@ function hasPermission(permission) {
   }
   return Array.isArray(permissions) && permissions.includes(permission)
 }
-function canViewOtherRotas() { return hasPermission('view_all_rotas') || (hasPermission('view_other_rotas') && !hasPermission('view_team_rotas')) }
-function canManageTasks() { return hasPermission('manage_tasks') }
+function canViewOtherRotas() { return ['view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) }
+function canManageTasks() { return ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission) }
 function canTargetOtherUsers() {
   return canViewOtherRotas() || ['add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)
 }
 function canManage() {
-  return ['add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)
+  return ['add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission)
 }
-function canAddShiftFor(userId = cfg?.user?.id) { return userId === cfg?.user?.id ? hasPermission('add_own_shifts') : hasPermission('add_other_shifts') }
-function canEditShift(shift) { return shift?.user_id === cfg?.user?.id ? hasPermission('edit_own_shifts') : hasPermission('edit_other_shifts') }
-function canDeleteShift(shift) { return shift?.user_id === cfg?.user?.id ? hasPermission('delete_own_shifts') : hasPermission('delete_other_shifts') }
+function canManageScopedShifts() { return ['manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) }
+function canAddShiftFor(userId = cfg?.user?.id) { return canManageScopedShifts() || (userId === cfg?.user?.id ? hasPermission('add_own_shifts') : hasPermission('add_other_shifts')) }
+function canEditShift(shift) { return canManageScopedShifts() || (shift?.user_id === cfg?.user?.id ? hasPermission('edit_own_shifts') : hasPermission('edit_other_shifts')) }
+function canDeleteShift(shift) { return canManageScopedShifts() || (shift?.user_id === cfg?.user?.id ? hasPermission('delete_own_shifts') : hasPermission('delete_other_shifts')) }
 function canAddShiftInCurrentScope() { return canAddShiftFor(getCalendarContextUserId()) }
 let prefs = null
 let view = 'month'

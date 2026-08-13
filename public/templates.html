@@ -197,8 +197,8 @@ function hasPermission(permission) {
   return Array.isArray(permissions) && permissions.includes(permission)
 }
 function canManageTemplates() { return hasPermission('manage_templates') }
-function canApplyTemplates() { return canManageTemplates() || hasPermission('add_own_shifts') || hasPermission('add_other_shifts') }
-function canViewOtherRotas() { return hasPermission('view_all_rotas') || (hasPermission('view_other_rotas') && !hasPermission('view_team_rotas')) }
+function canApplyTemplates() { return canManageTemplates() || ['add_own_shifts','add_other_shifts','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) }
+function canViewOtherRotas() { return ['view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) }
 
 function getTemplateType(value) {
   return value === TEMPLATE_TYPE_PATTERN ? TEMPLATE_TYPE_PATTERN : TEMPLATE_TYPE_WEEKLY

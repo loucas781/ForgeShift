@@ -1488,7 +1488,7 @@ async function init() {
 
   // Load data then populate
   const canViewTeamPanel = isAdmin || isManager || hasPermission('view_teams') || hasPermission('manage_users') || canManageTeams()
-  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','view_other_rotas','view_teams'].some(hasPermission)
+  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','manage_all_tasks','view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts','view_teams'].some(hasPermission)
   const canViewRoles = isAdmin || hasPermission('manage_roles')
   const canManageOrganisations = isAdmin || hasPermission('manage_organisations')
   const canManageLocations = isAdmin || hasPermission('manage_locations')
@@ -2526,7 +2526,7 @@ async function renderTeamPanel() {
           </div>
         </div>` : ''}
 
-        ${hasPermission('view_other_rotas') ? `<div style="margin-top:32px">
+        ${['view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) ? `<div style="margin-top:32px">
           <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Export Shifts</h2>
           <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Download shift data as a CSV file for reporting or integration with other tools.</p>
           <div class="card team-export-card">

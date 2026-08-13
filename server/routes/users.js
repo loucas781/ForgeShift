@@ -10,7 +10,7 @@ const path    = require('path')
 const multer  = require('multer')
 const logger  = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
-const { getShiftLeadScope } = require('../utils/scope')
+const { getShiftLeadScope, getOrganisationScope } = require('../utils/scope')
 const { BUILTIN, parsePermissions, hasPermission, canGrantRole, canManageUserRole } = require('../utils/roles')
 
 // ── Avatar upload storage ──────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ function getInitials(name) {
   return name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 function canViewFullUserDirectory(req) {
-  return ['admin', 'manager', 'shift_lead'].includes(req.user.role) || hasPermission(req, 'manage_users')
+  return req.user.role === 'admin' || hasPermission(req, 'manage_users')
 }
 function serializeUser(user, req) {
   if (!user) return user
@@ -50,12 +50,21 @@ function serializeUser(user, req) {
 function canListUsers(req) {
   return [
     'view_other_rotas',
+    'view_team_rotas',
+    'view_all_rotas',
     'view_teams',
     'add_other_shifts',
     'edit_other_shifts',
     'delete_other_shifts',
+    'manage_team_shifts',
+    'manage_org_shifts',
+    'manage_all_shifts',
+    'manage_team_tasks',
+    'manage_all_tasks',
     'manage_users',
     'manage_teams',
+    'manage_own_teams',
+    'manage_all_teams',
     'manage_locations',
     'manage_organisations',
     'manage_tasks',
@@ -63,36 +72,45 @@ function canListUsers(req) {
     .some(permission => hasPermission(req, permission))
 }
 
-function getOrganisationUserScope(req) {
-  if (!hasPermission(req, 'view_teams') || req.user.role === 'admin' || req.user.role === 'manager') return null
-  const visibleIds = new Set([req.user.id])
-  db.prepare(`
-    SELECT DISTINCT om2.user_id
-    FROM organisation_members om1
-    JOIN organisation_members om2 ON om2.org_id = om1.org_id
-    WHERE om1.user_id = ?
-  `).all(req.user.id).forEach(row => visibleIds.add(row.user_id))
-  return visibleIds
+function canListAllUsers(req) {
+  return req.user.role === 'admin' || [
+    'view_all_rotas',
+    'manage_all_shifts',
+    'manage_all_tasks',
+    'manage_all_teams',
+    'manage_tasks',
+    'manage_teams',
+    'manage_locations',
+    'manage_organisations',
+    'manage_users',
+  ].some(permission => hasPermission(req, permission))
+}
+
+function getVisibleUserScope(req) {
+  // Built-in Manager and Shift Lead remain organisation/team scoped even though
+  // they retain several legacy generic management permissions.
+  if (req.user.role === 'admin') return null
+  if (req.user.role === 'shift_lead') return getShiftLeadScope(req.user.id)
+  if (req.user.role === 'manager') return getOrganisationScope(req.user.id)
+  if (canListAllUsers(req)) return null
+  if (canListUsers(req)) return getOrganisationScope(req.user.id)
+  return new Set([req.user.id])
 }
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
 function canViewUser(req, userId) {
-  if (hasPermission(req, 'view_teams') && req.user.role !== 'admin' && req.user.role !== 'manager') {
-    return getOrganisationUserScope(req)?.has(userId) || userId === req.user.id
-  }
-  if (canListUsers(req)) return true
-  if (req.user.role === 'shift_lead') return getShiftLeadScope(req.user.id).has(userId)
-  return userId === req.user.id
+  if (userId === req.user.id) return true
+  if (!canListUsers(req)) return false
+  const visibleIds = getVisibleUserScope(req)
+  return visibleIds === null || visibleIds.has(userId)
 }
 // ── GET /api/users ────────────────────────────────────────────────────────────
 // Supports optional ?limit=N&offset=N pagination. Without these params returns all users.
 router.get('/', requireAuth, (req, res) => {
   res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
-  const visibleIds = (req.user.role === 'shift_lead')
-    ? getShiftLeadScope(req.user.id)
-    : getOrganisationUserScope(req)
-  const isPrivileged = canListUsers(req) && req.user.role !== 'shift_lead'
-  if (!isPrivileged && req.user.role !== 'shift_lead') {
+  const mayListUsers = canListUsers(req)
+  const visibleIds = mayListUsers ? getVisibleUserScope(req) : new Set([req.user.id])
+  if (!mayListUsers) {
     const user = db.prepare(
       `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
               r.name AS role_name, r.color AS role_color, r.permissions AS permissions,
