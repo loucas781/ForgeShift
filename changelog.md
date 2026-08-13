@@ -2,6 +2,10 @@
 
 ## 2026-08-13
 
+- Fixed custom rota, shift, task and team permissions across web and native API clients.
+- Fixed team-scoped and all-user rota permissions so the correct active users are returned to calendar selectors.
+- Added compatible nested task feature flags for native clients while preserving the existing API fields.
+- Removed inactive accounts from team member responses.
 - Aligned the development release metadata back to the 2.1.3 development line.
 - Added descriptions for every role permission and separated legacy compatibility permissions into a clearly labelled Legacy section.
 - Restored the development release metadata to the 2.1.3 line to match staging.

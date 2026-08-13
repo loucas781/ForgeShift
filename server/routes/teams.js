@@ -106,7 +106,7 @@ router.get('/', requireAuth, (req, res) => {
       FROM team_members tm
       JOIN users u ON u.id = tm.user_id
       LEFT JOIN roles r ON r.id = u.role_id
-      WHERE tm.team_id IN (${teamIds.map(() => '?').join(',')})
+      WHERE tm.team_id IN (${teamIds.map(() => '?').join(',')}) AND u.is_active = 1
       ORDER BY u.name
     `).all(...teamIds)
     const membersByTeam = {}
@@ -125,7 +125,10 @@ router.get('/', requireAuth, (req, res) => {
         is_active: m.is_active,
       })
     })
-    teams.forEach(t => { t.members = membersByTeam[t.id] || [] })
+    teams.forEach(t => {
+      t.members = membersByTeam[t.id] || []
+      t.member_count = t.members.length
+    })
   } else {
     teams.forEach(t => { t.members = [] })
   }
@@ -140,7 +143,7 @@ router.get('/:id/members', requireAuth, (req, res) => {
   if (!team) return res.status(404).json({ error: 'Team not found' })
 
   const { role, id: userId } = req.user
-  let visible = role === 'admin' || role === 'manager' || hasPermission(req.user, 'manage_teams')
+  let visible = role === 'admin' || role === 'manager' || hasPermission(req.user, 'manage_teams') || hasPermission(req.user, 'manage_all_teams')
   if (!visible && role === 'shift_lead') {
     visible = team.owned_by === userId || team.created_by === userId || !!db.prepare(
       'SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?'
@@ -166,7 +169,7 @@ router.get('/:id/members', requireAuth, (req, res) => {
     FROM team_members tm
     JOIN users u ON u.id = tm.user_id
     LEFT JOIN roles r ON r.id = u.role_id
-    WHERE tm.team_id = ?
+    WHERE tm.team_id = ? AND u.is_active = 1
     ORDER BY u.name
   `).all(team.id)
   res.json(members.map(member => ({

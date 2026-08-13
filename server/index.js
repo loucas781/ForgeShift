@@ -182,11 +182,11 @@ app.get('/api/config', optionalAuth, (req, res) => {
     platform:       process.platform,
     user,
     sectionAccess: user ? {
-      calendar: hasPermission(req, 'view_calendar') || hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas'),
-      shifts: hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas'),
+      calendar: hasPermission(req, 'view_calendar') || hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_other_rotas') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts'),
+      shifts: hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_other_rotas') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts'),
       tasks: hasPermission(req, 'view_tasks') || hasPermission(req, 'manage_tasks') || hasPermission(req, 'manage_team_tasks') || hasPermission(req, 'manage_all_tasks'),
       templates: hasPermission(req, 'view_templates') || hasPermission(req, 'manage_templates'),
-      teams: hasPermission(req, 'view_teams') || hasPermission(req, 'manage_teams'),
+      teams: hasPermission(req, 'view_teams') || hasPermission(req, 'manage_teams') || hasPermission(req, 'manage_own_teams') || hasPermission(req, 'manage_all_teams'),
       locations: hasPermission(req, 'view_locations') || hasPermission(req, 'manage_locations'),
       organisations: hasPermission(req, 'view_organisations') || hasPermission(req, 'manage_organisations'),
       settings: hasPermission(req, 'view_settings') || hasPermission(req, 'manage_settings'),
@@ -200,6 +200,10 @@ app.get('/api/config', optionalAuth, (req, res) => {
     inactivityTimeout:  overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
     featureTasks,
     featureDragDrop,
+    features: {
+      tasks: featureTasks,
+      dragDrop: featureDragDrop,
+    },
   })
 })
 

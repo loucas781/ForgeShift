@@ -294,13 +294,15 @@ function renderShell(cfg, activePage) {
     || _cfgHasPermission(cfg, 'view_calendar')
     || _cfgHasPermission(cfg, 'view_shifts')
     || _cfgHasPermission(cfg, 'view_own_rota')
+    || _cfgHasPermission(cfg, 'view_other_rotas')
     || _cfgHasPermission(cfg, 'view_team_rotas')
     || _cfgHasPermission(cfg, 'view_all_rotas')
+    || _cfgHasPermission(cfg, 'manage_team_shifts')
+    || _cfgHasPermission(cfg, 'manage_org_shifts')
+    || _cfgHasPermission(cfg, 'manage_all_shifts')
   const showTemplates = cfg.user?.role === 'admin'
     || _cfgHasPermission(cfg, 'view_templates')
     || _cfgHasPermission(cfg, 'manage_templates')
-    || _cfgHasPermission(cfg, 'add_own_shifts')
-    || _cfgHasPermission(cfg, 'add_other_shifts')
   const showSettings = cfg.user?.role === 'admin' || _cfgHasPermission(cfg, 'view_settings') || _cfgHasPermission(cfg, 'manage_settings')
   const showEnvBadges = envClass !== 'production'
 
