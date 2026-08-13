@@ -2,20 +2,39 @@
 const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
-const { requireAuth, requirePermission } = require('../middleware/auth')
+const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
-const { getShiftLeadScope } = require('../utils/scope')
+const { getShiftLeadScope, getOrganisationScope } = require('../utils/scope')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 const logger = require('../utils/logger')
 const { hasPermission } = require('../utils/roles')
+
+function canManageAllTasks(req) {
+  return hasPermission(req, 'manage_all_tasks') || (hasPermission(req, 'manage_tasks') && req.user.role !== 'shift_lead' && !hasPermission(req, 'manage_team_tasks'))
+}
+function canManageTeamTasks(req) {
+  return req.user.role === 'shift_lead' || hasPermission(req, 'manage_team_tasks')
+}
+function taskScope(req) {
+  return req.user.role === 'shift_lead' ? getShiftLeadScope(req.user.id) : getOrganisationScope(req.user.id)
+}
+function requireTaskManagement(req, res, next) {
+  if (!hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) {
+    return res.status(403).json({ error: 'Insufficient permissions', permission: 'manage_tasks' })
+  }
+  next()
+}
+function assertTaskTarget(req, userId) {
+  return canManageAllTasks(req) || (canManageTeamTasks(req) && taskScope(req).has(userId))
+}
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
 // Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
 router.get('/lists', requireAuth, (req, res) => {
   try {
-    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     let lists
-    if (req.user.role === 'admin' || hasPermission(req, 'manage_tasks')) {
+    if (canManageAllTasks(req)) {
       lists = db.prepare(`
         SELECT t.*, u.name as created_by_name, l.name as location_name, l.color as location_color,
                o.name as org_name, o.id as org_id, g.name as group_name
@@ -48,7 +67,7 @@ router.get('/lists', requireAuth, (req, res) => {
 })
 
 // ── POST /api/tasks/lists — create a task list ────────────────────────────────
-router.post('/lists', requireAuth, requirePermission('manage_tasks'), (req, res) => {
+router.post('/lists', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const { name, color, description, location_id, sort_order, org_id, label } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
@@ -80,7 +99,7 @@ router.post('/lists', requireAuth, requirePermission('manage_tasks'), (req, res)
 })
 
 // ── PUT /api/tasks/lists/:id — update a task list ─────────────────────────────
-router.put('/lists/:id', requireAuth, requirePermission('manage_tasks'), (req, res) => {
+router.put('/lists/:id', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
@@ -111,7 +130,7 @@ router.put('/lists/:id', requireAuth, requirePermission('manage_tasks'), (req, r
 })
 
 // ── DELETE /api/tasks/lists/:id — delete a task list ─────────────────────────
-router.delete('/lists/:id', requireAuth, requirePermission('manage_tasks'), (req, res) => {
+router.delete('/lists/:id', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
@@ -126,7 +145,7 @@ router.delete('/lists/:id', requireAuth, requirePermission('manage_tasks'), (req
 // ── GET /api/tasks/assignments ────────────────────────────────────────────────
 router.get('/assignments', requireAuth, (req, res) => {
   try {
-    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     const { start, end, user_id, org_id, team_id } = req.query
     let sql = `
       SELECT a.*, u.name as user_name, u.initials as user_initials, u.color as user_color,
@@ -149,11 +168,11 @@ router.get('/assignments', requireAuth, (req, res) => {
       if (team?.org_id) { sql += ' AND (tl.org_id IS NULL OR tl.org_id = ?)'; params.push(team.org_id) }
     }
 
-    if (req.user.role === 'admin' || req.user.role === 'manager' || hasPermission(req, 'manage_tasks')) {
+    if (canManageAllTasks(req)) {
       // no extra filter — admins and managers see all assignments
-    } else if (req.user.role === 'shift_lead') {
+    } else if (canManageTeamTasks(req)) {
       // Always constrain to team scope whether or not a specific user_id was requested.
-      const scope = getShiftLeadScope(req.user.id)
+      const scope = taskScope(req)
       const scopeIds = [...scope]
       if (user_id) {
         // Specific user requested — must be in scope
@@ -180,10 +199,11 @@ router.get('/assignments', requireAuth, (req, res) => {
 // ── POST /api/tasks/assignments — create an assignment ────────────────────────
 // Body: { user_id, task_list_id, date }
 // To remove: send task_list_id = null (clears all for user+date) or DELETE /:id
-router.post('/assignments', requireAuth, requirePermission('manage_tasks'), (req, res) => {
+router.post('/assignments', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const { user_id, task_list_id, date } = req.body
     if (!user_id || !date) return res.status(400).json({ error: 'user_id and date are required.' })
+    if (!assertTaskTarget(req, user_id)) return res.status(403).json({ error: 'That user is outside your team scope.' })
 
     // task_list_id null = clear all assignments for that user+date
     if (task_list_id === null || task_list_id === '') {
@@ -219,11 +239,12 @@ router.post('/assignments', requireAuth, requirePermission('manage_tasks'), (req
 // ── POST /api/tasks/assignments/bulk — assign a task list to multiple dates ────
 // Body: { user_id, task_list_id, dates: ['YYYY-MM-DD', ...] }
 // Skips silently any date that already has this user+list combo (idempotent).
-router.post('/assignments/bulk', requireAuth, requirePermission('manage_tasks'), (req, res) => {
+router.post('/assignments/bulk', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const { user_id, task_list_id, dates } = req.body
     if (!user_id || !task_list_id) return res.status(400).json({ error: 'user_id and task_list_id are required.' })
     if (!Array.isArray(dates) || !dates.length) return res.status(400).json({ error: 'dates must be a non-empty array.' })
+    if (!assertTaskTarget(req, user_id)) return res.status(403).json({ error: 'That user is outside your team scope.' })
 
     const insert = db.prepare(
       'INSERT OR IGNORE INTO task_assignments (id, user_id, task_list_id, date, created_by) VALUES (?,?,?,?,?)'
@@ -250,10 +271,11 @@ router.post('/assignments/bulk', requireAuth, requirePermission('manage_tasks'),
 })
 
 
-router.delete('/assignments/:id', requireAuth, requirePermission('manage_tasks'), (req, res) => {
+router.delete('/assignments/:id', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const a = db.prepare('SELECT * FROM task_assignments WHERE id = ?').get(req.params.id)
     if (!a) return res.status(404).json({ error: 'Assignment not found' })
+    if (!assertTaskTarget(req, a.user_id)) return res.status(403).json({ error: 'That user is outside your team scope.' })
     db.prepare('DELETE FROM task_assignments WHERE id = ?').run(req.params.id)
     audit(req.user.id, 'task_assignment.delete', 'task_assignment', req.params.id, a.date, { user_id: a.user_id })
     res.json({ ok: true })

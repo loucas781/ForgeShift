@@ -9,14 +9,28 @@ const logger = require('../utils/logger')
 
 // ── GET /api/template-groups ──────────────────────────────────────────────────
 router.get('/', requireAuth, (req, res) => {
-  const groups = db.prepare(`
-    SELECT g.*, COUNT(DISTINCT t.id) as template_count, COUNT(DISTINCT utg.user_id) as member_count
-    FROM template_groups g
-    LEFT JOIN shift_templates t ON t.group_id = g.id
-    LEFT JOIN user_template_groups utg ON utg.group_id = g.id
-    GROUP BY g.id
-    ORDER BY g.sort_order, g.name
-  `).all()
+  if (!hasPermission(req, 'view_templates') && !hasPermission(req, 'manage_templates')) {
+    return res.status(403).json({ error: 'You do not have permission to view templates.' })
+  }
+  const canViewAllGroups = req.user.role === 'admin' || hasPermission(req, 'manage_templates')
+  const groups = canViewAllGroups
+    ? db.prepare(`
+        SELECT g.*, COUNT(DISTINCT t.id) as template_count, COUNT(DISTINCT utg.user_id) as member_count
+        FROM template_groups g
+        LEFT JOIN shift_templates t ON t.group_id = g.id
+        LEFT JOIN user_template_groups utg ON utg.group_id = g.id
+        GROUP BY g.id
+        ORDER BY g.sort_order, g.name
+      `).all()
+    : db.prepare(`
+        SELECT g.*, COUNT(DISTINCT t.id) as template_count, COUNT(DISTINCT utg.user_id) as member_count
+        FROM template_groups g
+        JOIN user_template_groups visible_utg ON visible_utg.group_id = g.id AND visible_utg.user_id = ?
+        LEFT JOIN shift_templates t ON t.group_id = g.id
+        LEFT JOIN user_template_groups utg ON utg.group_id = g.id
+        GROUP BY g.id
+        ORDER BY g.sort_order, g.name
+      `).all(req.user.id)
 
   // Attach member list (id + name + role) to each group for admin display
   if (req.user.role === 'admin' || hasPermission(req, 'manage_templates')) {

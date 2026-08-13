@@ -357,7 +357,7 @@ function hasPermission(permission) {
   }
   return Array.isArray(permissions) && permissions.includes(permission)
 }
-function canViewOtherRotas() { return hasPermission('view_other_rotas') }
+function canViewOtherRotas() { return hasPermission('view_all_rotas') || (hasPermission('view_other_rotas') && !hasPermission('view_team_rotas')) }
 function canManageTasks() { return hasPermission('manage_tasks') }
 function canTargetOtherUsers() {
   return canViewOtherRotas() || ['add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)

@@ -294,6 +294,8 @@ function renderShell(cfg, activePage) {
     || _cfgHasPermission(cfg, 'view_calendar')
     || _cfgHasPermission(cfg, 'view_shifts')
     || _cfgHasPermission(cfg, 'view_own_rota')
+    || _cfgHasPermission(cfg, 'view_team_rotas')
+    || _cfgHasPermission(cfg, 'view_all_rotas')
   const showTemplates = cfg.user?.role === 'admin'
     || _cfgHasPermission(cfg, 'view_templates')
     || _cfgHasPermission(cfg, 'manage_templates')

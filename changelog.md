@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-08-13
+
+- Hardened task-list and template-group reads so view-only roles require the matching section permission and only receive groups assigned to them.
+- Added scoped role permissions for team rotas, all rotas, team shifts, all shifts, team tasks, all tasks, and team administration.
+- Updated the iOS built-in-role fallback catalogue so older servers and offline role data understand the new scopes.
+- Updated Android shift capability checks to honour server permissions for custom roles while retaining legacy-role compatibility.
+- Added a Roles & permissions health warning for active accounts with missing or unknown role assignments.
+- Applied team-scoped rota visibility and shift editing to the new scoped permissions instead of relying only on the Shift Lead role name.
+- Assigned the new scopes to the protected Shift Lead and Manager defaults and kept native fallback role data aligned.
+- Updated web navigation and section access payloads to recognise the new scoped rota and task permissions.
+- Added a lightweight permission regression check covering the catalogue, built-in roles and scoped route enforcement.
+- Added scope descriptions to role comparison so administrators can distinguish team-level and global access.
+- Removed duplicated task-route permission middleware in favour of one shared capability check.
+- Applied the new assigned-team and all-team permissions to team management endpoints while preserving the legacy `manage_teams` permission.
+- Added the native Team screen’s member fallback endpoint (`GET /api/teams/:id/members`) with the same role and organisation visibility rules as the main teams feed.
+- Fixed Manager organisation views so assigned members are shown directly instead of appearing undefined.
+- Added a shared My Team view for any role with team-view permission, while keeping team editing controls restricted to team managers.
+- Renamed the administrative Team page to People & Teams to distinguish it from personal team views.
+- Added role comparison for administrators and expanded audit labels for roles, organisations and location membership changes.
+- Added broader permission coverage for workspace sections and preserved the existing native API contract.
+
 ## 2026-08-12
 
 - Added section-level view permissions for Calendar, Shifts, Tasks, Templates, Teams, Locations, Organisations and Settings.
