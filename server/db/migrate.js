@@ -248,6 +248,10 @@ function migrateAdditive() {
     db.exec("ALTER TABLE shifts ADD COLUMN is_oncall INTEGER NOT NULL DEFAULT 0")
     console.log('✓ Added is_oncall column to shifts')
   }
+  if (!shiftCols.includes('absence_type')) {
+    db.exec("ALTER TABLE shifts ADD COLUMN absence_type TEXT NOT NULL DEFAULT 'annual_leave'")
+    console.log('✓ Added absence_type column to shifts')
+  }
   if (!shiftCols.includes('updated_by')) {
     db.exec("ALTER TABLE shifts ADD COLUMN updated_by TEXT REFERENCES users(id) ON DELETE SET NULL")
     console.log('✓ Added updated_by column to shifts')

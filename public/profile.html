@@ -362,7 +362,7 @@ async function loadIcalPreview() {
     const rows = upcoming.map(s => {
       const d = new Date(s.date + 'T12:00:00')
       const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
-      const timeStr = s.is_off ? 'Day off' : (s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day')
+      const timeStr = s.is_off ? (s.absence_type === 'absent' ? 'Absent' : 'Annual Leave') : (s.start_time && s.end_time ? `${s.start_time}–${s.end_time}` : 'All day')
       const loc = s.location_name ? `<span style="color:var(--text-3)">${escHtml(s.location_name)}</span>` : ''
       return `<div style="display:flex;gap:12px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:13px;font-weight:500;min-width:110px">${escHtml(dateStr)}</span>

@@ -222,6 +222,13 @@
           </span>
           <span><strong>Day off / leave</strong><small>Show this day as unavailable</small></span>
         </label>
+        <label class="form-group" for="modalAbsenceType" style="margin:8px 0 0">
+          <span class="form-label">Non-working day type</span>
+          <select class="form-input" id="modalAbsenceType">
+            <option value="annual_leave">Annual Leave</option>
+            <option value="absent">Absent / Sick</option>
+          </select>
+        </label>
         <label class="shift-status-option" for="modalIsOncall">
           <span class="toggle">
             <input type="checkbox" id="modalIsOncall">
@@ -420,6 +427,7 @@ function renderTaskDots(dayAssignments, dateStr, className = '') {
 
 // Copy/paste state
 let copiedShift = null   // { location_id, start_time, end_time, notes, note_color, is_off }
+function absenceLabel(shift) { return shift?.absence_type === 'absent' ? 'Absent' : 'Annual Leave' }
 
 // Holiday map cache: { year: { 'YYYY-MM-DD': [{name, emoji}] } }
 let _holidayCache = {}
@@ -1123,7 +1131,7 @@ function renderMonth() {
     const mobileOverflow  = dayShifts.length - mobileMaxChips
     chipsToShow.forEach((s, chipIndex) => {
       const color = getShiftDisplayColour(s)
-      const label = s.is_off ? '🏖️ Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
+      const label = s.is_off ? `🏖️ ${absenceLabel(s)}` : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const name  = canViewOtherRotas() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       // Duration badge
       let durBadge = ''
@@ -1349,7 +1357,7 @@ function renderWeek() {
     dayShifts.forEach(entry => {
       const s = entry.shift
       const color = getShiftDisplayColour(s)
-      const label = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
+      const label = s.is_off ? `🏖️ ${absenceLabel(s)}` : (s.location_name || 'Shift') + (s.is_oncall ? ' 📟' : '')
       const prefix = canViewOtherRotas() && s.user_name ? s.user_name.split(' ')[0] + ': ' : ''
       const safeId = escHtml(s.id)
       const clickFn = `openShiftPanel('${safeId}')`
@@ -1946,6 +1954,7 @@ function openCreateModal(date, returnFocus = null) {
   document.getElementById('modalLocation').value = _lastShiftPreset?.location_id || ''
   document.getElementById('modalNotes').value = ''
   document.getElementById('modalIsOff').checked = false
+  document.getElementById('modalAbsenceType').value = 'annual_leave'
   document.getElementById('modalIsOncall').checked = !!_lastShiftPreset?.is_oncall
   document.getElementById('deleteShiftBtn').style.display = 'none'
   if (canManage()) document.getElementById('modalUser').value = targetUserId
@@ -1974,6 +1983,7 @@ function openEditModal(id, returnFocus = null) {
   document.getElementById('modalEnd').value   = s.end_time || ''
   document.getElementById('modalNotes').value = s.notes || ''
   document.getElementById('modalIsOff').checked = !!s.is_off
+  document.getElementById('modalAbsenceType').value = s.absence_type === 'absent' ? 'absent' : 'annual_leave'
   document.getElementById('modalIsOncall').checked = !!s.is_oncall
   document.getElementById('deleteShiftBtn').style.display = canDeleteShift(s) ? 'flex' : 'none'
   if (canManage()) document.getElementById('modalUser').value = s.user_id
@@ -2030,6 +2040,7 @@ function copyPreviousDayShift() {
   document.getElementById('modalEnd').value = previous.end_time || ''
   document.getElementById('modalNotes').value = previous.notes || ''
   document.getElementById('modalIsOff').checked = !!previous.is_off
+  document.getElementById('modalAbsenceType').value = previous.absence_type === 'absent' ? 'absent' : 'annual_leave'
   document.getElementById('modalIsOncall').checked = !!previous.is_oncall
   selectedColour = resolveColourValue(previous.note_color, '#4f46e5')
   setupColourPicker()
@@ -2364,7 +2375,7 @@ function exportCSV() {
     const hours = !s.is_off && s.start_time && s.end_time
       ? (_shiftDurationMins(s.start_time, s.end_time) / 60).toFixed(2)
       : ''
-    const type = s.is_off ? 'Annual Leave' : s.is_oncall ? 'On-call' : 'Shift'
+    const type = s.is_off ? absenceLabel(s) : s.is_oncall ? 'On-call' : 'Shift'
     lines.push([
       s.date,
       dayNames[date.getDay()],
@@ -2503,7 +2514,7 @@ function openShiftPanel(shiftId) {
   _shiftPanelDay = s.date
 
   // Title
-  const title = s.is_off ? '🏖️ Day Off' : (s.location_name || 'Shift')
+  const title = s.is_off ? `🏖️ ${absenceLabel(s)}` : (s.location_name || 'Shift')
   document.getElementById('shiftPanelTitle').textContent = title
 
   // Edit button (managers only)
@@ -2585,7 +2596,7 @@ function openDayPanel(dateStr) {
 
   const shiftCards = dayShifts.length
     ? dayShifts.map(s => {
-      const label = s.is_off ? 'Day Off' : (s.location_name || 'Shift')
+      const label = s.is_off ? absenceLabel(s) : (s.location_name || 'Shift')
       const meta = [
         s.user_name || '',
         s.is_oncall ? 'On call' : '',
@@ -2773,6 +2784,7 @@ async function saveShift() {
     notes:       document.getElementById('modalNotes').value.trim() || null,
     note_color:  selectedColour,
     is_off:      document.getElementById('modalIsOff').checked,
+    absence_type: document.getElementById('modalAbsenceType').value,
     is_oncall:   document.getElementById('modalIsOncall').checked,
   }
   if (canManage()) baseBody.user_id = getSelectedModalUserId()

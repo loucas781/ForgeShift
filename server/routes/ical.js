@@ -214,7 +214,7 @@ router.get('/feed/:token', (req, res) => {
 
       const onCallOnly = !!shift.is_oncall && !shift.is_off && !shift.location_name
       let summary = shift.is_off
-        ? 'Annual Leave'
+        ? (shift.absence_type === 'absent' ? 'Absent' : 'Annual Leave')
         : (onCallOnly ? 'ON CALL' : `Work - ${shift.location_name || 'Shift'}`)
       let desc = []
       if (shift.is_oncall) desc.push('On call')
