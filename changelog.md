@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-24
+
+- Added an Absent / Sick day status alongside Annual Leave. Absent days appear as all-day “Absent” events in iCal feeds and are included in the existing shift API for native clients.
+- Added a migration and backup support for the new absence type while keeping existing day-off records as Annual Leave.
+- Improved organisation and team assignment dialogs with clearer scope guidance and searchable people lists.
+
 ## 2026-08-13
 
 - Added descriptions for every role permission and separated legacy compatibility permissions into a clearly labelled Legacy section.

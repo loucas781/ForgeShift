@@ -23,6 +23,9 @@ function isValidDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 function isValidTime(value) { return value == null || value === '' || TIME_RE.test(String(value)) }
+function normalizeAbsenceType(value) {
+  return String(value || 'annual_leave').toLowerCase() === 'absent' ? 'absent' : 'annual_leave'
+}
 function canViewAllRotas(req) {
   // Global rota visibility is deliberately explicit. The legacy
   // view_other_rotas permission is retained for team-scoped compatibility but
@@ -169,7 +172,7 @@ router.post('/', requireAuth, (req, res) => {
     const isShiftLead = req.user.role === 'shift_lead'
     const globalShiftManagement = req.user.role === 'admin' || hasPermission(req, 'manage_all_shifts')
     const teamScoped = !globalShiftManagement && (canAddOthers || isShiftLead)
-    const { user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
+    const { user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, absence_type } = req.body
 
     if (!date) return res.status(400).json({ error: 'Date is required.' })
     if (!isValidDate(date)) return res.status(400).json({ error: 'Date must be a valid ISO date (YYYY-MM-DD).' })
@@ -203,10 +206,10 @@ router.post('/', requireAuth, (req, res) => {
 
       id = uuidv4()
       db.prepare(`
-        INSERT INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO shifts (id, user_id, date, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, absence_type, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       `).run(id, targetUserId, date, location_id || null, start_time || null, end_time || null,
-             notes || null, resolveStoredColor(note_color, DEFAULT_COLOR), is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id)
+             notes || null, resolveStoredColor(note_color, DEFAULT_COLOR), is_off ? 1 : 0, is_oncall ? 1 : 0, normalizeAbsenceType(absence_type), req.user.id)
       shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(id)
       return { ok: true }
     })
@@ -242,17 +245,17 @@ router.put('/:id', requireAuth, (req, res) => {
       return res.status(403).json({ error: 'You do not have permission to edit this shift.' })
     }
 
-    const { date: newDate, location_id, start_time, end_time, notes, note_color, is_off, is_oncall } = req.body
+    const { date: newDate, location_id, start_time, end_time, notes, note_color, is_off, is_oncall, absence_type } = req.body
     const targetDate = newDate || shift.date
     if (!isValidDate(targetDate)) return res.status(400).json({ error: 'Date must be a valid ISO date (YYYY-MM-DD).' })
     if (!isValidTime(start_time) || !isValidTime(end_time)) return res.status(400).json({ error: 'Times must use HH:MM format.' })
     const conflict = db.prepare('SELECT id FROM shifts WHERE user_id = ? AND date = ? AND id <> ?').get(shift.user_id, targetDate, req.params.id)
     if (conflict) return res.status(409).json({ error: 'A shift already exists for this user on this date.' })
     db.prepare(`
-      UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, updated_at=datetime('now'), updated_by=?
+      UPDATE shifts SET date=?, location_id=?, start_time=?, end_time=?, notes=?, note_color=?, is_off=?, is_oncall=?, absence_type=?, updated_at=datetime('now'), updated_by=?
       WHERE id=?
     `).run(targetDate, location_id || null, start_time || null, end_time || null,
-           notes || null, note_color !== undefined ? normalizeColorInput(note_color) : shift.note_color, is_off ? 1 : 0, is_oncall ? 1 : 0, req.user.id, req.params.id)
+           notes || null, note_color !== undefined ? normalizeColorInput(note_color) : shift.note_color, is_off ? 1 : 0, is_oncall ? 1 : 0, absence_type !== undefined ? normalizeAbsenceType(absence_type) : (shift.absence_type || 'annual_leave'), req.user.id, req.params.id)
 
     const updated = db.prepare('SELECT * FROM shifts WHERE id = ?').get(req.params.id)
     audit(req.user.id, 'shift.update', 'shift', req.params.id, targetDate)
