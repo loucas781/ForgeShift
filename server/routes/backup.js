@@ -543,24 +543,24 @@ router.post('/restore', (req, res) => {
         INSERT INTO shifts (
           id, user_id, date, location_id, start_time, end_time,
           notes, note_color, is_off, template_id, created_by, created_at, updated_at
-          ${shiftCols.has('is_oncall') ? ', is_oncall' : ''}
+          ${shiftCols.has('is_oncall') ? ', is_oncall' : ''}${shiftCols.has('absence_type') ? ', absence_type' : ''}
         ) VALUES (
           @id, @user_id, @date, @location_id, @start_time, @end_time,
           @notes, @note_color, @is_off, @template_id, @created_by, @created_at, @updated_at
-          ${shiftCols.has('is_oncall') ? ', @is_oncall' : ''}
+          ${shiftCols.has('is_oncall') ? ', @is_oncall' : ''}${shiftCols.has('absence_type') ? ', @absence_type' : ''}
         )
         ON CONFLICT(id) DO UPDATE SET
           date=excluded.date, location_id=excluded.location_id,
           start_time=excluded.start_time, end_time=excluded.end_time,
           notes=excluded.notes, note_color=excluded.note_color,
           is_off=excluded.is_off, updated_at=excluded.updated_at
-          ${shiftCols.has('is_oncall') ? ', is_oncall=excluded.is_oncall' : ''}
+          ${shiftCols.has('is_oncall') ? ', is_oncall=excluded.is_oncall' : ''}${shiftCols.has('absence_type') ? ', absence_type=excluded.absence_type' : ''}
         ON CONFLICT(user_id, date) DO UPDATE SET
           location_id=excluded.location_id,
           start_time=excluded.start_time, end_time=excluded.end_time,
           notes=excluded.notes, note_color=excluded.note_color,
           is_off=excluded.is_off, updated_at=excluded.updated_at
-          ${shiftCols.has('is_oncall') ? ', is_oncall=excluded.is_oncall' : ''}
+          ${shiftCols.has('is_oncall') ? ', is_oncall=excluded.is_oncall' : ''}${shiftCols.has('absence_type') ? ', absence_type=excluded.absence_type' : ''}
       `)
       let shiftCount = 0
       for (const s of (tables.shifts || [])) {
@@ -574,7 +574,8 @@ router.post('/restore', (req, res) => {
           notes:       s.notes || null,
           note_color:  resolveStoredColor(s.note_color, DEFAULT_COLOR),
           is_off:      s.is_off ?? 0,
-          is_oncall:   s.is_oncall ?? 0,
+        is_oncall:   s.is_oncall ?? 0,
+        absence_type: s.absence_type || 'annual_leave',
           template_id: s.template_id || null,
           created_by:  s.created_by || null,
           created_at:  s.created_at,

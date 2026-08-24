@@ -1307,8 +1307,15 @@ function canManageRoleDefinition(role) {
 function populateRoleSelect(selectOrId, selectedRoleId) {
   const select = typeof selectOrId === 'string' ? document.getElementById(selectOrId) : selectOrId
   if (!select) return
-  select.innerHTML = assignableRoles().map(role => `<option value="${role.id}">${escHtml(role.name)}${role.is_builtin ? ' · built-in' : ''}</option>`).join('')
+  select.innerHTML = assignableRoles().map(role => `<option value="${role.id}" title="${escHtml(role.description || '')}">${escHtml(role.name)}${role.is_builtin ? ' · built-in' : ''}</option>`).join('')
   if (selectedRoleId && assignableRoles().some(role => role.id === selectedRoleId)) select.value = selectedRoleId
+}
+
+function filterAssignmentRows(input, containerId) {
+  const query = String(input.value || '').trim().toLowerCase()
+  document.querySelectorAll(`#${containerId} [data-assignment-row]`).forEach(row => {
+    row.style.display = !query || row.dataset.assignmentRow.includes(query) ? '' : 'none'
+  })
 }
 
 const SETTINGS_MODAL_PROFILES = [
@@ -2482,7 +2489,7 @@ async function renderTeamPanel() {
             <div class="form-group" style="max-width:280px;margin-bottom:20px">
               <label class="form-label">Role</label>
               <select class="form-select" id="iRole">
-                ${assignableRoles().map(role => `<option value="${role.id}">${escHtml(role.name)}${role.is_builtin ? ' · built-in' : ''}</option>`).join('')}
+                ${assignableRoles().map(role => `<option value="${role.id}" title="${escHtml(role.description || '')}">${escHtml(role.name)}${role.is_builtin ? ' · built-in' : ''}</option>`).join('')}
               </select>
             </div>
             <div id="inviteResult" style="display:none;margin-bottom:16px"></div>
@@ -3099,10 +3106,12 @@ function openTeamMembersModal(teamId) {
         <button class="modal-close" onclick="document.getElementById('teamMembersModal').remove()">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Select which users belong to this team.</p>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">Select which users belong to this team. Team membership controls who can receive team-scoped rota and task access.</p>
+        <label class="form-label" for="tmUserSearch">Find people</label>
+        <input class="form-input" id="tmUserSearch" placeholder="Search name, email or role…" oninput="filterAssignmentRows(this,'tmUserList')" style="margin-bottom:10px">
         <div id="tmUserList" style="display:flex;flex-direction:column;gap:2px">
           ${activeUsers.map(u => `
-            <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;transition:background var(--t-fast)" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
+            <label data-assignment-row="${escHtml(`${u.name} ${u.email} ${roleNameForUser(u)}`.toLowerCase())}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:pointer;transition:background var(--t-fast)" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
               <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer">
               ${_avatarHTML(u, 'md')}
               <div style="flex:1;min-width:0">
@@ -3297,7 +3306,7 @@ function openTmplGroupMembersModal(groupId) {
 
   const rows = assignableUsers.length
     ? assignableUsers.map(u => `
-        <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
+        <label data-assignment-row="${escHtml(`${u.name} ${u.email} ${roleNameForUser(u)}`.toLowerCase())}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
           <input type="checkbox" value="${u.id}" ${memberIds.has(u.id) ? 'checked' : ''}
             style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer;flex-shrink:0">
           ${_avatarHTML(u, 'md')}
@@ -4228,6 +4237,8 @@ function openOrgMembersModal(orgId) {
         <p style="font-size:13px;color:var(--text-3);margin-bottom:12px">
           Selected users will have access to all locations, task lists, templates, and teams linked to <strong>${escHtml(org.name)}</strong>. Members remain read-only — write access requires Shift Lead or Admin role.
         </p>
+        <label class="form-label" for="orgMemberSearch">Find people</label>
+        <input class="form-input" id="orgMemberSearch" placeholder="Search name, email or role…" oninput="filterAssignmentRows(this,'orgMemberRows')" style="margin-bottom:10px">
         <div id="orgMemberRows" style="max-height:360px;overflow-y:auto">${rows}</div>
       </div>
       <div class="modal-footer">
