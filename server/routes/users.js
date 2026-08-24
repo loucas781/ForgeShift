@@ -148,8 +148,9 @@ router.get('/', requireAuth, (req, res) => {
   const users = db.prepare(
     `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
             r.name AS role_name, r.color AS role_color, r.permissions AS permissions, u.previous_role_id, u.is_active, u.created_at,
-            tm.team_id
+            MIN(tm.team_id) AS team_id
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id LEFT JOIN roles r ON r.id=u.role_id${where}
+     GROUP BY u.id
      ORDER BY u.name`
   ).all(...(visibleIds ? [...visibleIds] : []))
   res.json(users.map(user => serializeUser(user, req)))
