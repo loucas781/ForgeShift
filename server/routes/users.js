@@ -300,7 +300,8 @@ router.post('/:id/reset-password', requireAuth, requireAdmin, async (req, res) =
     const pv  = validatePassword(password, pol)
     if (!pv.ok) return res.status(400).json({ error: pv.errors.join(' ') })
     const hash = await hashPassword(password)
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, req.params.id)
+    // Password resets invalidate every existing browser/mobile session.
+    db.prepare('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?').run(hash, req.params.id)
     audit(req.user.id, 'user.admin_password_reset', 'user', req.params.id, null, { by: req.user.name })
     res.json({ ok: true })
   } catch (err) {

@@ -26,7 +26,7 @@ function isHttpsRequest(req) {
 }
 
 function clearCookieOpts(req) {
-  const secure = process.env.COOKIE_SECURE === 'true' && isHttpsRequest(req)
+  const secure = (process.env.COOKIE_SECURE === 'true' || process.env.APP_ENV === 'production') && isHttpsRequest(req)
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', path: '/' }
 }
 
