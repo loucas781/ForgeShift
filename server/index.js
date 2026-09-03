@@ -254,7 +254,7 @@ app.get('/api/releases', requireAuth, async (req, res) => {
 
 // ── GET/PATCH /api/features — admin feature flag management ───────────────────
 app.get('/api/features', requireAuth, (req, res) => {
-  if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'manage_settings') && !hasPermission(req, 'view_task_lists')) return res.status(403).json({ error: 'Insufficient permissions' })
   const db = require('./db/connection')
   const tasksRow    = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_tasks'").get()
   const dragDropRow = db.prepare("SELECT value FROM app_preferences WHERE key = 'feature_drag_drop'").get()
