@@ -24,10 +24,11 @@ const PERMISSION_CATALOG = [
   { key: 'edit_other_shifts', label: 'Edit shifts for other users', description: 'Change another user’s shifts within the account scope.', category: 'Shifts' },
   { key: 'delete_other_shifts', label: 'Delete shifts for other users', description: 'Remove another user’s shifts within the account scope.', category: 'Shifts' },
   { key: 'manage_team_shifts', label: 'Manage shifts for your teams', description: 'Add, edit and remove shifts for assigned teams.', category: 'Shifts', scope: 'Organisation/team members only' },
+  { key: 'manage_org_shifts', label: 'Manage shifts across your organisation', description: 'Add, edit and remove shifts for members of your organisations.', category: 'Shifts', scope: 'Organisation members only' },
   { key: 'manage_all_shifts', label: 'Manage all shifts', description: 'Add, edit and remove shifts for any active user.', category: 'Shifts', scope: 'All active users' },
-  { key: 'manage_tasks', label: 'Manage tasks and assignments', description: 'Create, edit and assign task lists within the account scope.', category: 'Administration' },
-  { key: 'manage_team_tasks', label: 'Manage tasks for your teams', description: 'Manage task lists and assignments for assigned teams.', category: 'Administration', scope: 'Organisation/team members only' },
-  { key: 'manage_all_tasks', label: 'Manage all tasks', description: 'Manage task lists and assignments across the instance.', category: 'Administration', scope: 'All active users' },
+  { key: 'manage_tasks', label: 'Manage tasks and assignments', description: 'Create, edit and assign task lists within the account scope.', category: 'Tasks' },
+  { key: 'manage_team_tasks', label: 'Manage tasks for your teams', description: 'Manage task lists and assignments for assigned teams.', category: 'Tasks', scope: 'Organisation/team members only' },
+  { key: 'manage_all_tasks', label: 'Manage all tasks', description: 'Manage task lists and assignments across the instance.', category: 'Tasks', scope: 'All active users' },
   { key: 'manage_templates', label: 'Manage shift templates', description: 'Create, edit, apply and remove saved shift templates.', category: 'Administration' },
   { key: 'manage_teams', label: 'Manage teams', description: 'Create and maintain teams and their membership.', category: 'Administration' },
   { key: 'manage_own_teams', label: 'Manage assigned teams', description: 'Manage only teams assigned to or owned by the user.', category: 'Administration', scope: 'Owned or assigned teams' },
@@ -45,23 +46,23 @@ const ALL_PERMISSIONS = PERMISSION_CATALOG.map(p => p.key)
 
 const BUILTIN = {
   member: {
-    id: 'builtin-member', name: 'Member', color: '#059669', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_settings', 'view_own_rota'],
+    id: 'builtin-member', name: 'Member', description: 'Personal access to your own calendar, shifts, tasks and settings.', color: '#059669', is_builtin: 1,
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_settings', 'view_own_rota'],
   },
   shift_lead: {
-    id: 'builtin-shift-lead', name: 'Shift Lead', color: '#2563eb', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_team_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_teams', 'manage_own_teams'],
+    id: 'builtin-shift-lead', name: 'Shift Lead', description: 'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color: '#2563eb', is_builtin: 1,
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_team_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_teams', 'manage_own_teams'],
   },
   manager: {
-    id: 'builtin-manager', name: 'Manager', color: '#d97706', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_all_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_all_shifts', 'manage_tasks', 'manage_all_tasks', 'manage_templates', 'manage_teams', 'manage_all_teams'],
+    id: 'builtin-manager', name: 'Manager', description: 'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color: '#d97706', is_builtin: 1,
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_org_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_templates', 'manage_teams', 'manage_own_teams'],
   },
   admin: {
-    id: 'builtin-admin', name: 'Admin', color: '#4f46e5', is_builtin: 1,
+    id: 'builtin-admin', name: 'Admin', description: 'Full instance access, including global rotas, users, roles, settings and backups.', color: '#4f46e5', is_builtin: 1,
     permissions: ALL_PERMISSIONS,
   },
   inactive: {
-    id: 'system-inactive', name: 'Inactive', color: '#6b7280', is_builtin: 1, is_system: 1,
+    id: 'system-inactive', name: 'Inactive', description: 'System role for disabled accounts. Cannot sign in until re-enabled.', color: '#6b7280', is_builtin: 1, is_system: 1,
     permissions: [],
   },
 }

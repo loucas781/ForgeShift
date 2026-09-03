@@ -514,9 +514,21 @@ function setTheme(t) {
   toast(`Theme: ${t}`, 'success', 1500)
 }
 
+let _logoutInFlight = null
 async function doLogout() {
-  await fetch('/api/auth/logout', { method: 'POST' })
-  window.location.href = '/login.html'
+  // Make logout safe to tap repeatedly and guarantee navigation even when the
+  // server is temporarily unreachable. The server endpoint is idempotent too.
+  if (_logoutInFlight) return _logoutInFlight
+  _logoutInFlight = (async () => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', signal: controller.signal })
+    } catch {}
+    finally { clearTimeout(timeout) }
+    window.location.replace('/login.html')
+  })()
+  return _logoutInFlight
 }
 
 // ── Inactivity timeout watcher ─────────────────────────────────────────────────

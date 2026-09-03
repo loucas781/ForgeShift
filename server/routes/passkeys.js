@@ -61,14 +61,18 @@ function isHttpsRequest(req) {
 }
 
 function issueSession(req, res, user) {
+  const sessionId = uuid()
+  const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
+  const ua = req.headers['user-agent'] || null
+  db.prepare('INSERT INTO user_sessions (id, user_id, ip, user_agent) VALUES (?,?,?,?)').run(sessionId, user.id, ip, ua)
   const tv = user.token_version || 0
   const token = jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role, tv },
+    { id: user.id, email: user.email, name: user.name, role: user.role, tv, sid: sessionId },
     process.env.JWT_SECRET,
     { expiresIn: `${process.env.COOKIE_MAX_AGE_HOURS || 72}h` }
   )
   const maxAge = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72', 10) * 3600 * 1000
-  const secure = process.env.COOKIE_SECURE === 'true' && isHttpsRequest(req)
+  const secure = (process.env.COOKIE_SECURE === 'true' || process.env.APP_ENV === 'production') && isHttpsRequest(req)
   res.cookie('token', token, {
     httpOnly: true,
     sameSite: secure ? 'strict' : 'lax',

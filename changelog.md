@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-09-03
+
+- Improved logout reliability and made repeated logout taps safe; logout and routine authenticated reads no longer consume sign-in rate-limit attempts.
+- Added a per-user session cap to automatically remove the oldest abandoned device sessions.
+- Strengthened iCal feed privacy headers and bounded abandoned device sessions without changing native authentication contracts.
+- Redacted bearer tokens from iCal feed request logs to prevent accidental disclosure through server log files.
+- Removed an unused server cache middleware that was never attached to a route.
+
+- Added a dedicated **Tasks** permission group, including separate access to view tasks, assign task lists to yourself, and manage task lists.
+- Added a permission-gated **Task Lists** settings tab; task assignment no longer implies permission to create or edit task lists.
+- Settings navigation and supporting data loads now follow the account’s assigned permissions instead of relying on role names.
+- Shift Leads can now view organisations and locations needed for day-to-day rota management.
+- Improved task assignment API and calendar controls for users who may assign their own task lists only.
+- Prevented mobile Safari focus zoom in authentication and editor forms, keeping date pickers and bottom-sheet menus within the viewport.
+- Extended the modern sign-in, sign-up and password-recovery presentation to mobile with a compact branded header, while preserving light, dark and OLED theme assets.
+- Restored the opt-in “Remember me” behaviour for users who explicitly want local password storage, with a clear private-device warning.
+- Added baseline security response headers and ensured administrator and recovery password resets revoke existing sessions.
+- Password changes from the profile page now revoke other active sessions while preserving the newly authenticated session.
+- Production authentication cookies now enforce the Secure flag automatically when served over HTTPS.
+- Passkey sign-ins are now tracked as revocable sessions, matching password sign-ins.
+- Login responses no longer reveal whether an inactive email address exists, and passkey endpoints now have dedicated rate limiting.
+- Expired session records are now removed automatically and when the Active Sessions panel is opened, so stale devices no longer accumulate indefinitely.
+
 ## 2026-08-24
 
 - Added an **Absent / Sick** day status alongside Annual Leave.

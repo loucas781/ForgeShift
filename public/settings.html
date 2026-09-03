@@ -1196,7 +1196,8 @@ let settingsModalObserver = null
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_calendar', label:'View calendar', description:'Open the calendar and switch between month, week and agenda views.', category:'Workspace' },
   { key:'view_shifts', label:'View shifts', description:'Read shift details that the account is allowed to access.', category:'Workspace' },
-  { key:'view_tasks', label:'View tasks', description:'Read task lists and assigned task details within the account scope.', category:'Workspace' },
+  { key:'view_tasks', label:'View tasks', description:'Read task lists and assigned task details within the account scope.', category:'Tasks' },
+  { key:'assign_own_tasks', label:'Assign task lists to self', description:'Assign available task lists to the signed-in user without creating or editing task lists.', category:'Tasks' },
   { key:'view_templates', label:'View shift templates', description:'Browse saved shift templates available to the account.', category:'Workspace' },
   { key:'view_own_rota', label:'View own rota', description:'View the signed-in user’s own shifts and rota.', category:'Rota' },
   { key:'view_other_rotas', label:'View other users’ rotas', description:'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category:'Legacy', legacy:true },
@@ -1213,6 +1214,7 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'edit_other_shifts', label:'Edit shifts for other users', description:'Change another user’s shifts within the account scope.', category:'Shifts' },
   { key:'delete_other_shifts', label:'Delete shifts for other users', description:'Remove another user’s shifts within the account scope.', category:'Shifts' },
   { key:'manage_team_shifts', label:'Manage shifts for your teams', description:'Add, edit and remove shifts for assigned teams.', category:'Shifts', scope:'Organisation/team members only' },
+  { key:'manage_org_shifts', label:'Manage shifts across your organisation', description:'Add, edit and remove shifts for members of your organisations.', category:'Shifts', scope:'Organisation members only' },
   { key:'manage_all_shifts', label:'Manage all shifts', description:'Add, edit and remove shifts for any active user.', category:'Shifts', scope:'All active users' },
   { key:'manage_tasks', label:'Manage tasks and assignments', description:'Create, edit and assign task lists within the account scope.', category:'Administration' },
   { key:'manage_team_tasks', label:'Manage tasks for your teams', description:'Manage task lists and assignments for assigned teams.', category:'Administration', scope:'Organisation/team members only' },
@@ -1231,11 +1233,11 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'manage_holidays', label:'Manage holidays', description:'Configure bank holidays and holiday overrides.', category:'Administration' },
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
-  { id:'builtin-member', name:'Member', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
-  { id:'builtin-shift-lead', name:'Shift Lead', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-manager', name:'Manager', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_all_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_all_shifts','manage_tasks','manage_all_tasks','manage_templates','manage_teams','manage_all_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-admin', name:'Admin', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
-  { id:'system-inactive', name:'Inactive', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
+  { id:'builtin-member', name:'Member', description:'Personal access to your own calendar, shifts, tasks and settings.', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
+  { id:'builtin-shift-lead', name:'Shift Lead', description:'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-admin', name:'Admin', description:'Full instance access, including global rotas, users, roles, settings and backups.', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
+  { id:'system-inactive', name:'Inactive', description:'System role for disabled accounts. Cannot sign in until re-enabled.', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
 const ROLE_API_UNAVAILABLE_MESSAGE = 'Roles API is unavailable. Restart/update the ForgeShift server before managing roles.'
 

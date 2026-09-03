@@ -150,6 +150,9 @@ function buildVTimezone() {
 // ── GET /api/ical/feed/:token.ics — public feed ───────────────────────────────
 router.get('/feed/:token', (req, res) => {
   try {
+    // The URL contains a bearer token. Prevent intermediary/browser caching
+    // and referrer propagation of the private feed.
+    res.set({ 'Cache-Control': 'no-store', 'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer' })
     const tokenParam = req.params.token.replace(/\.ics$/, '')
     const row = db.prepare('SELECT * FROM ical_tokens WHERE token = ?').get(tokenParam)
     if (!row) return res.status(404).end()

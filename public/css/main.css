@@ -1813,6 +1813,12 @@ tr:hover td { background: var(--surface-2); }
 
 /* ── Mobile: bottom-sheet modals ─────────────────────────────────────────────── */
 @media (max-width: 640px) {
+  /* iOS Safari zooms the page when a control uses a sub-16px font. Keep
+     editors at the platform-safe size so focusing date/select fields does
+     not magnify or push the bottom sheet out of view. */
+  .modal input,
+  .modal select,
+  .modal textarea { font-size:16px; }
   .modal-overlay {
     align-items: flex-end;
     padding: 0 var(--safe-right) 0 var(--safe-left);
