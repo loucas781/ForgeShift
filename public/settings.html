@@ -1204,6 +1204,7 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_team_rotas', label:'View team rotas', category:'Rota', scope:'Organisation/team members only' },
   { key:'view_all_rotas', label:'View all rotas', category:'Rota', scope:'All active users' },
   { key:'view_teams', label:'View organisation team members', category:'Teams' },
+  { key:'view_people_teams', label:'View People & Teams administration', description:'Open the People & Teams settings page to review organisation users, roles and team assignments.', category:'Administration' },
   { key:'view_locations', label:'View locations', category:'Workspace' },
   { key:'view_organisations', label:'View organisations', category:'Workspace' },
   { key:'view_settings', label:'View settings', category:'Workspace' },
@@ -1235,7 +1236,7 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
   { id:'builtin-member', name:'Member', description:'Personal access to your own calendar, shifts, tasks and settings.', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
   { id:'builtin-shift-lead', name:'Shift Lead', description:'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','view_people_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
   { id:'builtin-admin', name:'Admin', description:'Full instance access, including global rotas, users, roles, settings and backups.', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
   { id:'system-inactive', name:'Inactive', description:'System role for disabled accounts. Cannot sign in until re-enabled.', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
@@ -1427,10 +1428,10 @@ async function init() {
     { id: 'task-lists', label: 'Task Lists', roles: [], permissions: ['view_tasks','manage_tasks','manage_team_tasks','manage_all_tasks'],
       icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>' },
 
-    { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams',
+    { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams', permissionHint: 'Requires “View organisation team members”. This is the personal team view used by the native apps.',
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
-    { id: 'team', label: 'People & Teams', roles: [], permissions: ['view_teams','manage_users','manage_teams'],
+    { id: 'team', label: 'People & Teams', roles: [], permission: 'view_people_teams', permissionHint: 'Requires “View People & Teams administration”.',
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
     { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: [], permission: 'manage_roles',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>' },
@@ -1498,7 +1499,7 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  const canViewTeamPanel = ['view_teams','manage_users','manage_teams','manage_own_teams','manage_all_teams'].some(hasPermission)
+  const canViewTeamPanel = hasPermission('view_people_teams')
   const canLoadUsers = canViewTeamPanel || ['assign_own_tasks','manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','manage_all_tasks','view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts','view_teams'].some(hasPermission)
   const canViewRoles = hasPermission('manage_roles')
   const canManageOrganisations = hasPermission('manage_organisations')
