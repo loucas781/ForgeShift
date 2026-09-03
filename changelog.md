@@ -5,6 +5,11 @@
 - Added dedicated permissions for the Task Lists and API Reference settings pages, keeping page visibility separate from edit permissions.
 - API Reference catalogue access now follows the same `view_api_reference` permission as its settings page.
 - Task list reads now honour the dedicated `view_task_lists` permission without granting task-list creation or editing.
+- Restored Task Lists to the existing Features area instead of showing a separate settings tab.
+- Settings data preloads and panels now fail independently with an inline error state, preventing one unavailable endpoint from blanking the entire settings page.
+- Ensured the role editor merges the current permission contract with older server catalogues, so **Assign task lists to self** remains selectable during updates.
+- Replaced the browser-native role deletion prompt with the themed in-app confirmation dialog.
+- Added immediate loading states to Security and Backup so slow data requests no longer present as blank settings panels.
 - Separated the personal **My Team** view from the administrative **People & Teams** settings page.
 - Added a dedicated `view_people_teams` permission for organisation-wide People & Teams administration.
 - Kept `view_teams` as the native-compatible team visibility permission, so existing iOS and Android clients continue to show their Team page without an app update.
@@ -18,7 +23,7 @@
 - Removed an unused server cache middleware that was never attached to a route.
 
 - Added a dedicated **Tasks** permission group, including separate access to view tasks, assign task lists to yourself, and manage task lists.
-- Added a permission-gated **Task Lists** settings tab; task assignment no longer implies permission to create or edit task lists.
+- Added dedicated task-list permissions; task assignment no longer implies permission to create or edit task lists.
 - Settings navigation and supporting data loads now follow the account’s assigned permissions instead of relying on role names.
 - Shift Leads can now view organisations and locations needed for day-to-day rota management.
 - Improved task assignment API and calendar controls for users who may assign their own task lists only.

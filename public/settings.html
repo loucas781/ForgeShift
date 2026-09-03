@@ -1427,9 +1427,6 @@ async function init() {
     { id: 'preferences', label: 'Preferences', roles: [], permission: 'view_settings',
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
-    { id: 'task-lists', label: 'Task Lists', roles: [], permission: 'view_task_lists', permissionHint: 'Requires “View task lists settings”. Management actions remain controlled by task permissions.',
-      icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>' },
-
     { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams', permissionHint: 'Requires “View organisation team members”. This is the personal team view used by the native apps.',
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
@@ -1464,7 +1461,7 @@ async function init() {
   const userRole = cfg.user.role
   const sectionByTab = {
     appearance: 'personal', preferences: 'personal', security: 'personal',
-    'my-teams': 'workspace', team: 'workspace', 'task-lists': 'workspace', roles: 'workspace', organisations: 'workspace', locations: 'workspace', features: 'workspace',
+    'my-teams': 'workspace', team: 'workspace', roles: 'workspace', organisations: 'workspace', locations: 'workspace', features: 'workspace',
     email: 'system', api: 'system', audit: 'system', backup: 'system', updates: 'system', buildinfo: 'system', about: 'system',
   }
   const sectionLabels = { personal: 'Personal', workspace: 'Workspace', system: 'System' }
@@ -1508,31 +1505,36 @@ async function init() {
   const canManageLocations = hasPermission('manage_locations')
   const canViewOrganisations = canManageOrganisations || hasPermission('view_organisations')
   const canViewLocations = canManageLocations || hasPermission('view_locations')
-  if (canLoadUsers || canViewRoles) await loadUsers()
-  if (canViewLocations) await loadLocations()
-  if (canViewOrganisations || canViewLocations) await loadOrgs()
+  // Keep an unavailable optional data source from aborting the whole settings page.
+  // Individual panels still render their own inline error state below.
+  try { if (canLoadUsers || canViewRoles) await loadUsers() } catch (error) { console.warn('Settings users preload failed', error) }
+  try { if (canViewLocations) await loadLocations() } catch (error) { console.warn('Settings locations preload failed', error) }
+  try { if (canViewOrganisations || canViewLocations) await loadOrgs() } catch (error) { console.warn('Settings organisations preload failed', error) }
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
   // Wire password indicator for Edit User modal
   euPwIndicator = document.getElementById('euPwIndicatorWrap')
+  const renderPanelSafely = (renderFn, panelId) => Promise.resolve().then(renderFn).catch(error => {
+    const panel = document.getElementById(`panel-${panelId}`)
+    if (panel) panel.innerHTML = `<div class="card section-card"><div class="card-body"><strong>Unable to load this section</strong><p style="margin-top:8px;color:var(--text-3)">${escHtml(error?.message || 'Please refresh and try again.')}</p></div></div>`
+  })
   await Promise.all([
-    hasPermission('view_settings') ? renderAppearancePanel() : Promise.resolve(),
-    hasPermission('view_settings') ? renderPreferencesPanel() : Promise.resolve(),
-    hasPermission('view_teams') ? renderMyTeamsPanel() : Promise.resolve(),
-    canViewTeamPanel ? renderTeamPanel() : Promise.resolve(),
-    canViewRoles ? renderRolesPanel() : Promise.resolve(),
-    canViewOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
-    canViewLocations ? renderLocationsPanel() : Promise.resolve(),
-    hasPermission('manage_settings') ? renderFeaturesPanel() : Promise.resolve(),
-    hasPermission('view_task_lists') ? renderTaskListsPanel() : Promise.resolve(),
-    hasPermission('view_settings') ? renderSecurityPanel() : Promise.resolve(),
-    hasPermission('manage_settings') ? renderEmailPanel() : Promise.resolve(),
-    hasPermission('view_api_reference') ? renderApiPanel() : Promise.resolve(),
-    hasPermission('view_audit') ? renderAuditPanel() : Promise.resolve(),
-    hasPermission('manage_backups') ? renderBackupPanel() : Promise.resolve(),
-    hasPermission('view_settings') ? renderUpdatesPanel() : Promise.resolve(),
-    hasPermission('view_settings') ? renderBuildInfoPanel() : Promise.resolve(),
-    hasPermission('view_settings') ? renderAboutPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderPanelSafely(renderAppearancePanel, 'appearance') : Promise.resolve(),
+    hasPermission('view_settings') ? renderPanelSafely(renderPreferencesPanel, 'preferences') : Promise.resolve(),
+    hasPermission('view_teams') ? renderPanelSafely(renderMyTeamsPanel, 'my-teams') : Promise.resolve(),
+    canViewTeamPanel ? renderPanelSafely(renderTeamPanel, 'team') : Promise.resolve(),
+    canViewRoles ? renderPanelSafely(renderRolesPanel, 'roles') : Promise.resolve(),
+    canViewOrganisations ? renderPanelSafely(renderOrganisationsPanel, 'organisations') : Promise.resolve(),
+    canViewLocations ? renderPanelSafely(renderLocationsPanel, 'locations') : Promise.resolve(),
+    hasPermission('manage_settings') ? renderPanelSafely(renderFeaturesPanel, 'features') : Promise.resolve(),
+    hasPermission('view_settings') ? renderPanelSafely(renderSecurityPanel, 'security') : Promise.resolve(),
+    hasPermission('manage_settings') ? renderPanelSafely(renderEmailPanel, 'email') : Promise.resolve(),
+    hasPermission('view_api_reference') ? renderPanelSafely(renderApiPanel, 'api') : Promise.resolve(),
+    hasPermission('view_audit') ? renderPanelSafely(renderAuditPanel, 'audit') : Promise.resolve(),
+    hasPermission('manage_backups') ? renderPanelSafely(renderBackupPanel, 'backup') : Promise.resolve(),
+    hasPermission('view_settings') ? renderPanelSafely(renderUpdatesPanel, 'updates') : Promise.resolve(),
+    hasPermission('view_settings') ? renderPanelSafely(renderBuildInfoPanel, 'buildinfo') : Promise.resolve(),
+    hasPermission('view_settings') ? renderPanelSafely(renderAboutPanel, 'about') : Promise.resolve(),
   ])
 
   // Show first tab (or hash)
@@ -1898,9 +1900,15 @@ async function loadRoles() {
     if (!normalizedRoles.some(role => role.id === fallback.id)) normalizedRoles.push({ ...fallback, permissions:fallback.permissions.slice() })
   }
   roles = normalizedRoles
-  rolePermissionCatalog = Array.isArray(catalogPayload?.permissions) && catalogPayload.permissions.length
-    ? catalogPayload.permissions
-    : ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => ({ ...permission }))
+  // Merge the server catalogue with the client contract. This keeps newly
+  // introduced permissions (such as assign_own_tasks) selectable when the UI
+  // is temporarily talking to an older server during a rolling deployment.
+  const serverCatalog = Array.isArray(catalogPayload?.permissions) ? catalogPayload.permissions : []
+  const catalogByKey = new Map(serverCatalog.filter(permission => permission?.key).map(permission => [permission.key, permission]))
+  rolePermissionCatalog = ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => ({ ...permission, ...(catalogByKey.get(permission.key) || {}) }))
+  for (const permission of serverCatalog) {
+    if (permission?.key && !rolePermissionCatalog.some(item => item.key === permission.key)) rolePermissionCatalog.push(permission)
+  }
 }
 async function loadUsers() { try { users = await api('/api/users') } catch { users = [] } }
 async function loadLocations() { locations = await api('/api/locations') }
@@ -2843,9 +2851,36 @@ async function saveRole() {
   }
 }
 
+function confirmRoleDeletion(roleName) {
+  document.getElementById('roleDeleteConfirm')?.remove()
+  return new Promise(resolve => {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.id = 'roleDeleteConfirm'
+    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="roleDeleteConfirmTitle" style="max-width:460px">
+      <div class="modal-header"><h3 class="modal-title" id="roleDeleteConfirmTitle">Delete custom role?</h3><button class="modal-close" type="button" aria-label="Close" data-cancel>✕</button></div>
+      <div class="modal-body"><p>Delete the custom role <strong>${escHtml(roleName)}</strong>?</p><p style="margin-top:8px;color:var(--text-3);font-size:13px">This action cannot be undone. Any assigned users must be reassigned first.</p></div>
+      <div class="modal-footer"><button class="btn btn-secondary" type="button" data-cancel>Cancel</button><button class="btn btn-danger" type="button" data-confirm>Delete role</button></div>
+    </div>`
+    document.body.appendChild(overlay)
+    overlay.classList.add('open')
+    let settled = false
+    const finish = value => {
+      if (settled) return
+      settled = true
+      overlay.remove()
+      resolve(value)
+    }
+    overlay.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => finish(false)))
+    overlay.querySelector('[data-confirm]')?.addEventListener('click', () => finish(true))
+    overlay.addEventListener('click', event => { if (event.target === overlay) finish(false) })
+    setTimeout(() => overlay.querySelector('[data-cancel]')?.focus(), 0)
+  })
+}
+
 async function deleteRole(id) {
   const role = roles.find(item => item.id === id)
-  if (!role?.deletable || Number(role.assigned_count || 0) > 0 || !canManageRoleDefinition(role) || !confirm(`Delete the custom role “${role.name}”?`)) return
+  if (!role?.deletable || Number(role.assigned_count || 0) > 0 || !canManageRoleDefinition(role) || !(await confirmRoleDeletion(role.name))) return
   try {
     await roleApiRequest(`/api/roles/${id}`, { method: 'DELETE' })
     await loadRoles()
@@ -3659,7 +3694,7 @@ async function renderFeaturesPanel() {
     <div class="card section-card" style="margin-bottom:20px">
       <div class="card-header">
         <div>
-          <h3 class="card-title">Task Notes</h3>
+          <h3 class="card-title">Task Lists</h3>
           <p style="font-size:12px;color:var(--text-3);margin-top:2px">Assign a weekly task list to each team member. Useful for rotating duties (e.g. monitoring rounds, desk assignments).</p>
         </div>
         <label class="toggle">
@@ -4491,9 +4526,17 @@ async function saveLocationMembers(locId) {
 // ── Security panel ─────────────────────────────────────────────────────────────
 async function renderSecurityPanel() {
   const userIsAdmin = cfg.user.role === 'admin'
-  const c = userIsAdmin ? await api('/api/config') : {}
-  const pol = c.passwordPolicy || {}
   const el = document.getElementById('panel-security')
+  if (!el) return
+  // Paint immediately so a slow/unavailable config endpoint never leaves the
+  // selected panel looking blank.
+  el.innerHTML = '<div class="card section-card"><div class="card-body" style="color:var(--text-3)">Loading security settings…</div></div>'
+  let c = {}
+  try { if (userIsAdmin) c = await api('/api/config') } catch (error) {
+    el.innerHTML = `<div class="card section-card"><div class="card-body"><strong>Unable to load security settings</strong><p style="margin-top:8px;color:var(--text-3)">${escHtml(error?.message || 'Please refresh and try again.')}</p></div></div>`
+    return
+  }
+  const pol = c.passwordPolicy || {}
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Security</h2>
 
@@ -5535,8 +5578,7 @@ async function clearAuditLog() {
 async function renderBackupPanel() {
   const el = document.getElementById('panel-backup')
   if (!el) return
-
-
+  el.innerHTML = '<div class="card section-card"><div class="card-body" style="color:var(--text-3)">Loading backup information…</div></div>'
 
   // Fetch live counts for the export summary
   let counts = { users: '…', locations: '…', shifts: '…', templates: '…' }
