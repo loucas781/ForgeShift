@@ -39,7 +39,7 @@ function assertTaskTarget(req, userId) {
 // Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
 router.get('/lists', requireAuth, (req, res) => {
   try {
-    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'view_task_lists') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     let lists
     if (canManageAllTasks(req)) {
       lists = db.prepare(`
@@ -152,7 +152,7 @@ router.delete('/lists/:id', requireAuth, requireTaskManagement, (req, res) => {
 // ── GET /api/tasks/assignments ────────────────────────────────────────────────
 router.get('/assignments', requireAuth, (req, res) => {
   try {
-    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'view_task_lists') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     const { start, end, user_id, org_id, team_id } = req.query
     let sql = `
       SELECT a.*, u.name as user_name, u.initials as user_initials, u.color as user_color,

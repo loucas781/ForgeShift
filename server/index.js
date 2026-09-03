@@ -427,9 +427,9 @@ app.get('/api/stats', requireAuth, (req, res) => {
   res.json({ users, shifts, locations, templates })
 })
 
-// ── GET /api/endpoints — admin-only API catalogue ─────────────────────────────
+// ── GET /api/endpoints — permission-gated API catalogue ───────────────────────
 app.get('/api/endpoints', requireAuth, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  if (!hasPermission(req, 'view_api_reference')) return res.status(403).json({ error: 'API reference access required' })
   try {
     const groups = buildApiCatalog()
     const endpointCount = groups.reduce((total, group) => total + group.endpoints.length, 0)
