@@ -9,6 +9,7 @@ const PERMISSION_CATALOG = [
   { key: 'view_shifts', label: 'View shifts', description: 'Read shift details that the account is allowed to access.', category: 'Workspace' },
   { key: 'view_tasks', label: 'View tasks', description: 'Read task lists and assigned task details within the account scope.', category: 'Tasks' },
   { key: 'view_task_lists', label: 'View task lists settings', description: 'Open the Task Lists settings page; edit actions remain controlled by task management permissions.', category: 'Tasks' },
+  { key: 'assign_own_tasks', label: 'Assign task lists to self', description: 'Assign available task lists to the signed-in user without creating or editing task lists.', category: 'Tasks' },
   { key: 'view_templates', label: 'View shift templates', description: 'Browse saved shift templates available to the account.', category: 'Workspace' },
   { key: 'view_own_rota', label: 'View own rota', description: 'View the signed-in user’s own shifts and rota.', category: 'Rota' },
   { key: 'view_other_rotas', label: 'View other users’ rotas', description: 'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category: 'Legacy', legacy: true },
