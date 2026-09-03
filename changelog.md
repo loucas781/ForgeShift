@@ -2,6 +2,9 @@
 
 ## 2026-09-03
 
+- Added dedicated permissions for the Task Lists and API Reference settings pages, keeping page visibility separate from edit permissions.
+- API Reference catalogue access now follows the same `view_api_reference` permission as its settings page.
+- Task list reads now honour the dedicated `view_task_lists` permission without granting task-list creation or editing.
 - Separated the personal **My Team** view from the administrative **People & Teams** settings page.
 - Added a dedicated `view_people_teams` permission for organisation-wide People & Teams administration.
 - Kept `view_teams` as the native-compatible team visibility permission, so existing iOS and Android clients continue to show their Team page without an app update.

@@ -7,7 +7,8 @@ const db = require('../db/connection')
 const PERMISSION_CATALOG = [
   { key: 'view_calendar', label: 'View calendar', description: 'Open the calendar and switch between month, week and agenda views.', category: 'Workspace' },
   { key: 'view_shifts', label: 'View shifts', description: 'Read shift details that the account is allowed to access.', category: 'Workspace' },
-  { key: 'view_tasks', label: 'View tasks', description: 'Read task lists and assigned task details within the account scope.', category: 'Workspace' },
+  { key: 'view_tasks', label: 'View tasks', description: 'Read task lists and assigned task details within the account scope.', category: 'Tasks' },
+  { key: 'view_task_lists', label: 'View task lists settings', description: 'Open the Task Lists settings page; edit actions remain controlled by task management permissions.', category: 'Tasks' },
   { key: 'view_templates', label: 'View shift templates', description: 'Browse saved shift templates available to the account.', category: 'Workspace' },
   { key: 'view_own_rota', label: 'View own rota', description: 'View the signed-in user’s own shifts and rota.', category: 'Rota' },
   { key: 'view_other_rotas', label: 'View other users’ rotas', description: 'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category: 'Legacy', legacy: true },
@@ -15,6 +16,7 @@ const PERMISSION_CATALOG = [
   { key: 'view_all_rotas', label: 'View all rotas', description: 'View rotas for every active user across the instance.', category: 'Rota', scope: 'All active users' },
   { key: 'view_teams', label: 'View organisation team members', description: 'See team membership and people in organisations the user can access.', category: 'Teams' },
   { key: 'view_people_teams', label: 'View People & Teams administration', description: 'Open the People & Teams settings page to review organisation users, roles and team assignments.', category: 'Administration' },
+  { key: 'view_api_reference', label: 'View API reference', description: 'Open the API Reference settings page and review available integration endpoints.', category: 'Administration' },
   { key: 'view_locations', label: 'View locations', description: 'Read configured work locations and their organisation links.', category: 'Workspace' },
   { key: 'view_organisations', label: 'View organisations', description: 'Read organisation details and assigned members.', category: 'Workspace' },
   { key: 'view_settings', label: 'View settings', description: 'Open the settings area permitted for the account.', category: 'Workspace' },
@@ -52,11 +54,11 @@ const BUILTIN = {
   },
   shift_lead: {
     id: 'builtin-shift-lead', name: 'Shift Lead', description: 'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color: '#2563eb', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_team_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_teams', 'manage_own_teams'],
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_task_lists', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_team_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_teams', 'manage_own_teams'],
   },
   manager: {
     id: 'builtin-manager', name: 'Manager', description: 'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color: '#d97706', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'view_people_teams', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_org_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_templates', 'manage_teams', 'manage_own_teams'],
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'view_task_lists', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'view_people_teams', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_org_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_templates', 'manage_teams', 'manage_own_teams'],
   },
   admin: {
     id: 'builtin-admin', name: 'Admin', description: 'Full instance access, including global rotas, users, roles, settings and backups.', color: '#4f46e5', is_builtin: 1,

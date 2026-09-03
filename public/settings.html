@@ -1194,6 +1194,7 @@ let settingsModalObserver = null
 // upgraded. These values intentionally mirror server/utils/roles.js so a
 // partial roles API response can never make protected roles appear empty.
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
+  { key:'view_task_lists', label:'View task lists settings', description:'Open the Task Lists settings page; edit actions remain controlled by task management permissions.', category:'Tasks' },
   { key:'view_calendar', label:'View calendar', description:'Open the calendar and switch between month, week and agenda views.', category:'Workspace' },
   { key:'view_shifts', label:'View shifts', description:'Read shift details that the account is allowed to access.', category:'Workspace' },
   { key:'view_tasks', label:'View tasks', description:'Read task lists and assigned task details within the account scope.', category:'Tasks' },
@@ -1232,11 +1233,12 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_audit', label:'View audit log', description:'Read the record of administrative and security actions.', category:'Administration' },
   { key:'manage_backups', label:'Manage backups', description:'Create, restore and manage application backups.', category:'Administration' },
   { key:'manage_holidays', label:'Manage holidays', description:'Configure bank holidays and holiday overrides.', category:'Administration' },
+  { key:'view_api_reference', label:'View API reference', description:'Open the API Reference settings page and review available integration endpoints.', category:'Administration' },
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
   { id:'builtin-member', name:'Member', description:'Personal access to your own calendar, shifts, tasks and settings.', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
-  { id:'builtin-shift-lead', name:'Shift Lead', description:'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','view_people_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-shift-lead', name:'Shift Lead', description:'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','view_task_lists','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','view_task_lists','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','view_people_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
   { id:'builtin-admin', name:'Admin', description:'Full instance access, including global rotas, users, roles, settings and backups.', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
   { id:'system-inactive', name:'Inactive', description:'System role for disabled accounts. Cannot sign in until re-enabled.', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
@@ -1425,7 +1427,7 @@ async function init() {
     { id: 'preferences', label: 'Preferences', roles: ['admin','manager','shift_lead','member'],
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
-    { id: 'task-lists', label: 'Task Lists', roles: [], permissions: ['view_tasks','manage_tasks','manage_team_tasks','manage_all_tasks'],
+    { id: 'task-lists', label: 'Task Lists', roles: [], permission: 'view_task_lists', permissionHint: 'Requires “View task lists settings”. Management actions remain controlled by task permissions.',
       icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>' },
 
     { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams', permissionHint: 'Requires “View organisation team members”. This is the personal team view used by the native apps.',
@@ -1445,7 +1447,7 @@ async function init() {
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
     { id: 'email', label: 'Email', roles: ['admin'], permission: 'manage_settings',
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
-    { id: 'api', label: 'API Reference', roles: ['admin'],
+    { id: 'api', label: 'API Reference', roles: [], permission: 'view_api_reference', permissionHint: 'Requires “View API reference”.',
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
     { id: 'audit', label: 'Audit Log', roles: ['admin'], permission: 'view_audit',
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
@@ -1521,15 +1523,16 @@ async function init() {
     canViewRoles ? renderRolesPanel() : Promise.resolve(),
     canViewOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
     canViewLocations ? renderLocationsPanel() : Promise.resolve(),
-    (isAdmin || hasPermission('manage_settings')) ? renderFeaturesPanel() : Promise.resolve(),
-    renderSecurityPanel(),
-    (isAdmin || hasPermission('manage_settings')) ? renderEmailPanel() : Promise.resolve(),
-    isAdmin ? renderApiPanel() : Promise.resolve(),
-    (isAdmin || hasPermission('view_audit')) ? renderAuditPanel() : Promise.resolve(),
-    (isAdmin || hasPermission('manage_backups')) ? renderBackupPanel() : Promise.resolve(),
-    renderUpdatesPanel(),
-    renderBuildInfoPanel(),
-    renderAboutPanel(),
+    hasPermission('manage_settings') ? renderFeaturesPanel() : Promise.resolve(),
+    hasPermission('view_task_lists') ? renderTaskListsPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderSecurityPanel() : Promise.resolve(),
+    hasPermission('manage_settings') ? renderEmailPanel() : Promise.resolve(),
+    hasPermission('view_api_reference') ? renderApiPanel() : Promise.resolve(),
+    hasPermission('view_audit') ? renderAuditPanel() : Promise.resolve(),
+    hasPermission('manage_backups') ? renderBackupPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderUpdatesPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderBuildInfoPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderAboutPanel() : Promise.resolve(),
   ])
 
   // Show first tab (or hash)
