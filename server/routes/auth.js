@@ -41,7 +41,7 @@ function isHttpsRequest(req) {
 
 function cookieOpts(req) {
   const hours  = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
-  const secureByConfig = process.env.COOKIE_SECURE === 'true'
+  const secureByConfig = process.env.COOKIE_SECURE === 'true' || process.env.APP_ENV === 'production'
   const secure = secureByConfig && isHttpsRequest(req)
   return { httpOnly: true, secure, sameSite: secure ? 'strict' : 'lax', maxAge: hours * 3600000, path: '/' }
 }
@@ -54,7 +54,7 @@ function makeToken(user, sessionId) {
 }
 
 function twoFaTrustCookieOpts(req) {
-  const secureByConfig = process.env.COOKIE_SECURE === 'true'
+  const secureByConfig = process.env.COOKIE_SECURE === 'true' || process.env.APP_ENV === 'production'
   const secure = secureByConfig && isHttpsRequest(req)
   return {
     httpOnly: true,
@@ -151,6 +151,16 @@ function createSession(req, userId) {
   const ip = (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) || req.ip || null
   const ua = req.headers['user-agent'] || null
   db.prepare('INSERT INTO user_sessions (id, user_id, ip, user_agent) VALUES (?,?,?,?)').run(id, userId, ip, ua)
+  // Keep abandoned/device sessions bounded. The newest session is always
+  // retained; this does not affect JWT/native-client login semantics.
+  const maxSessions = Math.max(1, Math.min(100, parseInt(process.env.MAX_SESSIONS_PER_USER || '20', 10) || 20))
+  db.prepare(`
+    DELETE FROM user_sessions
+    WHERE user_id = ? AND id != ? AND id NOT IN (
+      SELECT id FROM user_sessions WHERE user_id = ? AND id != ?
+      ORDER BY last_used_at DESC, created_at DESC LIMIT ?
+    )
+  `).run(userId, id, userId, id, Math.max(0, maxSessions - 1))
   return id
 }
 
@@ -210,8 +220,9 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required.' })
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase())
     if (!user) return res.status(401).json({ error: 'Invalid email or password.' })
+    // Use the same response for unknown and inactive accounts to avoid account enumeration.
     if (user.is_active === 0)
-      return res.status(403).json({ error: 'This account has been deactivated. Contact an admin.' })
+      return res.status(401).json({ error: 'Invalid email or password.' })
     const { ok: pwOk, needsRehash } = await comparePassword(password, user.password)
     if (!pwOk) return res.status(401).json({ error: 'Invalid email or password.' })
     if (needsRehash) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(await hashPassword(password), user.id)
@@ -323,10 +334,11 @@ router.patch('/profile', requireAuth, async (req, res) => {
       const pol = getPasswordPolicy(loadOverrides())
       const pv  = validatePassword(newPassword, pol)
       if (!pv.ok) return res.status(400).json({ error: pv.errors.join(' ') })
-      updates.push('password = ?'); vals.push(await hashPassword(newPassword))
+      // Changing a password revokes every other browser/mobile session.
+      updates.push('password = ?', 'token_version = token_version + 1'); vals.push(await hashPassword(newPassword))
     }
     if (updates.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...vals) }
-    const updated = addRoleMetadata(db.prepare('SELECT id, name, email, initials, color, avatar, role, role_id FROM users WHERE id = ?').get(user.id))
+    const updated = addRoleMetadata(db.prepare('SELECT id, name, email, initials, color, avatar, role, role_id, token_version FROM users WHERE id = ?').get(user.id))
     // Rotate session: delete old, create new so the session list stays accurate
     if (req.user?.sid) db.prepare('DELETE FROM user_sessions WHERE id = ?').run(req.user.sid)
     const newSid = createSession(req, updated.id)
@@ -525,7 +537,8 @@ router.post('/reset-password', async (req, res) => {
     if (!session)      return res.status(400).json({ error: 'Invalid or expired session.' })
     if (session.used)  return res.status(400).json({ error: 'This reset session has already been used.' })
     if (new Date(session.expires_at) < new Date()) return res.status(400).json({ error: 'Reset session has expired.' })
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(await hashPassword(password), session.user_id)
+    // A recovery flow must revoke any sessions created before the reset.
+    db.prepare('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?').run(await hashPassword(password), session.user_id)
     db.prepare('UPDATE password_reset_sessions SET used = 1 WHERE id = ?').run(session.id)
     audit(session.user_id, 'user.password_reset', 'user', session.user_id, null)
     res.json({ ok: true })
@@ -634,6 +647,11 @@ router.post('/2fa/disable', requireAuth, (req, res) => {
 // ── GET /api/auth/sessions — list all active sessions for current user ────────
 router.get('/sessions', requireAuth, (req, res) => {
   try {
+    const maxAgeHours = Math.max(1, Math.min(24 * 30, parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72', 10) || 72))
+    // JWT cookies cannot remain valid beyond their configured lifetime. Remove
+    // abandoned rows so the session list reflects genuinely active sessions.
+    db.prepare("DELETE FROM user_sessions WHERE user_id = ? AND last_used_at < datetime('now', ?)")
+      .run(req.user.id, `-${maxAgeHours} hours`)
     const rows = db.prepare(
       'SELECT id, ip, user_agent, created_at, last_used_at FROM user_sessions WHERE user_id = ? ORDER BY last_used_at DESC'
     ).all(req.user.id)

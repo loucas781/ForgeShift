@@ -69,7 +69,7 @@
       </div>
       <div id="rememberWarning" class="auth-warning">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <p>Only use this on a private device you own and trust. Credentials are saved in this browser.</p>
+        <p>Only use this on a private device you own and trust. Your email and password are stored locally in this browser when enabled.</p>
       </div>
       <button class="btn btn-primary auth-btn" id="loginBtn" onclick="doLogin()">Sign in</button>
     </div>
@@ -111,7 +111,8 @@
     try { return localStorage.getItem('fs-theme') || 'system' } catch { return 'system' }
   }
 
-  // Remember login details toggle
+  // Remember login details (opt-in). This uses browser local storage, so only
+  // enable it on a private device you own and trust.
   function onRememberChange(cb) {
     const warning = document.getElementById('rememberWarning')
     warning.style.display = cb.checked ? 'flex' : 'none'
@@ -123,7 +124,7 @@
     }
   }
 
-  // Restore saved credentials
+  // Restore remembered login details.
   ;(function restoreSaved() {
     try {
       const savedEmail = localStorage.getItem('fs-saved-email')
@@ -201,15 +202,6 @@
       if (d.user) window.location.href = '/'
       if (!d.allowSignup) document.getElementById('signupLink').style.display = 'none'
       setFooter(d.appEnv, d.version)
-      // Disable "remember login details" on non-production builds
-      if (d.appEnv === 'development') {
-        document.getElementById('rememberRow').style.display = 'none'
-        document.getElementById('rememberWarning').style.display = 'none'
-        try {
-          localStorage.removeItem('fs-saved-email')
-          localStorage.removeItem('fs-saved-password')
-        } catch {}
-      }
       // Update forgot-password link hint based on SMTP
       const fpLink = document.getElementById('forgotPwLink')
       if (fpLink && !d.smtpEnabled) {

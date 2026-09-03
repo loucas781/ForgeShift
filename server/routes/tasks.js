@@ -10,10 +10,10 @@ const logger = require('../utils/logger')
 const { hasPermission } = require('../utils/roles')
 
 function canManageAllTasks(req) {
-  return hasPermission(req, 'manage_all_tasks') || (hasPermission(req, 'manage_tasks') && req.user.role !== 'shift_lead' && !hasPermission(req, 'manage_team_tasks'))
+  return hasPermission(req, 'manage_all_tasks') || (hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks'))
 }
 function canManageTeamTasks(req) {
-  return req.user.role === 'shift_lead' || hasPermission(req, 'manage_team_tasks')
+  return hasPermission(req, 'manage_team_tasks')
 }
 function taskScope(req) {
   return req.user.role === 'shift_lead' ? getShiftLeadScope(req.user.id) : getOrganisationScope(req.user.id)
@@ -24,15 +24,22 @@ function requireTaskManagement(req, res, next) {
   }
   next()
 }
+function requireTaskAssignment(req, res, next) {
+  const canManage = hasPermission(req, 'manage_tasks') || hasPermission(req, 'manage_team_tasks') || hasPermission(req, 'manage_all_tasks')
+  const canAssignOwn = hasPermission(req, 'assign_own_tasks')
+  if (!canManage && !canAssignOwn) return res.status(403).json({ error: 'Insufficient permissions', permission: 'assign_own_tasks' })
+  req.canAssignOwnTasks = canAssignOwn
+  next()
+}
 function assertTaskTarget(req, userId) {
-  return canManageAllTasks(req) || (canManageTeamTasks(req) && taskScope(req).has(userId))
+  return canManageAllTasks(req) || (canManageTeamTasks(req) && taskScope(req).has(userId)) || (hasPermission(req, 'assign_own_tasks') && userId === req.user.id)
 }
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
 // Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
 router.get('/lists', requireAuth, (req, res) => {
   try {
-    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     let lists
     if (canManageAllTasks(req)) {
       lists = db.prepare(`
@@ -145,7 +152,7 @@ router.delete('/lists/:id', requireAuth, requireTaskManagement, (req, res) => {
 // ── GET /api/tasks/assignments ────────────────────────────────────────────────
 router.get('/assignments', requireAuth, (req, res) => {
   try {
-    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
+    if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) return res.status(403).json({ error: 'You do not have permission to view tasks.' })
     const { start, end, user_id, org_id, team_id } = req.query
     let sql = `
       SELECT a.*, u.name as user_name, u.initials as user_initials, u.color as user_color,
@@ -199,7 +206,7 @@ router.get('/assignments', requireAuth, (req, res) => {
 // ── POST /api/tasks/assignments — create an assignment ────────────────────────
 // Body: { user_id, task_list_id, date }
 // To remove: send task_list_id = null (clears all for user+date) or DELETE /:id
-router.post('/assignments', requireAuth, requireTaskManagement, (req, res) => {
+router.post('/assignments', requireAuth, requireTaskAssignment, (req, res) => {
   try {
     const { user_id, task_list_id, date } = req.body
     if (!user_id || !date) return res.status(400).json({ error: 'user_id and date are required.' })
@@ -239,7 +246,7 @@ router.post('/assignments', requireAuth, requireTaskManagement, (req, res) => {
 // ── POST /api/tasks/assignments/bulk — assign a task list to multiple dates ────
 // Body: { user_id, task_list_id, dates: ['YYYY-MM-DD', ...] }
 // Skips silently any date that already has this user+list combo (idempotent).
-router.post('/assignments/bulk', requireAuth, requireTaskManagement, (req, res) => {
+router.post('/assignments/bulk', requireAuth, requireTaskAssignment, (req, res) => {
   try {
     const { user_id, task_list_id, dates } = req.body
     if (!user_id || !task_list_id) return res.status(400).json({ error: 'user_id and task_list_id are required.' })
@@ -271,7 +278,7 @@ router.post('/assignments/bulk', requireAuth, requireTaskManagement, (req, res) 
 })
 
 
-router.delete('/assignments/:id', requireAuth, requireTaskManagement, (req, res) => {
+router.delete('/assignments/:id', requireAuth, requireTaskAssignment, (req, res) => {
   try {
     const a = db.prepare('SELECT * FROM task_assignments WHERE id = ?').get(req.params.id)
     if (!a) return res.status(404).json({ error: 'Assignment not found' })

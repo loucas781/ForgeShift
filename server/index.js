@@ -62,6 +62,7 @@ const emailSvc = require('./email')
 const logger   = require('./utils/logger')
 
 const app = express()
+app.disable('x-powered-by')
 const GITHUB_REPO = process.env.GITHUB_REPO || 'loucas781/ForgeShift'
 const GITHUB_RELEASES_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases`
 const GITHUB_RELEASES_CACHE_MS = 5 * 60 * 1000
@@ -73,8 +74,25 @@ app.use(express.urlencoded({ extended: false, limit: '1mb' }))
 app.use('/api/backup/restore', express.text({ limit: '256mb', type: 'text/plain' }))
 app.use(cookieParser())
 
+// Baseline browser security headers. CSP is intentionally not set here yet:
+// the current server-rendered pages contain inline scripts and styles, and a
+// partial CSP would break clients without providing complete coverage.
 app.use((req, res, next) => {
-  logger.debug(`[req] ${req.method} ${req.path}`)
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  })
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase()
+  if (req.secure || forwardedProto === 'https') res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  next()
+})
+
+app.use((req, res, next) => {
+  // iCal feed URLs contain bearer tokens; never write those tokens to logs.
+  const safePath = req.path.replace(/(\/api\/ical\/feed\/)[^/]+/i, '$1[redacted]')
+  logger.debug(`[req] ${req.method} ${safePath}`)
   next()
 })
 
@@ -117,8 +135,18 @@ if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1)
 
 app.use('/api/auth', rateLimit({
   windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
-  skip: () => process.env.APP_ENV === 'development',
+  // Logout is deliberately idempotent and must never consume login attempts.
+  // This prevents repeated taps or a retry after a flaky connection from
+  // locking the same IP out of the sign-in endpoint.
+  // Only authentication attempts need this limiter. Routine authenticated
+  // reads (for example /me and /sessions) must not consume login attempts.
+  skip: (req) => process.env.APP_ENV === 'development' || req.path === '/logout' || req.method !== 'POST',
   message: { error: 'Too many attempts — please wait 15 minutes.' },
+}))
+app.use('/api/passkeys', rateLimit({
+  windowMs: 15 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false,
+  skip: () => process.env.APP_ENV === 'development',
+  message: { error: 'Too many passkey attempts — please wait 15 minutes.' },
 }))
 
 // Rate limit on data write operations (POST/PUT/PATCH/DELETE to most API routes)
@@ -184,7 +212,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     sectionAccess: user ? {
       calendar: hasPermission(req, 'view_calendar') || hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_other_rotas') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts'),
       shifts: hasPermission(req, 'view_shifts') || hasPermission(req, 'view_own_rota') || hasPermission(req, 'view_other_rotas') || hasPermission(req, 'view_team_rotas') || hasPermission(req, 'view_all_rotas') || hasPermission(req, 'manage_team_shifts') || hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_all_shifts'),
-      tasks: hasPermission(req, 'view_tasks') || hasPermission(req, 'manage_tasks') || hasPermission(req, 'manage_team_tasks') || hasPermission(req, 'manage_all_tasks'),
+      tasks: hasPermission(req, 'view_tasks') || hasPermission(req, 'assign_own_tasks') || hasPermission(req, 'manage_tasks') || hasPermission(req, 'manage_team_tasks') || hasPermission(req, 'manage_all_tasks'),
       templates: hasPermission(req, 'view_templates') || hasPermission(req, 'manage_templates'),
       teams: hasPermission(req, 'view_teams') || hasPermission(req, 'manage_teams') || hasPermission(req, 'manage_own_teams') || hasPermission(req, 'manage_all_teams'),
       locations: hasPermission(req, 'view_locations') || hasPermission(req, 'manage_locations'),
@@ -193,7 +221,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     } : null,
     allowSignup:        (overrides.ALLOW_SIGNUP  ?? 'true') !== 'false',
     maintenanceMode:    (overrides.MAINTENANCE_MODE ?? 'false') === 'true',
-    cookieSecure:       process.env.COOKIE_SECURE === 'true',
+    cookieSecure:       process.env.COOKIE_SECURE === 'true' || APP_ENV_NORM === 'production',
     trustProxy:         process.env.TRUST_PROXY   === 'true',
     passwordPolicy:     getPasswordPolicy(overrides),
     smtpEnabled:        emailSvc.getSmtpConfig().enabled,
@@ -288,7 +316,7 @@ app.patch('/api/config', requireAuth, (req, res) => {
     ok: true,
     allowSignup:       overrides.ALLOW_SIGNUP   !== 'false',
     maintenanceMode:   overrides.MAINTENANCE_MODE === 'true',
-    cookieSecure:      process.env.COOKIE_SECURE === 'true',
+      cookieSecure:      process.env.COOKIE_SECURE === 'true' || APP_ENV_NORM === 'production',
     trustProxy:        process.env.TRUST_PROXY   === 'true',
     inactivityTimeout: overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
   })
@@ -387,12 +415,6 @@ app.delete('/api/audit', requireAuth, (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
-
-// Short-lived cache helper (10 s public, stale-while-revalidate)
-function cacheShort(req, res, next) {
-  res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
-  next()
-}
 
 // ── GET /api/stats — instance stats for Build Info panel ──────────────────────
 app.get('/api/stats', requireAuth, (req, res) => {
@@ -624,8 +646,10 @@ function cleanExpiredTokens() {
     const now = new Date().toISOString()
     const tokens   = db.prepare("DELETE FROM password_reset_tokens   WHERE expires_at < ? OR used = 1").run(now)
     const sessions = db.prepare("DELETE FROM password_reset_sessions WHERE expires_at < ? OR used = 1").run(now)
-    if (tokens.changes || sessions.changes) {
-      logger.debug(`Token cleanup: removed ${tokens.changes} tokens, ${sessions.changes} sessions`)
+    const maxAgeHours = Math.max(1, Math.min(24 * 30, parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72', 10) || 72))
+    const userSessions = db.prepare("DELETE FROM user_sessions WHERE last_used_at < datetime('now', ?)").run(`-${maxAgeHours} hours`)
+    if (tokens.changes || sessions.changes || userSessions.changes) {
+      logger.debug(`Token cleanup: removed ${tokens.changes} reset tokens, ${sessions.changes} reset sessions, ${userSessions.changes} expired user sessions`)
     }
   } catch (err) {
     logger.error('Token cleanup failed:', err.message)

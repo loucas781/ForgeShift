@@ -366,6 +366,7 @@ function hasPermission(permission) {
 }
 function canViewOtherRotas() { return ['view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) }
 function canManageTasks() { return ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission) }
+function canAssignOwnTasks() { return canManageTasks() || hasPermission('assign_own_tasks') }
 function canTargetOtherUsers() {
   return canViewOtherRotas() || ['add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)
 }
@@ -408,7 +409,8 @@ function getTaskBannerPresentation(taskAssignment, alpha = '22') {
 
 function renderTaskDots(dayAssignments, dateStr, className = '') {
   if (!cfg.featureTasks || !dayAssignments.length) return ''
-  const clickAttr = canManageTasks()
+  const canOpen = canManageTasks() || (canAssignOwnTasks() && dayAssignments.some(a => a.user_id === cfg?.user?.id))
+  const clickAttr = canOpen
     ? `onclick="event.stopPropagation();openTaskAssignModal('${dateStr}')"`
     : ''
   const count = dayAssignments.length
@@ -419,7 +421,7 @@ function renderTaskDots(dayAssignments, dateStr, className = '') {
   const title = dayAssignments.map(a =>
     `${a.task_list_name || 'Task'}${a.user_name ? ' • ' + a.user_name : ''}`
   ).join('\n')
-  return `<div class="cal-task-dots${canManageTasks() ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canManageTasks() ? clickAttr : ''} title="${escHtml(title)}">` +
+  return `<div class="cal-task-dots${canOpen ? ' clickable' : ''}${className ? ' ' + className : ''}" ${canOpen ? clickAttr : ''} title="${escHtml(title)}">` +
     `<span class="cal-task-dot-row">${dotsHtml}</span>` +
     `<span class="cal-task-dot-label">${count} task list${count === 1 ? '' : 's'}</span>` +
   `</div>`
@@ -622,9 +624,8 @@ async function loadLocations() {
 }
 
 async function loadUsers() {
-  if (!canTargetOtherUsers()) { users = [cfg.user]; return }
   // The backend applies team/permission scope; do not duplicate role rules here.
-  users = await api('/api/users')
+  users = canTargetOtherUsers() ? await api('/api/users') : [cfg.user]
   const msel = document.getElementById('modalUser')
   const tasel = document.getElementById('taUser')
   const mFrag = document.createDocumentFragment()
@@ -632,11 +633,15 @@ async function loadUsers() {
   users.filter(u => u.is_active).forEach(u => {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
     mFrag.appendChild(o)
+  })
+  const taskUsers = canManageTasks() ? users.filter(u => u.is_active) : [cfg.user]
+  taskUsers.forEach(u => {
     const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
     taFrag.appendChild(o2)
   })
   msel.appendChild(mFrag)
   tasel.appendChild(taFrag)
+  if (!canManageTasks()) tasel.disabled = true
 }
 
 let teams = []
@@ -1085,12 +1090,12 @@ function renderMonth() {
     // Task indicator — compact dots keeps month view clean.
     let taskBannerHtml = ''
     if (cfg.featureTasks && taskLists.length) {
-      const clickAttr = canManageTasks()
+      const clickAttr = canAssignOwnTasks()
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       if (dayAssignments.length) {
         taskBannerHtml = renderTaskDots(dayAssignments, ds)
-      } else if (canManageTasks() && isSingleUserView) {
+      } else if (canAssignOwnTasks() && isSingleUserView) {
         taskBannerHtml = `<div class="cal-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
     }
@@ -1294,19 +1299,19 @@ function renderWeek() {
   html += `</div>` // end header-row
 
   // ── Task row (optional, sits between header and time body) ───────────────────
-  if (cfg.featureTasks && (weekHasTasks || canManageTasks())) {
+  if (cfg.featureTasks && (weekHasTasks || canAssignOwnTasks())) {
     html += `<div class="cal-week-task-row">`
     html += `<div class="cal-week-task-gutter" aria-hidden="true"></div>` // gutter spacer
     days.forEach(d => {
       const ds = toDateStr(d)
       const dayAssignments = taskMap[ds] || []
-      const clickAttr = canManageTasks() && taskLists.length
+      const clickAttr = canAssignOwnTasks() && taskLists.length
         ? `onclick="event.stopPropagation();openTaskAssignModal('${ds}')"`
         : ''
       html += `<div class="cal-week-task-cell">`
       if (dayAssignments.length) {
         html += renderTaskDots(dayAssignments, ds, 'week-task-dots')
-      } else if (canManageTasks() && taskLists.length && isSingleUserView) {
+      } else if (canAssignOwnTasks() && taskLists.length && isSingleUserView) {
         html += `<div class="cal-task-banner week-task-banner task-banner-empty" ${clickAttr} title="Assign task for this day">+ Task</div>`
       }
       html += `</div>`

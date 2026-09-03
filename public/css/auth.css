@@ -544,6 +544,8 @@
 }
 
 @media (max-width: 820px) {
+  /* Prevent Safari focus zoom on sign-in, reset-password and sign-up forms. */
+  .auth-card .form-input { font-size:16px; }
   .auth-page {
     align-items: flex-start;
     padding:
@@ -560,9 +562,23 @@
     border-radius: 22px;
   }
 
+  /* Keep the modern welcome treatment on phones as a compact branded header
+     instead of dropping the desktop panel entirely. */
   .auth-welcome {
-    display: none;
+    display: block;
+    min-height: 0;
+    padding: 20px 22px;
+    border-radius: 22px 22px 0 0;
   }
+
+  .auth-welcome-content,
+  .auth-welcome-foot { display: none; }
+
+  .auth-welcome-brand { font-size: 17px; }
+  .auth-welcome-brand .auth-logo-img { width: 32px; height: 32px; }
+
+  /* The compact header carries the logo, so avoid showing it twice. */
+  .auth-card .auth-logo { display: none; }
 
   .auth-card {
     max-width: none;
@@ -582,6 +598,8 @@
   .auth-shell {
     border-radius: 18px;
   }
+
+  .auth-welcome { border-radius: 18px 18px 0 0; }
 
   .auth-card {
     padding: 26px 22px 24px;

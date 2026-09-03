@@ -1196,7 +1196,8 @@ let settingsModalObserver = null
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_calendar', label:'View calendar', category:'Workspace' },
   { key:'view_shifts', label:'View shifts', category:'Workspace' },
-  { key:'view_tasks', label:'View tasks', category:'Workspace' },
+  { key:'view_tasks', label:'View tasks', category:'Tasks' },
+  { key:'assign_own_tasks', label:'Assign task lists to self', description:'Assign available task lists to the signed-in user without creating or editing task lists.', category:'Tasks' },
   { key:'view_templates', label:'View shift templates', category:'Workspace' },
   { key:'view_own_rota', label:'View own rota', category:'Rota' },
   { key:'view_other_rotas', label:'View other users’ rotas', description:'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category:'Legacy', legacy:true },
@@ -1215,9 +1216,9 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'manage_team_shifts', label:'Manage shifts for your teams', category:'Shifts', scope:'Organisation/team members only' },
   { key:'manage_org_shifts', label:'Manage shifts across your organisation', category:'Shifts', scope:'Organisation members only' },
   { key:'manage_all_shifts', label:'Manage all shifts', category:'Shifts', scope:'All active users' },
-  { key:'manage_tasks', label:'Manage tasks and assignments', category:'Administration' },
-  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Administration', scope:'Organisation/team members only' },
-  { key:'manage_all_tasks', label:'Manage all tasks', category:'Administration', scope:'All active users' },
+  { key:'manage_tasks', label:'Manage tasks and assignments', category:'Tasks' },
+  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Tasks', scope:'Organisation/team members only' },
+  { key:'manage_all_tasks', label:'Manage all tasks', category:'Tasks', scope:'All active users' },
   { key:'manage_templates', label:'Manage shift templates', category:'Administration' },
   { key:'manage_teams', label:'Manage teams', category:'Administration' },
   { key:'manage_own_teams', label:'Manage assigned teams', category:'Administration', scope:'Owned or assigned teams' },
@@ -1232,9 +1233,9 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'manage_holidays', label:'Manage holidays', category:'Administration' },
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
-  { id:'builtin-member', name:'Member', description:'Personal access to your own calendar, shifts, tasks and settings.', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
-  { id:'builtin-shift-lead', name:'Shift Lead', description:'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
-  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-member', name:'Member', description:'Personal access to your own calendar, shifts, tasks and settings.', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
+  { id:'builtin-shift-lead', name:'Shift Lead', description:'Day-to-day team operations: manage team rotas, tasks and assigned team members.', color:'#2563eb', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts','manage_tasks','manage_team_tasks','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
+  { id:'builtin-manager', name:'Manager', description:'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color:'#d97706', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_templates','view_settings','view_own_rota','view_other_rotas','view_team_rotas','view_teams','view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts','add_other_shifts','edit_other_shifts','delete_other_shifts','manage_org_shifts','manage_tasks','manage_team_tasks','manage_templates','manage_teams','manage_own_teams'], is_builtin:true, is_system:false },
   { id:'builtin-admin', name:'Admin', description:'Full instance access, including global rotas, users, roles, settings and backups.', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
   { id:'system-inactive', name:'Inactive', description:'System role for disabled accounts. Cannot sign in until re-enabled.', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
@@ -1418,46 +1419,49 @@ async function init() {
   bindResetLinkDelegatedHandler()
 
   const ALL_TABS = [
-    { id: 'appearance', label: 'Appearance', roles: ['admin','manager','shift_lead','member'],
+    { id: 'appearance', label: 'Appearance', roles: [], permission: 'view_settings',
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-    { id: 'preferences', label: 'Preferences', roles: ['admin','manager','shift_lead','member'],
+    { id: 'preferences', label: 'Preferences', roles: [], permission: 'view_settings',
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
+
+    { id: 'task-lists', label: 'Task Lists', roles: [], permissions: ['view_tasks','manage_tasks','manage_team_tasks','manage_all_tasks'],
+      icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>' },
 
     { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams',
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
 
-    { id: 'team', label: 'People & Teams', roles: ['admin','manager'], permissions: ['view_teams','manage_users','manage_teams'],
+    { id: 'team', label: 'People & Teams', roles: [], permissions: ['view_teams','manage_users','manage_teams'],
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
-    { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: ['admin'], permission: 'manage_roles',
+    { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: [], permission: 'manage_roles',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>' },
-    { id: 'organisations', label: 'Organisations', roles: ['admin'], permissions: ['view_organisations','manage_organisations'],
+    { id: 'organisations', label: 'Organisations', roles: [], permissions: ['view_organisations','manage_organisations'],
       icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
-    { id: 'locations', label: 'Locations', roles: ['admin'], permissions: ['view_locations','manage_locations'],
+    { id: 'locations', label: 'Locations', roles: [], permissions: ['view_locations','manage_locations'],
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
-    { id: 'features', label: 'Features', roles: ['admin'], permission: 'manage_settings',
+    { id: 'features', label: 'Features', roles: [], permission: 'manage_settings',
       icon: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>' },
-    { id: 'security', label: 'Security', roles: ['admin','manager','shift_lead','member'],
+    { id: 'security', label: 'Security', roles: [], permission: 'view_settings',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
-    { id: 'email', label: 'Email', roles: ['admin'], permission: 'manage_settings',
+    { id: 'email', label: 'Email', roles: [], permission: 'manage_settings',
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
     { id: 'api', label: 'API Reference', roles: ['admin'],
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'audit', label: 'Audit Log', roles: ['admin'], permission: 'view_audit',
+    { id: 'audit', label: 'Audit Log', roles: [], permission: 'view_audit',
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
-    { id: 'backup', label: 'Backup', roles: ['admin'], permission: 'manage_backups',
+    { id: 'backup', label: 'Backup', roles: [], permission: 'manage_backups',
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
-    { id: 'updates', label: 'Updates', roles: ['admin'],
+    { id: 'updates', label: 'Updates', roles: [], permission: 'view_settings',
       icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>' },
-    { id: 'buildinfo', label: 'Build Info', roles: ['admin','manager','shift_lead','member'],
+    { id: 'buildinfo', label: 'Build Info', roles: [], permission: 'view_settings',
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'about', label: 'About', roles: ['admin','manager','shift_lead','member'],
+    { id: 'about', label: 'About', roles: [], permission: 'view_settings',
       icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
 
   const userRole = cfg.user.role
   const sectionByTab = {
     appearance: 'personal', preferences: 'personal', security: 'personal',
-    'my-teams': 'workspace', team: 'workspace', roles: 'workspace', organisations: 'workspace', locations: 'workspace', features: 'workspace',
+    'my-teams': 'workspace', team: 'workspace', 'task-lists': 'workspace', roles: 'workspace', organisations: 'workspace', locations: 'workspace', features: 'workspace',
     email: 'system', api: 'system', audit: 'system', backup: 'system', updates: 'system', buildinfo: 'system', about: 'system',
   }
   const sectionLabels = { personal: 'Personal', workspace: 'Workspace', system: 'System' }
@@ -1494,11 +1498,11 @@ async function init() {
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
 
   // Load data then populate
-  const canViewTeamPanel = isAdmin || isManager || hasPermission('view_teams') || hasPermission('manage_users') || canManageTeams()
-  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','manage_all_tasks','view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts','view_teams'].some(hasPermission)
-  const canViewRoles = isAdmin || hasPermission('manage_roles')
-  const canManageOrganisations = isAdmin || hasPermission('manage_organisations')
-  const canManageLocations = isAdmin || hasPermission('manage_locations')
+  const canViewTeamPanel = ['view_teams','manage_users','manage_teams','manage_own_teams','manage_all_teams'].some(hasPermission)
+  const canLoadUsers = canViewTeamPanel || ['assign_own_tasks','manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','manage_all_tasks','view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts','view_teams'].some(hasPermission)
+  const canViewRoles = hasPermission('manage_roles')
+  const canManageOrganisations = hasPermission('manage_organisations')
+  const canManageLocations = hasPermission('manage_locations')
   const canViewOrganisations = canManageOrganisations || hasPermission('view_organisations')
   const canViewLocations = canManageLocations || hasPermission('view_locations')
   if (canLoadUsers || canViewRoles) await loadUsers()
@@ -1509,22 +1513,23 @@ async function init() {
   // Wire password indicator for Edit User modal
   euPwIndicator = document.getElementById('euPwIndicatorWrap')
   await Promise.all([
-    renderAppearancePanel(),
-    renderPreferencesPanel(),
+    hasPermission('view_settings') ? renderAppearancePanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderPreferencesPanel() : Promise.resolve(),
     hasPermission('view_teams') ? renderMyTeamsPanel() : Promise.resolve(),
     canViewTeamPanel ? renderTeamPanel() : Promise.resolve(),
     canViewRoles ? renderRolesPanel() : Promise.resolve(),
     canViewOrganisations ? renderOrganisationsPanel() : Promise.resolve(),
     canViewLocations ? renderLocationsPanel() : Promise.resolve(),
-    (isAdmin || hasPermission('manage_settings')) ? renderFeaturesPanel() : Promise.resolve(),
-    renderSecurityPanel(),
-    (isAdmin || hasPermission('manage_settings')) ? renderEmailPanel() : Promise.resolve(),
+    hasPermission('manage_settings') ? renderFeaturesPanel() : Promise.resolve(),
+    (hasPermission('view_tasks') || hasPermission('manage_tasks') || hasPermission('manage_team_tasks') || hasPermission('manage_all_tasks')) ? renderTaskListsPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderSecurityPanel() : Promise.resolve(),
+    hasPermission('manage_settings') ? renderEmailPanel() : Promise.resolve(),
     isAdmin ? renderApiPanel() : Promise.resolve(),
-    (isAdmin || hasPermission('view_audit')) ? renderAuditPanel() : Promise.resolve(),
-    (isAdmin || hasPermission('manage_backups')) ? renderBackupPanel() : Promise.resolve(),
-    renderUpdatesPanel(),
-    renderBuildInfoPanel(),
-    renderAboutPanel(),
+    hasPermission('view_audit') ? renderAuditPanel() : Promise.resolve(),
+    hasPermission('manage_backups') ? renderBackupPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderUpdatesPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderBuildInfoPanel() : Promise.resolve(),
+    hasPermission('view_settings') ? renderAboutPanel() : Promise.resolve(),
   ])
 
   // Show first tab (or hash)
@@ -3615,6 +3620,20 @@ let taskLists = []
 let editingTaskListId = null
 let tlColour = '#4f46e5'
 
+async function renderTaskListsPanel() {
+  const el = document.getElementById('panel-task-lists')
+  if (!el) return
+  const canEdit = ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission)
+  el.innerHTML = `<div class="admin-page-header"><div class="admin-page-heading"><span class="admin-page-eyebrow">Task management</span><h2>Task Lists</h2><p>${canEdit ? 'Create and organise reusable task lists.' : 'Browse task lists available to your account.'} Assigning a list to yourself does not require permission to create or edit lists.</p></div></div>
+    <div class="card section-card"><div class="card-header"><h3 class="card-title">Task Lists</h3>${canEdit ? '<button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>' : ''}</div>
+      <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
+      <div id="taskListLabelTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface-2)"></div>
+      <div class="card-body" style="padding:0"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Label</th><th>Colour</th><th>Actions</th></tr></thead><tbody id="taskListsBody"></tbody></table></div></div>
+    </div>`
+  await loadTaskLists()
+  renderTaskListOrgTabs(); renderTaskListLabelTabs(); renderTaskListsTable()
+}
+
 async function renderFeaturesPanel() {
   const featData = await api('/api/features')
   const el = document.getElementById('panel-features')
@@ -3645,28 +3664,7 @@ async function renderFeaturesPanel() {
           <span class="toggle-slider"></span>
         </label>
       </div>
-    </div>
-
-    <div id="taskListsSection" style="display:${featData.feature_tasks ? 'block' : 'none'}">
-      <div class="card section-card">
-        <div class="card-header">
-          <h3 class="card-title">Task Lists</h3>
-          <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
-        </div>
-        <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
-        <div id="taskListLabelTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface-2)"></div>
-        <div class="card-body" style="padding:0">
-          <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Label</th><th>Colour</th><th>Actions</th></tr></thead>
-            <tbody id="taskListsBody"></tbody>
-          </table></div>
-        </div>
-      </div>
     </div>`
-  await loadTaskLists()
-  renderTaskListOrgTabs()
-  renderTaskListLabelTabs()
-  renderTaskListsTable()
 }
 
 let activeTaskListOrgTab = 'all'
@@ -3745,6 +3743,7 @@ function switchTaskListLabelTab(key) {
 }
 
 function _renderTaskListRows(lists) {
+  const canEdit = ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission)
   return lists.map(t => {
     const description = t.description
       ? `<span title="${escHtml(t.description)}">${escHtml(t.description.length > 80 ? t.description.slice(0, 80) + '…' : t.description)}</span>`
@@ -3757,10 +3756,10 @@ function _renderTaskListRows(lists) {
       <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${escHtml(t.location_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td>${t.label ? `<span class="badge badge-gray">${escHtml(t.label)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
-      <td><div style="display:flex;gap:4px">
+      <td>${canEdit ? `<div style="display:flex;gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteTaskList("${t.id}", ${safeName})'>Delete</button>
-      </div></td>
+      </div>` : '<span style="color:var(--text-3)">View only</span>'}</td>
     </tr>`
   }).join('')
 }
@@ -3777,7 +3776,7 @@ function renderTaskListsTable() {
   else if (activeTaskListOrgTab !== 'all') visible = visible.filter(t => t.org_id === activeTaskListOrgTab)
   if (activeTaskListLabelTab !== 'all') visible = visible.filter(t => t.label === activeTaskListLabelTab)
   if (!visible.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists match the selected filters</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px">No task lists match the selected filters</td></tr>'
     return
   }
   tbody.innerHTML = _renderTaskListRows(visible)
@@ -3796,8 +3795,10 @@ async function toggleFeatureDragDrop(enabled) {
 async function toggleFeatureTasks(enabled) {
   try {
     await api('/api/features', { method: 'PATCH', body: { feature_tasks: enabled } })
-    document.getElementById('taskListsSection').style.display = enabled ? 'block' : 'none'
-    if (enabled) await loadTaskLists()
+    if (enabled && document.getElementById('panel-task-lists')) {
+      await loadTaskLists()
+      renderTaskListOrgTabs(); renderTaskListLabelTabs(); renderTaskListsTable()
+    }
     toast('Feature ' + (enabled ? 'enabled' : 'disabled'), 'success')
   } catch (err) {
     toast(err.message, 'error')
