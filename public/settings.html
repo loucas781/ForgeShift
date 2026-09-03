@@ -5904,8 +5904,28 @@ async function renderBuildInfoPanel() {
 }
 
 // ── Clear App Cache ───────────────────────────────────────────────────────────
+function confirmCacheClear() {
+  document.getElementById('cacheClearConfirm')?.remove()
+  return new Promise(resolve => {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'; overlay.id = 'cacheClearConfirm'
+    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="cacheClearConfirmTitle" style="max-width:500px">
+      <div class="modal-header"><h3 class="modal-title" id="cacheClearConfirmTitle">Clear application cache?</h3><button class="modal-close" type="button" aria-label="Close" data-cancel>✕</button></div>
+      <div class="modal-body"><p>Fresh application assets will be downloaded and the page will reload.</p><p style="margin-top:8px;color:var(--text-3);font-size:13px">Your account and preferences will not be affected.</p></div>
+      <div class="modal-footer"><button class="btn btn-secondary" type="button" data-cancel>Cancel</button><button class="btn btn-primary" type="button" data-confirm>Clear cache</button></div>
+    </div>`
+    document.body.appendChild(overlay); overlay.classList.add('open')
+    let settled = false
+    const finish = value => { if (settled) return; settled = true; overlay.remove(); resolve(value) }
+    overlay.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => finish(false)))
+    overlay.querySelector('[data-confirm]')?.addEventListener('click', () => finish(true))
+    overlay.addEventListener('click', event => { if (event.target === overlay) finish(false) })
+    setTimeout(() => overlay.querySelector('[data-cancel]')?.focus(), 0)
+  })
+}
+
 async function clearAppCache() {
-  if (!confirm('Clear application cache and reload? Fresh assets will be downloaded. Your account and preferences will not be affected.')) return
+  if (!(await confirmCacheClear())) return
   try {
     if ('caches' in window) {
       const keys = await caches.keys()
