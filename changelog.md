@@ -2,11 +2,14 @@
 
 ## 2026-08-24
 
+- Added an **Absent / Sick** day status alongside Annual Leave.
+- Absent days appear as all-day **“Absent”** events in iCal feeds.
+- Added database migration and backup support for absence types.
+- Kept existing day-off records as Annual Leave.
+- Improved organisation and team assignment dialogs with clearer guidance and searchable people lists.
+- Added absence status to the existing shift API for native clients.
 - Fixed users appearing multiple times in People & Teams when one account belongs to multiple teams or organisations.
 - Clarified the difference between My Team (personal view) and People & Teams (administration); administrators now manage teams from People & Teams only.
-- Added an Absent / Sick day status alongside Annual Leave. Absent days appear as all-day “Absent” events in iCal feeds and are included in the existing shift API for native clients.
-- Added a migration and backup support for the new absence type while keeping existing day-off records as Annual Leave.
-- Improved organisation and team assignment dialogs with clearer scope guidance and searchable people lists.
 
 ## 2026-08-13
 
