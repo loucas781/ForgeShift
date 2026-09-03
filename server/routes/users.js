@@ -53,6 +53,7 @@ function canListUsers(req) {
     'view_team_rotas',
     'view_all_rotas',
     'view_teams',
+    'view_people_teams',
     'add_other_shifts',
     'edit_other_shifts',
     'delete_other_shifts',

@@ -15,6 +15,7 @@ const PERMISSION_CATALOG = [
   { key: 'view_team_rotas', label: 'View team rotas', description: 'View rotas for members of the user’s assigned teams or organisation scope.', category: 'Rota', scope: 'Organisation/team members only' },
   { key: 'view_all_rotas', label: 'View all rotas', description: 'View rotas for every active user across the instance.', category: 'Rota', scope: 'All active users' },
   { key: 'view_teams', label: 'View organisation team members', description: 'See team membership and people in organisations the user can access.', category: 'Teams' },
+  { key: 'view_people_teams', label: 'View People & Teams administration', description: 'Open the People & Teams settings page to review organisation users, roles and team assignments.', category: 'Administration' },
   { key: 'view_locations', label: 'View locations', description: 'Read configured work locations and their organisation links.', category: 'Workspace' },
   { key: 'view_organisations', label: 'View organisations', description: 'Read organisation details and assigned members.', category: 'Workspace' },
   { key: 'view_settings', label: 'View settings', description: 'Open the settings area permitted for the account.', category: 'Workspace' },
@@ -56,7 +57,7 @@ const BUILTIN = {
   },
   manager: {
     id: 'builtin-manager', name: 'Manager', description: 'Organisation-level oversight: manage organisation rotas, locations, templates and teams.', color: '#d97706', is_builtin: 1,
-    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_org_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_templates', 'manage_teams', 'manage_own_teams'],
+    permissions: ['view_calendar', 'view_shifts', 'view_tasks', 'assign_own_tasks', 'view_templates', 'view_settings', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_teams', 'view_locations', 'view_organisations', 'view_people_teams', 'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts', 'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts', 'manage_org_shifts', 'manage_tasks', 'manage_team_tasks', 'manage_templates', 'manage_teams', 'manage_own_teams'],
   },
   admin: {
     id: 'builtin-admin', name: 'Admin', description: 'Full instance access, including global rotas, users, roles, settings and backups.', color: '#4f46e5', is_builtin: 1,
@@ -98,6 +99,12 @@ function getRoleForUser(userId) {
 }
 
 function hasPermission(userOrReq, permission) {
+  // requireAuth resolves the role once per request. Reuse that snapshot
+  // instead of issuing a fresh roles/users query for every permission check
+  // (calendar and settings pages perform many checks per request).
+  const requestPermissions = userOrReq?.user?.permissions
+  if (Array.isArray(requestPermissions)) return requestPermissions.includes(permission)
+  if (Array.isArray(userOrReq?.permissions)) return userOrReq.permissions.includes(permission)
   const userId = userOrReq?.id || userOrReq?.user?.id
   const legacyRole = userOrReq?.role || userOrReq?.user?.role
   const row = userId ? getRoleForUser(userId) : null
