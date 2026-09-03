@@ -1438,7 +1438,7 @@ async function init() {
       icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
     { id: 'locations', label: 'Locations', roles: ['admin'], permissions: ['view_locations','manage_locations'],
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
-    { id: 'features', label: 'Features', roles: ['admin'], permission: 'manage_settings',
+    { id: 'features', label: 'Features', roles: [], permissions: ['manage_settings','view_task_lists'], permissionHint: 'Manage settings is required to change feature flags; View task lists settings provides read-only access.',
       icon: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>' },
     { id: 'security', label: 'Security', roles: ['admin','manager','shift_lead','member'],
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
@@ -1526,7 +1526,7 @@ async function init() {
     canViewRoles ? renderPanelSafely(renderRolesPanel, 'roles') : Promise.resolve(),
     canViewOrganisations ? renderPanelSafely(renderOrganisationsPanel, 'organisations') : Promise.resolve(),
     canViewLocations ? renderPanelSafely(renderLocationsPanel, 'locations') : Promise.resolve(),
-    hasPermission('manage_settings') ? renderPanelSafely(renderFeaturesPanel, 'features') : Promise.resolve(),
+    (hasPermission('manage_settings') || hasPermission('view_task_lists')) ? renderPanelSafely(renderFeaturesPanel, 'features') : Promise.resolve(),
     hasPermission('view_settings') ? renderPanelSafely(renderSecurityPanel, 'security') : Promise.resolve(),
     hasPermission('manage_settings') ? renderPanelSafely(renderEmailPanel, 'email') : Promise.resolve(),
     hasPermission('view_api_reference') ? renderPanelSafely(renderApiPanel, 'api') : Promise.resolve(),
@@ -3660,10 +3660,11 @@ let tlColour = '#4f46e5'
 async function renderFeaturesPanel() {
   const featData = await api('/api/features')
   const el = document.getElementById('panel-features')
+  const canManageFeatures = hasPermission('manage_settings')
   el.innerHTML = `
     <h2 style="font-size:18px;font-weight:800;margin-bottom:20px">Features</h2>
 
-    <div class="card section-card" style="margin-bottom:20px">
+    ${canManageFeatures ? `<div class="card section-card" style="margin-bottom:20px">
       <div class="card-header">
         <div>
           <h3 class="card-title">Drag &amp; Drop</h3>
@@ -3674,7 +3675,7 @@ async function renderFeaturesPanel() {
           <span class="toggle-slider"></span>
         </label>
       </div>
-    </div>
+    </div>` : ''}
 
     <div class="card section-card" style="margin-bottom:20px">
       <div class="card-header">
@@ -3683,17 +3684,18 @@ async function renderFeaturesPanel() {
           <p style="font-size:12px;color:var(--text-3);margin-top:2px">Assign a weekly task list to each team member. Useful for rotating duties (e.g. monitoring rounds, desk assignments).</p>
         </div>
         <label class="toggle">
-          <input type="checkbox" id="featureTasksToggle" ${featData.feature_tasks ? 'checked' : ''} onchange="toggleFeatureTasks(this.checked)">
+          <input type="checkbox" id="featureTasksToggle" ${featData.feature_tasks ? 'checked' : ''} ${canManageFeatures ? '' : 'disabled'} onchange="toggleFeatureTasks(this.checked)">
           <span class="toggle-slider"></span>
         </label>
       </div>
+      ${canManageFeatures ? '' : '<div class="card-body" style="padding-top:0;color:var(--text-3);font-size:12px">View-only access. Manage settings is required to change feature flags.</div>'}
     </div>
 
     <div id="taskListsSection" style="display:${featData.feature_tasks ? 'block' : 'none'}">
       <div class="card section-card">
         <div class="card-header">
           <h3 class="card-title">Task Lists</h3>
-          <button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>
+          ${canManageFeatures ? '<button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>' : '<span style="font-size:12px;color:var(--text-3)">View only</span>'}
         </div>
         <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
         <div id="taskListLabelTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface-2)"></div>
