@@ -2,6 +2,12 @@
 
 ## 2026-09-03
 
+- Separated the personal **My Team** view from the administrative **People & Teams** settings page.
+- Added a dedicated `view_people_teams` permission for organisation-wide People & Teams administration.
+- Kept `view_teams` as the native-compatible team visibility permission, so existing iOS and Android clients continue to show their Team page without an app update.
+- Improved role permission descriptions and clarified which permission unlocks each team surface.
+- Reduced repeated permission database lookups during authenticated requests, improving calendar and settings response time.
+
 - Improved logout reliability and made repeated logout taps safe; logout and routine authenticated reads no longer consume sign-in rate-limit attempts.
 - Added a per-user session cap to automatically remove the oldest abandoned device sessions.
 - Strengthened iCal feed privacy headers and bounded abandoned device sessions without changing native authentication contracts.
