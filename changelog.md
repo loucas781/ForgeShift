@@ -1,15 +1,23 @@
 # Changelog
 
+## 2.2.2
+
+- Corrected the production build version displayed by the application to `2.2.2`.
+
+### Latest settings fixes
+
+- Removed the duplicate standalone **Task Lists** settings tab and kept Task Lists under Features.
+- Added independent loading and inline error states for settings panels, so one unavailable endpoint cannot blank the page.
+- Added immediate loading states for Security and Backup while their data is fetched.
+- Ensured `assign_own_tasks` remains selectable when an older server permission catalogue is in use.
+- Replaced the browser-native role deletion prompt with the themed in-app confirmation dialog.
+- Fixed role saves dropping `assign_own_tasks` by adding it to the server’s authoritative permission catalogue.
+
 ## 2026-09-03
 
 - Added dedicated permissions for the Task Lists and API Reference settings pages, keeping page visibility separate from edit permissions.
 - API Reference catalogue access now follows the same `view_api_reference` permission as its settings page.
 - Task list reads now honour the dedicated `view_task_lists` permission without granting task-list creation or editing.
-- Restored Task Lists to the existing Features area instead of showing a separate settings tab.
-- Settings data preloads and panels now fail independently with an inline error state, preventing one unavailable endpoint from blanking the entire settings page.
-- Ensured the role editor merges the current permission contract with older server catalogues, so **Assign task lists to self** remains selectable during updates.
-- Replaced the browser-native role deletion prompt with the themed in-app confirmation dialog.
-- Added immediate loading states to Security and Backup so slow data requests no longer present as blank settings panels.
 - Separated the personal **My Team** view from the administrative **People & Teams** settings page.
 - Added a dedicated `view_people_teams` permission for organisation-wide People & Teams administration.
 - Kept `view_teams` as the native-compatible team visibility permission, so existing iOS and Android clients continue to show their Team page without an app update.
