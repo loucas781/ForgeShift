@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2
+
+- Corrected the production build version displayed by the application to `2.2.2`.
+
 ## 2026-09-03
 
 - Added dedicated permissions for the Task Lists and API Reference settings pages, keeping page visibility separate from edit permissions.
