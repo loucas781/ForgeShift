@@ -3658,20 +3658,6 @@ let taskLists = []
 let editingTaskListId = null
 let tlColour = '#4f46e5'
 
-async function renderTaskListsPanel() {
-  const el = document.getElementById('panel-task-lists')
-  if (!el) return
-  const canEdit = ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission)
-  el.innerHTML = `<div class="admin-page-header"><div class="admin-page-heading"><span class="admin-page-eyebrow">Task management</span><h2>Task Lists</h2><p>${canEdit ? 'Create and organise reusable task lists.' : 'Browse task lists available to your account.'} Assigning a list to yourself does not require permission to create or edit lists.</p></div></div>
-    <div class="card section-card"><div class="card-header"><h3 class="card-title">Task Lists</h3>${canEdit ? '<button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>' : ''}</div>
-      <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
-      <div id="taskListLabelTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface-2)"></div>
-      <div class="card-body" style="padding:0"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Label</th><th>Colour</th><th>Actions</th></tr></thead><tbody id="taskListsBody"></tbody></table></div></div>
-    </div>`
-  await loadTaskLists()
-  renderTaskListOrgTabs(); renderTaskListLabelTabs(); renderTaskListsTable()
-}
-
 async function renderFeaturesPanel() {
   const featData = await api('/api/features')
   const el = document.getElementById('panel-features')
@@ -3705,7 +3691,27 @@ async function renderFeaturesPanel() {
       </div>
       ${canManageFeatures ? '' : '<div class="card-body" style="padding-top:0;color:var(--text-3);font-size:12px">View-only access. Manage settings is required to change feature flags.</div>'}
     </div>
-    `
+
+    <div id="taskListsSection" style="display:${featData.feature_tasks ? 'block' : 'none'}">
+      <div class="card section-card">
+        <div class="card-header">
+          <h3 class="card-title">Task Lists</h3>
+          ${canManageFeatures ? '<button class="btn btn-primary btn-sm" onclick="openCreateTaskList()">+ Add task list</button>' : '<span style="font-size:12px;color:var(--text-3)">View only</span>'}
+        </div>
+        <div id="taskListOrgTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px"></div>
+        <div id="taskListLabelTabBar" style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface-2)"></div>
+        <div class="card-body" style="padding:0">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Organisation</th><th>Description</th><th>Location</th><th>Label</th><th>Colour</th><th>Actions</th></tr></thead>
+            <tbody id="taskListsBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>`
+  await loadTaskLists()
+  renderTaskListOrgTabs()
+  renderTaskListLabelTabs()
+  renderTaskListsTable()
 }
 
 let activeTaskListOrgTab = 'all'
@@ -3836,10 +3842,8 @@ async function toggleFeatureDragDrop(enabled) {
 async function toggleFeatureTasks(enabled) {
   try {
     await api('/api/features', { method: 'PATCH', body: { feature_tasks: enabled } })
-    if (enabled && document.getElementById('panel-task-lists')) {
-      await loadTaskLists()
-      renderTaskListOrgTabs(); renderTaskListLabelTabs(); renderTaskListsTable()
-    }
+    document.getElementById('taskListsSection').style.display = enabled ? 'block' : 'none'
+    if (enabled) await loadTaskLists()
     toast('Feature ' + (enabled ? 'enabled' : 'disabled'), 'success')
   } catch (err) {
     toast(err.message, 'error')
