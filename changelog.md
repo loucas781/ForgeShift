@@ -14,6 +14,7 @@
 - Fixed role saves dropping `assign_own_tasks` by adding it to the server’s authoritative permission catalogue.
 - Replaced the browser-native Clear App Cache prompt with the consistent themed settings dialog.
 - Made **View task lists settings** functional by granting read-only access to the Features page and its Task Lists section.
+- Kept task-list browsing inside Features consistent across release channels.
 
 ## 2026-09-03
 
