@@ -56,7 +56,7 @@ router.get('/', requireAuth, (req, res) => {
       FROM shifts s
       LEFT JOIN users u ON u.id = s.user_id
       LEFT JOIN locations l ON l.id = s.location_id
-      WHERE 1=1
+      WHERE u.is_active = 1
     `
     const params = []
     if (start)   { sql += ' AND s.date >= ?'; params.push(start) }

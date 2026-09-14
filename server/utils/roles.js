@@ -42,6 +42,7 @@ const PERMISSION_CATALOG = [
   { key: 'manage_users', label: 'Manage users', description: 'Invite, edit, deactivate and assign roles to users.', category: 'Administration' },
   { key: 'manage_roles', label: 'Manage roles', description: 'Create and maintain custom roles and their permissions.', category: 'Administration' },
   { key: 'manage_settings', label: 'Manage settings', description: 'Change application and workspace settings.', category: 'Administration' },
+  { key: 'bypass_inactive_account_timer', label: 'Bypass inactive account timer', description: 'Keep accounts assigned to this role from being automatically marked inactive.', category: 'Administration' },
   { key: 'view_audit', label: 'View audit log', description: 'Read the record of administrative and security actions.', category: 'Administration' },
   { key: 'manage_backups', label: 'Manage backups', description: 'Create, restore and manage application backups.', category: 'Administration' },
   { key: 'manage_holidays', label: 'Manage holidays', description: 'Configure bank holidays and holiday overrides.', category: 'Administration' },

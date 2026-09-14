@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.5
+
+- Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
+- Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
+- Added a role permission to bypass the inactive account timer for approved extended-absence roles.
+- Inactive accounts are omitted from organisation, team and rota views and cannot be re-added to teams until re-enabled.
+
 ## 2.2.2
 
 - Corrected the production build version displayed by the application to `2.2.2`.

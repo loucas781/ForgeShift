@@ -1230,6 +1230,7 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'manage_users', label:'Manage users', description:'Invite, edit, deactivate and assign roles to users.', category:'Administration' },
   { key:'manage_roles', label:'Manage roles', description:'Create and maintain custom roles and their permissions.', category:'Administration' },
   { key:'manage_settings', label:'Manage settings', description:'Change application and workspace settings.', category:'Administration' },
+  { key:'bypass_inactive_account_timer', label:'Bypass inactive account timer', description:'Keep accounts assigned to this role from being automatically marked inactive.', category:'Administration' },
   { key:'view_audit', label:'View audit log', description:'Read the record of administrative and security actions.', category:'Administration' },
   { key:'manage_backups', label:'Manage backups', description:'Create, restore and manage application backups.', category:'Administration' },
   { key:'manage_holidays', label:'Manage holidays', description:'Configure bank holidays and holiday overrides.', category:'Administration' },
@@ -4547,6 +4548,13 @@ async function renderSecurityPanel() {
 
     ${userIsAdmin ? `
     <div class="card section-card">
+      <div class="card-header"><h3 class="card-title">Inactive Accounts</h3><button class="btn btn-primary btn-sm" onclick="saveAccountInactivityDays()">Save</button></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">Automatically lock accounts that have not been used for this many days. Locked accounts cannot sign in until re-enabled. Roles with <strong>Bypass inactive account timer</strong> are excluded. Set to <strong>0</strong> to disable.</p>
+        <div class="policy-row"><div class="pref-info"><strong>Account inactivity timer</strong><span>Days since last account activity (0 = disabled)</span></div><div style="display:flex;align-items:center;gap:8px"><input type="number" class="form-input" id="accountInactivityDaysInput" value="${c.accountInactivityDays ?? 30}" min="0" max="3650" step="1" style="width:80px;text-align:center"><span style="font-size:12px;color:var(--text-3)">days</span></div></div>
+      </div>
+    </div>
+    <div class="card section-card">
       <div class="card-header">
         <h3 class="card-title">Password Policy</h3>
         <button class="btn btn-primary btn-sm" onclick="savePasswordPolicy()">Save</button>
@@ -4974,6 +4982,17 @@ async function saveInactivityTimeout() {
   try {
     await api('/api/config', { method: 'PATCH', body: { inactivityTimeout: val } })
     toast(val === 0 ? 'Session timeout disabled' : `Session timeout set to ${val} minute${val === 1 ? '' : 's'}`, 'success')
+  } catch (err) { toast(err.message, 'error') }
+}
+
+async function saveAccountInactivityDays() {
+  const input = document.getElementById('accountInactivityDaysInput')
+  if (!input) return
+  const val = parseInt(input.value, 10)
+  if (isNaN(val) || val < 0 || val > 3650) { toast('Enter a value between 0 and 3650 days', 'error'); return }
+  try {
+    await api('/api/config', { method: 'PATCH', body: { accountInactivityDays: val } })
+    toast(val === 0 ? 'Account inactivity timer disabled' : `Account inactivity timer set to ${val} day${val === 1 ? '' : 's'}`, 'success')
   } catch (err) { toast(err.message, 'error') }
 }
 

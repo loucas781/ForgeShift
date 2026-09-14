@@ -3,6 +3,26 @@ const jwt = require('jsonwebtoken')
 const db  = require('../db/connection')
 const { getRoleForUser, hasPermission, rolePermissions } = require('../utils/roles')
 
+function getAccountInactivityDays() {
+  try {
+    const { loadOverrides } = require('../utils/overrides')
+    const value = loadOverrides().ACCOUNT_INACTIVITY_DAYS
+    if (value == null) return 30
+    const days = parseInt(value, 10)
+    return Number.isFinite(days) && days > 0 ? days : 0
+  } catch { return 30 }
+}
+
+function enforceAccountInactivity(userId, roleRow) {
+  const days = getAccountInactivityDays()
+  if (!days || rolePermissions(roleRow).includes('bypass_inactive_account_timer')) return false
+  const lastActivity = db.prepare('SELECT MAX(last_used_at) AS last_used_at FROM user_sessions WHERE user_id = ?').get(userId)?.last_used_at || db.prepare('SELECT created_at FROM users WHERE id = ?').get(userId)?.created_at
+  if (!lastActivity || Date.now() - new Date(lastActivity).getTime() <= days * 86400000) return false
+  db.prepare("UPDATE users SET is_active = 0, role_id = 'system-inactive', previous_role_id = COALESCE(previous_role_id, role_id), token_version = COALESCE(token_version, 0) + 1 WHERE id = ? AND is_active = 1").run(userId)
+  db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId)
+  return true
+}
+
 // ── Inactivity timeout (cached, refreshed every 30s) ──────────────────────────
 let _inactivityCache = null
 let _inactivityCachedAt = 0
@@ -46,12 +66,13 @@ function requireAuth(req, res, next) {
       if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Session revoked' })
       return res.redirect('/login.html')
     }
+    const role = getRoleForUser(req.user.id)
+    if (enforceAccountInactivity(req.user.id, role)) row.is_active = 0
     if (!row.is_active) {
       res.clearCookie('token', clearCookieOpts(req))
       if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'Account inactive' })
       return res.redirect('/login.html?reason=inactive')
     }
-    const role = getRoleForUser(req.user.id)
     req.user.role = row.role
     req.user.role_id = row.role_id || null
     req.user.role_name = role?.name || null

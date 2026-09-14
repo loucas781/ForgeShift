@@ -226,6 +226,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
     passwordPolicy:     getPasswordPolicy(overrides),
     smtpEnabled:        emailSvc.getSmtpConfig().enabled,
     inactivityTimeout:  overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
+    accountInactivityDays: overrides.ACCOUNT_INACTIVITY_DAYS != null ? parseInt(overrides.ACCOUNT_INACTIVITY_DAYS) : 30,
     featureTasks,
     featureDragDrop,
     features: {
@@ -311,6 +312,11 @@ app.patch('/api/config', requireAuth, (req, res) => {
       overrides.INACTIVITY_TIMEOUT_MINUTES = n
     }
   }
+  if (req.body.accountInactivityDays !== undefined) {
+    const v = req.body.accountInactivityDays
+    if (v === null || v === 0) overrides.ACCOUNT_INACTIVITY_DAYS = 0
+    else { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 1 || n > 3650) return res.status(400).json({ error: 'Account inactivity must be 1–3650 days, or 0 to disable' }); overrides.ACCOUNT_INACTIVITY_DAYS = n }
+  }
   saveOverrides(overrides)
   res.json({
     ok: true,
@@ -319,6 +325,7 @@ app.patch('/api/config', requireAuth, (req, res) => {
       cookieSecure:      process.env.COOKIE_SECURE === 'true' || APP_ENV_NORM === 'production',
     trustProxy:        process.env.TRUST_PROXY   === 'true',
     inactivityTimeout: overrides.INACTIVITY_TIMEOUT_MINUTES != null ? parseInt(overrides.INACTIVITY_TIMEOUT_MINUTES) : 15,
+    accountInactivityDays: overrides.ACCOUNT_INACTIVITY_DAYS != null ? parseInt(overrides.ACCOUNT_INACTIVITY_DAYS) : 30,
   })
 })
 

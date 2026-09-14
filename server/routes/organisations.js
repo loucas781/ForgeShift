@@ -44,7 +44,7 @@ router.get('/', requireAuth, (req, res) => {
                  r.name AS role_name, r.color AS role_color, u.is_active
           FROM organisation_members om JOIN users u ON u.id = om.user_id
           LEFT JOIN roles r ON r.id = u.role_id
-          WHERE om.org_id IN (${ids.map(() => '?').join(',')}) ORDER BY u.name
+          WHERE om.org_id IN (${ids.map(() => '?').join(',')}) AND u.is_active = 1 ORDER BY u.name
         `).all(...ids) : []
         const byOrg = {}
         members.forEach(member => {
@@ -90,7 +90,7 @@ router.get('/', requireAuth, (req, res) => {
         SELECT om.org_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.role_id,
                r.name AS role_name, r.color AS role_color, u.is_active
         FROM organisation_members om JOIN users u ON u.id = om.user_id LEFT JOIN roles r ON r.id=u.role_id
-        WHERE om.org_id IN (${orgIds.map(() => '?').join(',')})
+        WHERE om.org_id IN (${orgIds.map(() => '?').join(',')}) AND u.is_active = 1
         ORDER BY u.name
       `).all(...orgIds)
       const byOrg = {}
