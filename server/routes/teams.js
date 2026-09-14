@@ -241,7 +241,7 @@ router.put('/:id/members', requireAuth, requireTeamManagement, (req, res) => {
   if (req.user.role === 'shift_lead' && user_ids.length > 0) {
     // Only allow members and shift_leads (and themselves) — not admins/managers
     const safePlaceholders = user_ids.map(() => '?').join(',')
-    const allowed = db.prepare(`SELECT id FROM users WHERE id IN (${safePlaceholders}) AND role IN ('member','shift_lead')`).all(...user_ids).map(u => u.id)
+    const allowed = db.prepare(`SELECT id FROM users WHERE id IN (${safePlaceholders}) AND is_active = 1 AND role IN ('member','shift_lead')`).all(...user_ids).map(u => u.id)
     if (!allowed.includes(req.user.id)) allowed.push(req.user.id)
     resolvedIds = allowed
   }

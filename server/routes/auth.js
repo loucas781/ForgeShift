@@ -221,6 +221,15 @@ router.post('/login', async (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase())
     if (!user) return res.status(401).json({ error: 'Invalid email or password.' })
     // Use the same response for unknown and inactive accounts to avoid account enumeration.
+    const { rolePermissions, getRoleForUser } = require('../utils/roles')
+    const role = getRoleForUser(user.id)
+    const overrides = loadOverrides()
+    const days = overrides.ACCOUNT_INACTIVITY_DAYS == null ? 30 : parseInt(overrides.ACCOUNT_INACTIVITY_DAYS, 10)
+    const lastActivity = db.prepare('SELECT MAX(last_used_at) AS last_used_at FROM user_sessions WHERE user_id = ?').get(user.id)?.last_used_at || user.created_at
+    if (user.is_active !== 0 && days > 0 && !rolePermissions(role).includes('bypass_inactive_account_timer') && Date.now() - new Date(lastActivity).getTime() > days * 86400000) {
+      db.prepare("UPDATE users SET is_active = 0, role_id = 'system-inactive', previous_role_id = COALESCE(previous_role_id, role_id), token_version = COALESCE(token_version, 0) + 1 WHERE id = ?").run(user.id)
+      user.is_active = 0
+    }
     if (user.is_active === 0)
       return res.status(401).json({ error: 'Invalid email or password.' })
     const { ok: pwOk, needsRehash } = await comparePassword(password, user.password)
@@ -800,9 +809,19 @@ router.patch('/prefs', requireAuth, (req, res) => {
     try { existing = JSON.parse(row?.prefs || '{}') } catch {}
     // Merge incoming keys — only allow known preference keys
     const ALLOWED = ['weekStartDay', 'defaultView', 'showWeekNumbers', 'holidays', 'defaultShiftStart', 'defaultShiftEnd', 'compactChips', 'shiftPanelSide']
+    const DEFAULT_VIEWS = new Set(['month', 'week', 'agenda'])
+    const normalizeDefaultView = value => {
+      const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+      return DEFAULT_VIEWS.has(normalized) ? normalized : 'month'
+    }
     const incoming = req.body || {}
     for (const k of ALLOWED) {
-      if (k in incoming) existing[k] = incoming[k]
+      if (k in incoming) {
+        existing[k] = k === 'defaultView' ? normalizeDefaultView(incoming[k]) : incoming[k]
+      }
+    }
+    if ('defaultView' in existing && !DEFAULT_VIEWS.has(existing.defaultView)) {
+      existing.defaultView = normalizeDefaultView(existing.defaultView)
     }
     db.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(existing), req.user.id)
     res.json(existing)

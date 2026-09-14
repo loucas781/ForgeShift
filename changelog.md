@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-14
+
+- Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
+- Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
+- Added a role permission to bypass the inactive account timer for roles such as maternity or other approved extended-absence functions; Admin includes this permission by default.
+- Inactive accounts are now omitted from organisation, team and rota views and cannot be re-added to teams until re-enabled.
+
+## 2026-09-05
+
+- Made Settings show loading feedback immediately and load system sections only when opened, reducing unnecessary background requests.
+- Brought confirmation and naming dialogs in Settings and Your Profile into the app’s theme, with keyboard navigation and focus restoration.
+- Fixed team names and profile details containing special characters breaking the layout, and added a fallback for missing team member counts.
+- Added a clear error when a role contains permissions unsupported by the server, preventing apparently successful saves that silently drop selections.
+
 ## 2.2.2
 
 - Corrected the production build version displayed by the application to `2.2.2`.
@@ -58,6 +72,11 @@
 
 ## 2026-08-13
 
+- Fixed custom rota, shift, task and team permissions across web and native API clients.
+- Fixed team-scoped and all-user rota permissions so the correct active users are returned to calendar selectors.
+- Added compatible nested task feature flags for native clients while preserving the existing API fields.
+- Removed inactive accounts from team member responses.
+- Aligned the development release metadata back to the 2.1.3 development line.
 - Added descriptions for every role permission and separated legacy compatibility permissions into a clearly labelled Legacy section.
 - Restored the development release metadata to the 2.1.3 line to match staging.
 - Restored built-in role descriptions when older or partially migrated role APIs return empty descriptions.
@@ -74,10 +93,6 @@
 - Added scope descriptions to role comparison so administrators can distinguish team-level and global access.
 - Removed duplicated task-route permission middleware in favour of one shared capability check.
 - Applied the new assigned-team and all-team permissions to team management endpoints while preserving the legacy `manage_teams` permission.
-- Changed Manager defaults from global rota access to organisation/team-scoped rota viewing and editing; only Admin retains global rota permissions.
-- Made global rota visibility require the explicit `view_all_rotas` permission (or Admin), so legacy `view_other_rotas` cannot bypass organisation boundaries.
-- Separated Manager and Shift Lead rota permissions: Managers use organisation-level shift management, while Shift Leads use team-level shift management.
-- Added clear administrator-facing descriptions for Member, Shift Lead, Manager, Admin and Inactive roles.
 - Changed Manager defaults from global rota access to organisation/team-scoped rota viewing and editing; only Admin retains global rota permissions.
 - Made global rota visibility require the explicit `view_all_rotas` permission (or Admin), so legacy `view_other_rotas` cannot bypass organisation boundaries.
 - Separated Manager and Shift Lead rota permissions: Managers use organisation-level shift management, while Shift Leads use team-level shift management.
