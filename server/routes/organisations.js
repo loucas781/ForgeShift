@@ -44,7 +44,7 @@ router.get('/', requireAuth, (req, res) => {
                  r.name AS role_name, r.color AS role_color, u.is_active
           FROM organisation_members om JOIN users u ON u.id = om.user_id
           LEFT JOIN roles r ON r.id = u.role_id
-          WHERE om.org_id IN (${ids.map(() => '?').join(',')}) ORDER BY u.name
+          WHERE om.org_id IN (${ids.map(() => '?').join(',')}) AND u.is_active = 1 ORDER BY u.name
         `).all(...ids) : []
         const byOrg = {}
         members.forEach(member => {
@@ -68,13 +68,14 @@ router.get('/', requireAuth, (req, res) => {
 
     const orgs = db.prepare(`
       SELECT o.*,
-             COUNT(DISTINCT om.user_id)  AS member_count,
+             COUNT(DISTINCT CASE WHEN member_user.is_active = 1 THEN om.user_id END) AS member_count,
       COUNT(DISTINCT CASE WHEN lo.org_id = o.id THEN lo.location_id WHEN l.org_id = o.id THEN l.id END) AS location_count,
              COUNT(DISTINCT tl.id)       AS task_list_count,
              COUNT(DISTINCT st.id)       AS template_count,
              COUNT(DISTINCT t.id)        AS team_count
       FROM organisations o
       LEFT JOIN organisation_members om ON om.org_id = o.id
+      LEFT JOIN users member_user ON member_user.id = om.user_id
       LEFT JOIN locations l             ON l.org_id  = o.id
       LEFT JOIN location_organisations lo ON lo.org_id = o.id
       LEFT JOIN task_lists tl           ON tl.org_id = o.id
@@ -90,7 +91,7 @@ router.get('/', requireAuth, (req, res) => {
         SELECT om.org_id, u.id, u.name, u.initials, u.color, u.avatar, u.role, u.role_id,
                r.name AS role_name, r.color AS role_color, u.is_active
         FROM organisation_members om JOIN users u ON u.id = om.user_id LEFT JOIN roles r ON r.id=u.role_id
-        WHERE om.org_id IN (${orgIds.map(() => '?').join(',')})
+        WHERE om.org_id IN (${orgIds.map(() => '?').join(',')}) AND u.is_active = 1
         ORDER BY u.name
       `).all(...orgIds)
       const byOrg = {}

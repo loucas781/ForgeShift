@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-14
+
+- Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
+- Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
+- Added a role permission to bypass the inactive account timer for roles such as maternity or other approved extended-absence functions; Admin includes this permission by default.
+- Inactive accounts are now omitted from organisation, team and rota views and cannot be re-added to teams until re-enabled.
+
+## 2026-09-05
+
+- Made Settings show loading feedback immediately and load system sections only when opened, reducing unnecessary background requests.
+- Brought confirmation and naming dialogs in Settings and Your Profile into the app’s theme, with keyboard navigation and focus restoration.
+- Fixed team names and profile details containing special characters breaking the layout, and added a fallback for missing team member counts.
+- Added a clear error when a role contains permissions unsupported by the server, preventing apparently successful saves that silently drop selections.
+
 ## 2.2.2
 
 - Corrected the production build version displayed by the application to `2.2.2`.

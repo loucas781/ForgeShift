@@ -1,5 +1,55 @@
 /* shell.js — shared layout, theme, toast, nav helpers */
 
+// One themed confirmation surface for settings, profile and calendar actions.
+let activeConfirmation = null
+function confirmAction(message, { title = 'Confirm action', confirmLabel = 'Continue', inputValue } = {}) {
+  const cancelled = inputValue === undefined ? false : null
+  if (activeConfirmation) return Promise.resolve(cancelled)
+  return new Promise(resolve => {
+    const previousFocus = document.activeElement
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay open'
+    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle" aria-describedby="confirmationMessage" style="max-width:500px"><div class="modal-header"><h3 class="modal-title" id="confirmationTitle"></h3></div><div class="modal-body"><p id="confirmationMessage"></p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-cancel>Cancel</button><button type="button" class="btn btn-primary" data-accept></button></div></div>`
+    overlay.querySelector('#confirmationTitle').textContent = title
+    overlay.querySelector('#confirmationMessage').textContent = message
+    const cancel = overlay.querySelector('[data-cancel]')
+    const accept = overlay.querySelector('[data-accept]')
+    let input
+    if (inputValue !== undefined) {
+      input = document.createElement('input')
+      input.className = 'form-input'
+      input.style.fontSize = '16px'
+      input.setAttribute('aria-labelledby', 'confirmationMessage')
+      input.value = inputValue
+      overlay.querySelector('.modal-body').appendChild(input)
+    }
+    const controls = input ? [input, cancel, accept] : [cancel, accept]
+    accept.textContent = confirmLabel
+    activeConfirmation = overlay
+    const finish = value => {
+      if (activeConfirmation !== overlay) return
+      activeConfirmation = null
+      overlay.remove()
+      if (previousFocus?.isConnected) previousFocus.focus()
+      resolve(value)
+    }
+    cancel.addEventListener('click', () => finish(cancelled))
+    accept.addEventListener('click', () => finish(input ? input.value : true))
+    overlay.addEventListener('click', event => { if (event.target === overlay) finish(cancelled) })
+    overlay.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(cancelled) }
+      if (event.key === 'Enter' && event.target === input) { event.preventDefault(); finish(input.value) }
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        const index = controls.indexOf(document.activeElement)
+        controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length].focus()
+      }
+    })
+    document.body.appendChild(overlay)
+    ;(input || cancel).focus()
+  })
+}
+
 // ── Collapsible card sections ──────────────────────────────────────────────────
 // containerSelector: optional CSS selector to scope which .card-header elements
 // are made collapsible (e.g. '.settings-panel'). Defaults to all .card-header.
