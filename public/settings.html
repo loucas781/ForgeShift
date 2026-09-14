@@ -977,9 +977,9 @@
     .role-permission-group h4 { margin:0 0 9px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
     .role-permission-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .role-permission-option { display:flex; gap:9px; align-items:flex-start; padding:9px; border-radius:var(--r-sm); background:var(--surface-2); font-size:12px; color:var(--text-2); cursor:pointer; }
-    .role-permission-option input { margin-top:1px; accent-color:var(--brand); }
     .role-permission-option-copy { display:grid; gap:2px; min-width:0; }
     .role-permission-option-copy small { color:var(--text-3); font-size:10px; line-height:1.35; }
+    .role-permission-option input { margin-top:1px; accent-color:var(--brand); }
     .role-badge-inline { display:inline-flex; align-items:center; gap:6px; border:1px solid currentColor; border-radius:999px; padding:3px 8px; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; }
     .location-org-badges { display:flex; flex-wrap:wrap; gap:5px; }
 
@@ -1194,47 +1194,47 @@ let settingsModalObserver = null
 // upgraded. These values intentionally mirror server/utils/roles.js so a
 // partial roles API response can never make protected roles appear empty.
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
+  { key:'view_calendar', label:'View calendar', category:'Workspace' },
+  { key:'view_shifts', label:'View shifts', category:'Workspace' },
+  { key:'view_tasks', label:'View tasks', category:'Tasks' },
   { key:'view_task_lists', label:'View task lists settings', description:'Open the Task Lists settings page; edit actions remain controlled by task management permissions.', category:'Tasks' },
-  { key:'view_calendar', label:'View calendar', description:'Open the calendar and switch between month, week and agenda views.', category:'Workspace' },
-  { key:'view_shifts', label:'View shifts', description:'Read shift details that the account is allowed to access.', category:'Workspace' },
-  { key:'view_tasks', label:'View tasks', description:'Read task lists and assigned task details within the account scope.', category:'Tasks' },
   { key:'assign_own_tasks', label:'Assign task lists to self', description:'Assign available task lists to the signed-in user without creating or editing task lists.', category:'Tasks' },
-  { key:'view_templates', label:'View shift templates', description:'Browse saved shift templates available to the account.', category:'Workspace' },
-  { key:'view_own_rota', label:'View own rota', description:'View the signed-in user’s own shifts and rota.', category:'Rota' },
+  { key:'view_templates', label:'View shift templates', category:'Workspace' },
+  { key:'view_own_rota', label:'View own rota', category:'Rota' },
   { key:'view_other_rotas', label:'View other users’ rotas', description:'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category:'Legacy', legacy:true },
-  { key:'view_team_rotas', label:'View team rotas', description:'View rotas for members of the user’s assigned teams or organisation scope.', category:'Rota', scope:'Organisation/team members only' },
-  { key:'view_all_rotas', label:'View all rotas', description:'View rotas for every active user across the instance.', category:'Rota', scope:'All active users' },
-  { key:'view_teams', label:'View organisation team members', description:'See team membership and people in organisations the user can access.', category:'Teams' },
+  { key:'view_team_rotas', label:'View team rotas', category:'Rota', scope:'Organisation/team members only' },
+  { key:'view_all_rotas', label:'View all rotas', category:'Rota', scope:'All active users' },
+  { key:'view_teams', label:'View organisation team members', category:'Teams' },
   { key:'view_people_teams', label:'View People & Teams administration', description:'Open the People & Teams settings page to review organisation users, roles and team assignments.', category:'Administration' },
-  { key:'view_locations', label:'View locations', description:'Read configured work locations and their organisation links.', category:'Workspace' },
-  { key:'view_organisations', label:'View organisations', description:'Read organisation details and assigned members.', category:'Workspace' },
-  { key:'view_settings', label:'View settings', description:'Open the settings area permitted for the account.', category:'Workspace' },
-  { key:'add_own_shifts', label:'Add own shifts', description:'Create shifts for the signed-in user.', category:'Shifts' },
-  { key:'edit_own_shifts', label:'Edit own shifts', description:'Change shifts belonging to the signed-in user.', category:'Shifts' },
-  { key:'delete_own_shifts', label:'Delete own shifts', description:'Remove shifts belonging to the signed-in user.', category:'Shifts' },
-  { key:'add_other_shifts', label:'Add shifts for other users', description:'Create shifts for another user within the account scope.', category:'Shifts' },
-  { key:'edit_other_shifts', label:'Edit shifts for other users', description:'Change another user’s shifts within the account scope.', category:'Shifts' },
-  { key:'delete_other_shifts', label:'Delete shifts for other users', description:'Remove another user’s shifts within the account scope.', category:'Shifts' },
-  { key:'manage_team_shifts', label:'Manage shifts for your teams', description:'Add, edit and remove shifts for assigned teams.', category:'Shifts', scope:'Organisation/team members only' },
-  { key:'manage_org_shifts', label:'Manage shifts across your organisation', description:'Add, edit and remove shifts for members of your organisations.', category:'Shifts', scope:'Organisation members only' },
-  { key:'manage_all_shifts', label:'Manage all shifts', description:'Add, edit and remove shifts for any active user.', category:'Shifts', scope:'All active users' },
-  { key:'manage_tasks', label:'Manage tasks and assignments', description:'Create, edit and assign task lists within the account scope.', category:'Administration' },
-  { key:'manage_team_tasks', label:'Manage tasks for your teams', description:'Manage task lists and assignments for assigned teams.', category:'Administration', scope:'Organisation/team members only' },
-  { key:'manage_all_tasks', label:'Manage all tasks', description:'Manage task lists and assignments across the instance.', category:'Administration', scope:'All active users' },
-  { key:'manage_templates', label:'Manage shift templates', description:'Create, edit, apply and remove saved shift templates.', category:'Administration' },
-  { key:'manage_teams', label:'Manage teams', description:'Create and maintain teams and their membership.', category:'Administration' },
-  { key:'manage_own_teams', label:'Manage assigned teams', description:'Manage only teams assigned to or owned by the user.', category:'Administration', scope:'Owned or assigned teams' },
-  { key:'manage_all_teams', label:'Manage all teams', description:'Manage every team in the instance.', category:'Administration', scope:'All teams' },
-  { key:'manage_locations', label:'Manage locations', description:'Create, edit and remove work locations.', category:'Administration' },
-  { key:'manage_organisations', label:'Manage organisations', description:'Create, edit and manage organisation membership.', category:'Administration' },
-  { key:'manage_users', label:'Manage users', description:'Invite, edit, deactivate and assign roles to users.', category:'Administration' },
-  { key:'manage_roles', label:'Manage roles', description:'Create and maintain custom roles and their permissions.', category:'Administration' },
-  { key:'manage_settings', label:'Manage settings', description:'Change application and workspace settings.', category:'Administration' },
-  { key:'bypass_inactive_account_timer', label:'Bypass inactive account timer', description:'Keep accounts assigned to this role from being automatically marked inactive.', category:'Administration' },
-  { key:'view_audit', label:'View audit log', description:'Read the record of administrative and security actions.', category:'Administration' },
-  { key:'manage_backups', label:'Manage backups', description:'Create, restore and manage application backups.', category:'Administration' },
-  { key:'manage_holidays', label:'Manage holidays', description:'Configure bank holidays and holiday overrides.', category:'Administration' },
   { key:'view_api_reference', label:'View API reference', description:'Open the API Reference settings page and review available integration endpoints.', category:'Administration' },
+  { key:'view_locations', label:'View locations', category:'Workspace' },
+  { key:'view_organisations', label:'View organisations', category:'Workspace' },
+  { key:'view_settings', label:'View settings', category:'Workspace' },
+  { key:'add_own_shifts', label:'Add own shifts', category:'Shifts' },
+  { key:'edit_own_shifts', label:'Edit own shifts', category:'Shifts' },
+  { key:'delete_own_shifts', label:'Delete own shifts', category:'Shifts' },
+  { key:'add_other_shifts', label:'Add shifts for other users', category:'Shifts' },
+  { key:'edit_other_shifts', label:'Edit shifts for other users', category:'Shifts' },
+  { key:'delete_other_shifts', label:'Delete shifts for other users', category:'Shifts' },
+  { key:'manage_team_shifts', label:'Manage shifts for your teams', category:'Shifts', scope:'Organisation/team members only' },
+  { key:'manage_org_shifts', label:'Manage shifts across your organisation', category:'Shifts', scope:'Organisation members only' },
+  { key:'manage_all_shifts', label:'Manage all shifts', category:'Shifts', scope:'All active users' },
+  { key:'manage_tasks', label:'Manage tasks and assignments', category:'Tasks' },
+  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Tasks', scope:'Organisation/team members only' },
+  { key:'manage_all_tasks', label:'Manage all tasks', category:'Tasks', scope:'All active users' },
+  { key:'manage_templates', label:'Manage shift templates', category:'Administration' },
+  { key:'manage_teams', label:'Manage teams', category:'Administration' },
+  { key:'manage_own_teams', label:'Manage assigned teams', category:'Administration', scope:'Owned or assigned teams' },
+  { key:'manage_all_teams', label:'Manage all teams', category:'Administration', scope:'All teams' },
+  { key:'manage_locations', label:'Manage locations', category:'Administration' },
+  { key:'manage_organisations', label:'Manage organisations', category:'Administration' },
+  { key:'manage_users', label:'Manage users', category:'Administration' },
+  { key:'manage_roles', label:'Manage roles', category:'Administration' },
+  { key:'manage_settings', label:'Manage settings', category:'Administration' },
+  { key:'bypass_inactive_account_timer', label:'Bypass inactive account timer', description:'Keep accounts assigned to this role from being automatically marked inactive.', category:'Administration' },
+  { key:'view_audit', label:'View audit log', category:'Administration' },
+  { key:'manage_backups', label:'Manage backups', category:'Administration' },
+  { key:'manage_holidays', label:'Manage holidays', category:'Administration' },
 ])
 const BUILTIN_ROLE_FALLBACK = Object.freeze([
   { id:'builtin-member', name:'Member', description:'Personal access to your own calendar, shifts, tasks and settings.', color:'#059669', permissions:['view_calendar','view_shifts','view_tasks','assign_own_tasks','view_settings','view_own_rota'], is_builtin:true, is_system:false },
@@ -1423,9 +1423,9 @@ async function init() {
   bindResetLinkDelegatedHandler()
 
   const ALL_TABS = [
-    { id: 'appearance', label: 'Appearance', roles: ['admin','manager','shift_lead','member'],
+    { id: 'appearance', label: 'Appearance', roles: [], permission: 'view_settings',
       icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-    { id: 'preferences', label: 'Preferences', roles: ['admin','manager','shift_lead','member'],
+    { id: 'preferences', label: 'Preferences', roles: [], permission: 'view_settings',
       icon: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>' },
 
     { id: 'my-teams', label: 'My Team', roles: [], permission: 'view_teams', permissionHint: 'Requires “View organisation team members”. This is the personal team view used by the native apps.',
@@ -1433,29 +1433,29 @@ async function init() {
 
     { id: 'team', label: 'People & Teams', roles: [], permission: 'view_people_teams', permissionHint: 'Requires “View People & Teams administration”.',
       icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
-    { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: ['admin'], permission: 'manage_roles',
+    { id: 'roles', label: 'Roles & Permissions', containsNew: true, roles: [], permission: 'manage_roles',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>' },
-    { id: 'organisations', label: 'Organisations', roles: ['admin'], permissions: ['view_organisations','manage_organisations'],
+    { id: 'organisations', label: 'Organisations', roles: [], permissions: ['view_organisations','manage_organisations'],
       icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>' },
-    { id: 'locations', label: 'Locations', roles: ['admin'], permissions: ['view_locations','manage_locations'],
+    { id: 'locations', label: 'Locations', roles: [], permissions: ['view_locations','manage_locations'],
       icon: '<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>' },
     { id: 'features', label: 'Features', roles: [], permissions: ['manage_settings','view_task_lists'], permissionHint: 'Manage settings is required to change feature flags; View task lists settings provides read-only access.',
       icon: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>' },
-    { id: 'security', label: 'Security', roles: ['admin','manager','shift_lead','member'],
+    { id: 'security', label: 'Security', roles: [], permission: 'view_settings',
       icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
-    { id: 'email', label: 'Email', roles: ['admin'], permission: 'manage_settings',
+    { id: 'email', label: 'Email', roles: [], permission: 'manage_settings',
       icon: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
     { id: 'api', label: 'API Reference', roles: [], permission: 'view_api_reference', permissionHint: 'Requires “View API reference”.',
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'audit', label: 'Audit Log', roles: ['admin'], permission: 'view_audit',
+    { id: 'audit', label: 'Audit Log', roles: [], permission: 'view_audit',
       icon: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
-    { id: 'backup', label: 'Backup', roles: ['admin'], permission: 'manage_backups',
+    { id: 'backup', label: 'Backup', roles: [], permission: 'manage_backups',
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
-    { id: 'updates', label: 'Updates', roles: ['admin'],
+    { id: 'updates', label: 'Updates', roles: [], permission: 'view_settings',
       icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>' },
-    { id: 'buildinfo', label: 'Build Info', roles: ['admin','manager','shift_lead','member'],
+    { id: 'buildinfo', label: 'Build Info', roles: [], permission: 'view_settings',
       icon: '<rect x="2" y="3" width="20" height="14" rx="2" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2"/>' },
-    { id: 'about', label: 'About', roles: ['admin','manager','shift_lead','member'],
+    { id: 'about', label: 'About', roles: [], permission: 'view_settings',
       icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
   ]
 
@@ -1497,28 +1497,46 @@ async function init() {
   // Render panels container
   const wrap = document.getElementById('settingsPanelsWrap')
   wrap.innerHTML = tabs.map(t => `<div class="settings-panel" id="panel-${t.id}"></div>`).join('')
+  wrap.querySelectorAll('.settings-panel').forEach(panel => {
+    panel.innerHTML = '<div class="card"><div class="card-body" role="status">Loading settings…</div></div>'
+  })
+  const requestedTab = window.location.hash.slice(1)
+  if (!tabs.length) {
+    wrap.innerHTML = '<div class="card"><div class="card-body">No settings sections are available for your role.</div></div>'
+    return
+  }
+  showTab(tabs.some(tab => tab.id === requestedTab) ? requestedTab : tabs[0].id)
 
   // Load data then populate
   const canViewTeamPanel = hasPermission('view_people_teams')
-  const canLoadUsers = canViewTeamPanel || isShiftLead || ['manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','manage_all_tasks','view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts','view_teams'].some(hasPermission)
-  const canViewRoles = isAdmin || hasPermission('manage_roles')
-  const canManageOrganisations = isAdmin || hasPermission('manage_organisations')
-  const canManageLocations = isAdmin || hasPermission('manage_locations')
+  const canLoadUsers = canViewTeamPanel || ['assign_own_tasks','manage_roles','manage_locations','manage_organisations','manage_tasks','manage_team_tasks','manage_all_tasks','view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts','view_teams'].some(hasPermission)
+  const canViewRoles = hasPermission('manage_roles')
+  const canManageOrganisations = hasPermission('manage_organisations')
+  const canManageLocations = hasPermission('manage_locations')
   const canViewOrganisations = canManageOrganisations || hasPermission('view_organisations')
   const canViewLocations = canManageLocations || hasPermission('view_locations')
   // Keep an unavailable optional data source from aborting the whole settings page.
   // Individual panels still render their own inline error state below.
-  try { if (canLoadUsers || canViewRoles) await loadUsers() } catch (error) { console.warn('Settings users preload failed', error) }
-  try { if (canViewLocations) await loadLocations() } catch (error) { console.warn('Settings locations preload failed', error) }
-  try { if (canViewOrganisations || canViewLocations) await loadOrgs() } catch (error) { console.warn('Settings organisations preload failed', error) }
+  await Promise.allSettled([
+    canLoadUsers || canViewRoles ? loadUsers() : Promise.resolve(),
+    canViewLocations ? loadLocations() : Promise.resolve(),
+    canViewOrganisations || canViewLocations ? loadOrgs() : Promise.resolve(),
+  ])
   // Apply password policy to client-side validator
   try { if (cfg.passwordPolicy) setPasswordPolicy(cfg.passwordPolicy) } catch {}
   // Wire password indicator for Edit User modal
   euPwIndicator = document.getElementById('euPwIndicatorWrap')
-  const renderPanelSafely = (renderFn, panelId) => Promise.resolve().then(renderFn).catch(error => {
+  const renderPanelSafely = (renderFn, panelId) => {
+    const render = () => Promise.resolve().then(renderFn).then(() => initCollapsibleSections(`#panel-${panelId}`)).catch(error => {
     const panel = document.getElementById(`panel-${panelId}`)
     if (panel) panel.innerHTML = `<div class="card section-card"><div class="card-body"><strong>Unable to load this section</strong><p style="margin-top:8px;color:var(--text-3)">${escHtml(error?.message || 'Please refresh and try again.')}</p></div></div>`
-  })
+    })
+    if (['security','email','api','audit','backup','updates','buildinfo','about'].includes(panelId) && !document.getElementById(`panel-${panelId}`)?.classList.contains('active')) {
+      deferredSettingsPanels.set(panelId, render)
+      return Promise.resolve()
+    }
+    return render()
+  }
   await Promise.all([
     hasPermission('view_settings') ? renderPanelSafely(renderAppearancePanel, 'appearance') : Promise.resolve(),
     hasPermission('view_settings') ? renderPanelSafely(renderPreferencesPanel, 'preferences') : Promise.resolve(),
@@ -1538,10 +1556,7 @@ async function init() {
     hasPermission('view_settings') ? renderPanelSafely(renderAboutPanel, 'about') : Promise.resolve(),
   ])
 
-  // Show first tab (or hash)
-  const hash = window.location.hash.slice(1)
-  const validTab = tabs.find(t => t.id === hash)
-  showTab(validTab ? hash : tabs[0].id)
+  // Preserve any tab the user selected while the panels were loading.
   initCollapsibleSections('.settings-panel')
 }
 
@@ -1844,11 +1859,13 @@ function _avatarHTML(user, size) {
   const fs   = Math.round(px * 0.38)
   const base = `border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:${px}px;height:${px}px;font-size:${fs}px;font-weight:700;color:#fff`
   if (user && user.avatar) {
-    return `<div class="avatar" style="${base};background:${user.color||'#4f46e5'}"><img src="${user.avatar}" alt="${user.name||''}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div>`
+    return `<div class="avatar" style="${base};background:${escHtml(user.color||'#4f46e5')}"><img src="${escHtml(user.avatar)}" alt="${escHtml(user.name||'')}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"></div>`
   }
   const initials = user ? (user.initials || (user.name||'?').slice(0,2).toUpperCase()) : '?'
-  return `<div class="avatar" style="${base};background:${(user&&user.color)||'#4f46e5'}">${initials}</div>`
+  return `<div class="avatar" style="${base};background:${escHtml((user&&user.color)||'#4f46e5')}">${escHtml(initials)}</div>`
 }
+
+const deferredSettingsPanels = new Map()
 
 function showTab(id) {
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'))
@@ -1859,6 +1876,11 @@ function showTab(id) {
   const panel = document.getElementById('panel-' + id)
   const btn   = document.getElementById('tab-btn-' + id)
   if (panel) panel.classList.add('active')
+  const render = deferredSettingsPanels.get(id)
+  if (render) {
+    deferredSettingsPanels.delete(id)
+    void render()
+  }
   if (btn) {
     btn.classList.add('active')
     btn.setAttribute('aria-current', 'page')
@@ -2167,7 +2189,7 @@ async function fetchHolidayData() {
 }
 
 async function clearHolidayData() {
-  if (!confirm('Remove all fetched holiday data? The built-in calculated data will continue to work, but any real dates from official sources will be cleared.')) return
+  if (!(await confirmAction('Remove all fetched holiday data? The built-in calculated data will continue to work, but any real dates from official sources will be cleared.'))) return
   try {
     await api('/api/holidays/overrides', { method: 'DELETE' })
     document.getElementById('holidayFetchStatus').innerHTML = 'Fetched data cleared &mdash; built-in calculations active'
@@ -2289,7 +2311,7 @@ function copyIcal() {
   navigator.clipboard.writeText(document.getElementById('icalUrl').value).then(() => toast('URL copied!', 'success'))
 }
 async function regenerateIcal() {
-  if (!confirm('Regenerate iCal token? Your current calendar subscription will stop working and you will need to re-subscribe.')) return
+  if (!(await confirmAction('Regenerate iCal token? Your current calendar subscription will stop working and you will need to re-subscribe.'))) return
   await api('/api/ical/token', { method: 'DELETE' })
   await loadIcal()
   toast('Token regenerated', 'success')
@@ -2336,13 +2358,13 @@ function renderMyTeamsList() {
       <div class="card-header">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:14px;height:14px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
-          <span style="font-weight:700;font-size:14px">${t.name}</span>
-          <span class="badge badge-gray">${t.member_count} member${t.member_count !== 1 ? 's' : ''}</span>
+          <span style="font-weight:700;font-size:14px">${escHtml(t.name)}</span>
+          <span class="badge badge-gray">${t.member_count ?? t.members?.length ?? 0} member${(t.member_count ?? t.members?.length ?? 0) !== 1 ? 's' : ''}</span>
           ${!isOwner ? '<span class="badge badge-gray" style="opacity:0.7">Assigned by admin</span>' : ''}
         </div>
         ${canEditFromMyTeam ? `<div style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick="openEditMyTeam('${t.id}')">Edit</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMyTeam('${t.id}','${t.name}')">Delete</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMyTeam('${t.id}',${escHtml(JSON.stringify(t.name))})">Delete</button>
         </div>` : ''}
       </div>
       <div class="card-body" style="padding-top:0">
@@ -2351,7 +2373,7 @@ function renderMyTeamsList() {
           ${(t.members||[]).filter(m => m.is_active).map(m =>
             `<div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 4px">
               ${_avatarHTML(m, 'sm')}
-              <span style="font-size:12px;font-weight:500">${m.name}</span>
+              <span style="font-size:12px;font-weight:500">${escHtml(m.name)}</span>
               ${canManageTeams() && (!isShiftLead || (m.id !== cfg.user.id && m.role !== 'shift_lead')) ? `<button onclick="removeMyTeamMember('${t.id}','${m.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0;margin-left:2px" title="Remove">×</button>` : ''}
             </div>`
           ).join('')}
@@ -2363,7 +2385,7 @@ function renderMyTeamsList() {
 }
 
 async function openCreateMyTeam() {
-  const name = prompt('Team name:')
+  const name = await confirmAction('Team name:', { title: 'Create team', confirmLabel: 'Create team', inputValue: '' })
   if (!name?.trim()) return
   try {
     await api('/api/teams', { method: 'POST', body: { name: name.trim() } })
@@ -2374,7 +2396,7 @@ async function openCreateMyTeam() {
 
 async function openEditMyTeam(id) {
   const t = myTeams.find(x => x.id === id); if (!t) return
-  const name = prompt('Rename team:', t.name)
+  const name = await confirmAction('Team name:', { title: 'Rename team', confirmLabel: 'Save changes', inputValue: t.name })
   if (!name?.trim() || name.trim() === t.name) return
   try {
     await api(`/api/teams/${id}`, { method: 'PATCH', body: { name: name.trim() } })
@@ -2384,7 +2406,7 @@ async function openEditMyTeam(id) {
 }
 
 async function deleteMyTeam(id, name) {
-  if (!confirm(`Delete team "${name}"?`)) return
+  if (!(await confirmAction(`Delete team "${name}"?`))) return
   try {
     await api(`/api/teams/${id}`, { method: 'DELETE' })
     await loadMyTeams()
@@ -2739,6 +2761,7 @@ async function renderRolesPanel() {
             </div>
             <span class="badge badge-gray" style="font-size:10px">${assignedCounts[role.id] || 0} user${assignedCounts[role.id] === 1 ? '' : 's'}</span>
           </div>
+          ${role.description ? `<p style="margin:10px 0 12px;color:var(--text-2);font-size:12px;line-height:1.45">${escHtml(role.description)}</p>` : ''}
           <div class="role-permission-chips">
             ${permissionNames.length ? permissionNames.slice(0, 6).map(label => `<span class="role-permission-chip">${escHtml(label)}</span>`).join('') : '<span style="font-size:11px;color:var(--text-3)">No application permissions</span>'}
             ${permissionNames.length > 6 ? `<span class="role-permission-chip">+${permissionNames.length - 6} more</span>` : ''}
@@ -2852,30 +2875,7 @@ async function saveRole() {
 }
 
 function confirmRoleDeletion(roleName) {
-  document.getElementById('roleDeleteConfirm')?.remove()
-  return new Promise(resolve => {
-    const overlay = document.createElement('div')
-    overlay.className = 'modal-overlay'
-    overlay.id = 'roleDeleteConfirm'
-    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="roleDeleteConfirmTitle" style="max-width:460px">
-      <div class="modal-header"><h3 class="modal-title" id="roleDeleteConfirmTitle">Delete custom role?</h3><button class="modal-close" type="button" aria-label="Close" data-cancel>✕</button></div>
-      <div class="modal-body"><p>Delete the custom role <strong>${escHtml(roleName)}</strong>?</p><p style="margin-top:8px;color:var(--text-3);font-size:13px">This action cannot be undone. Any assigned users must be reassigned first.</p></div>
-      <div class="modal-footer"><button class="btn btn-secondary" type="button" data-cancel>Cancel</button><button class="btn btn-danger" type="button" data-confirm>Delete role</button></div>
-    </div>`
-    document.body.appendChild(overlay)
-    overlay.classList.add('open')
-    let settled = false
-    const finish = value => {
-      if (settled) return
-      settled = true
-      overlay.remove()
-      resolve(value)
-    }
-    overlay.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => finish(false)))
-    overlay.querySelector('[data-confirm]')?.addEventListener('click', () => finish(true))
-    overlay.addEventListener('click', event => { if (event.target === overlay) finish(false) })
-    setTimeout(() => overlay.querySelector('[data-cancel]')?.focus(), 0)
-  })
+  return confirmAction('Delete the custom role “' + roleName + '”? This cannot be undone. Assigned users must be reassigned first.', { title: 'Delete custom role?', confirmLabel: 'Delete role' })
 }
 
 async function deleteRole(id) {
@@ -3125,7 +3125,7 @@ async function doEditTeam(id) {
 }
 
 async function deleteTeam(id, name) {
-  if (!confirm(`Delete team "${name}"? This cannot be undone. Users will not be deleted.`)) return
+  if (!(await confirmAction(`Delete team "${name}"? This cannot be undone. Users will not be deleted.`))) return
   try {
     await api(`/api/teams/${id}`, { method: 'DELETE' })
     await loadSettingsTeams()
@@ -3328,7 +3328,7 @@ async function doRenameTmplGroup(id) {
 }
 
 async function deleteTmplGroup(id, name) {
-  if (!confirm(`Delete group "${name}"? Templates in this group will become ungrouped. Members assigned to this group will lose access to those templates unless assigned to another group.`)) return
+  if (!(await confirmAction(`Delete group "${name}"? Templates in this group will become ungrouped. Members assigned to this group will lose access to those templates unless assigned to another group.`))) return
   try {
     await api(`/api/template-groups/${id}`, { method: 'DELETE' })
     await loadTmplGroups()
@@ -3511,7 +3511,7 @@ async function uploadEditedUserAvatar(input) {
 
 async function removeEditedUserAvatar() {
   if (!editingUserId) return
-  if (!confirm('Remove this user profile photo?')) return
+  if (!(await confirmAction('Remove this user profile photo?'))) return
   try {
     const r = await fetch(`/api/users/${editingUserId}/avatar`, { method: 'DELETE' })
     const d = await r.json().catch(() => ({}))
@@ -3644,7 +3644,7 @@ async function getResetLink(id, name, email) {
 }
 
 async function deleteUser(id, name) {
-  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return
+  if (!(await confirmAction(`Delete user "${name}"? This cannot be undone.`))) return
   try {
     await api(`/api/users/${id}`, { method: 'DELETE' })
     await loadUsers(); renderTeamList()
@@ -3790,11 +3790,12 @@ function switchTaskListLabelTab(key) {
 }
 
 function _renderTaskListRows(lists) {
+  const canEdit = ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission)
   return lists.map(t => {
     const description = t.description
       ? `<span title="${escHtml(t.description)}">${escHtml(t.description.length > 80 ? t.description.slice(0, 80) + '…' : t.description)}</span>`
       : '<span style="color:var(--text-3)">—</span>'
-    const safeName = JSON.stringify(t.name)
+    const safeName = escHtml(JSON.stringify(t.name))
     return `<tr>
       <td style="font-weight:600">${escHtml(t.name)}</td>
       <td style="font-size:13px">${t.org_name ? `<span class="badge badge-gray">${escHtml(t.org_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
@@ -3802,10 +3803,10 @@ function _renderTaskListRows(lists) {
       <td>${t.location_name ? `<span style="display:inline-flex;align-items:center;gap:6px">${renderInlineColourSwatch(t.location_color, { size: 10, title: pickColourValue(t.location_color) || 'No colour' })}${escHtml(t.location_name)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td>${t.label ? `<span class="badge badge-gray">${escHtml(t.label)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
       <td>${renderInlineColourSwatch(t.color, { size: 20, title: pickColourValue(t.color) || 'No colour' })}</td>
-      <td><div style="display:flex;gap:4px">
+      <td>${canEdit ? `<div style="display:flex;gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="openEditTaskList('${t.id}')">Edit</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick='deleteTaskList("${t.id}", ${safeName})'>Delete</button>
-      </div></td>
+      </div>` : '<span style="color:var(--text-3)">View only</span>'}</td>
     </tr>`
   }).join('')
 }
@@ -3822,7 +3823,7 @@ function renderTaskListsTable() {
   else if (activeTaskListOrgTab !== 'all') visible = visible.filter(t => t.org_id === activeTaskListOrgTab)
   if (activeTaskListLabelTab !== 'all') visible = visible.filter(t => t.label === activeTaskListLabelTab)
   if (!visible.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:24px">No task lists match the selected filters</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px">No task lists match the selected filters</td></tr>'
     return
   }
   tbody.innerHTML = _renderTaskListRows(visible)
@@ -3927,7 +3928,7 @@ async function saveTaskList() {
   } catch (err) { toast(err.message, 'error') }
 }
 async function deleteTaskList(id, name) {
-  if (!confirm(`Delete task list "${name}"? Any existing assignments will also be removed.`)) return
+  if (!(await confirmAction(`Delete task list "${name}"? Any existing assignments will also be removed.`))) return
   try {
     await api(`/api/tasks/lists/${id}`, { method: 'DELETE' })
     await loadTaskLists(); renderTaskListOrgTabs(); renderTaskListsTable()
@@ -4022,7 +4023,7 @@ async function doRenameTaskListGroup(id) {
   } catch (err) { errEl.style.display = 'block'; errEl.textContent = err.message }
 }
 async function deleteTaskListGroup(id, name) {
-  if (!confirm(`Delete group "${name}"? Task lists in this group will become ungrouped. Members assigned to this group will lose access to those task lists unless assigned to another group.`)) return
+  if (!(await confirmAction(`Delete group "${name}"? Task lists in this group will become ungrouped. Members assigned to this group will lose access to those task lists unless assigned to another group.`))) return
   try {
     await api(`/api/task-list-groups/${id}`, { method: 'DELETE' })
     await Promise.all([loadTaskListGroups(), loadTaskLists()])
@@ -4245,7 +4246,7 @@ async function deleteOrg(id) {
     toast('Organisation could not be found', 'error')
     return
   }
-  if (!confirm(`Delete organisation "${org.name}"? Linked locations, task lists, and templates will become visible to all users.`)) return
+  if (!(await confirmAction(`Delete organisation "${org.name}"? Linked locations, task lists, and templates will become visible to all users.`))) return
   try {
     await api(`/api/organisations/${id}`, { method: 'DELETE' })
     await loadOrgs(); renderOrgsList()
@@ -4467,7 +4468,7 @@ async function saveLoc() {
   } catch (err) { toast(err.message, 'error') }
 }
 async function deleteLoc(id, name) {
-  if (!confirm(`Delete location "${name}"?`)) return
+  if (!(await confirmAction(`Delete location "${name}"?`))) return
   try {
     await api(`/api/locations/${id}`, { method: 'DELETE' })
     await loadLocations(); renderLocOrgTabs(); renderLocsTable()
@@ -4548,12 +4549,27 @@ async function renderSecurityPanel() {
 
     ${userIsAdmin ? `
     <div class="card section-card">
-      <div class="card-header"><h3 class="card-title">Inactive Accounts</h3><button class="btn btn-primary btn-sm" onclick="saveAccountInactivityDays()">Save</button></div>
+      <div class="card-header">
+        <h3 class="card-title">Inactive Accounts</h3>
+        <button class="btn btn-primary btn-sm" onclick="saveAccountInactivityDays()">Save</button>
+      </div>
       <div class="card-body">
-        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">Automatically lock accounts that have not been used for this many days. Locked accounts cannot sign in until re-enabled. Roles with <strong>Bypass inactive account timer</strong> are excluded. Set to <strong>0</strong> to disable.</p>
-        <div class="policy-row"><div class="pref-info"><strong>Account inactivity timer</strong><span>Days since last account activity (0 = disabled)</span></div><div style="display:flex;align-items:center;gap:8px"><input type="number" class="form-input" id="accountInactivityDaysInput" value="${c.accountInactivityDays ?? 30}" min="0" max="3650" step="1" style="width:80px;text-align:center"><span style="font-size:12px;color:var(--text-3)">days</span></div></div>
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:16px;line-height:1.5">
+          Automatically lock accounts that have not been used for this many days. Locked accounts cannot sign in until an administrator re-enables them. Roles with <strong>Bypass inactive account timer</strong> are excluded. Set to <strong>0</strong> to disable.
+        </p>
+        <div class="policy-row">
+          <div class="pref-info">
+            <strong>Account inactivity timer</strong>
+            <span>Days since last account activity (0 = disabled)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" class="form-input" id="accountInactivityDaysInput" value="${c.accountInactivityDays ?? 30}" min="0" max="3650" step="1" style="width:80px;text-align:center">
+            <span style="font-size:12px;color:var(--text-3)">days</span>
+          </div>
+        </div>
       </div>
     </div>
+
     <div class="card section-card">
       <div class="card-header">
         <h3 class="card-title">Password Policy</h3>
@@ -4789,7 +4805,7 @@ async function renderPasskeys() {
   }
 
   window.deletePasskey = async function(id) {
-    if (!confirm('Remove this passkey? You will no longer be able to use it to sign in.')) return
+    if (!(await confirmAction('Remove this passkey? You will no longer be able to use it to sign in.'))) return
     try {
       await api(`/api/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' })
       toast('Passkey removed', 'success')
@@ -4818,10 +4834,8 @@ function _ab2b64url(buf) {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 async function _promptDeviceName() {
-  return new Promise(resolve => {
-    const name = prompt('Give this passkey a name (e.g. "Work Laptop"):')
-    resolve(name && name.trim() ? name.trim() : 'My passkey')
-  })
+  const name = await confirmAction('Give this passkey a name (e.g. “Work Laptop”):', { title: 'Name passkey', confirmLabel: 'Continue', inputValue: '' })
+  return name && name.trim() ? name.trim() : 'My passkey'
 }
 
 async function renderTwoFA() {
@@ -5191,7 +5205,7 @@ async function testSmtp() {
 }
 
 async function clearSmtp() {
-  if (!confirm('Clear all SMTP configuration? Password reset emails will stop working.')) return
+  if (!(await confirmAction('Clear all SMTP configuration? Password reset emails will stop working.'))) return
   await api('/api/config/email', { method: 'PATCH', body: {
     smtpHost: '',
     smtpUser: '',
@@ -5590,7 +5604,7 @@ function exportAuditCSV() {
 }
 
 async function clearAuditLog() {
-  if (!confirm('Permanently delete all audit log entries? This cannot be undone.')) return
+  if (!(await confirmAction('Permanently delete all audit log entries? This cannot be undone.'))) return
   try {
     await api('/api/audit', { method: 'DELETE' })
     toast('Audit log cleared', 'success')
@@ -5929,23 +5943,7 @@ async function renderBuildInfoPanel() {
 
 // ── Clear App Cache ───────────────────────────────────────────────────────────
 function confirmCacheClear() {
-  document.getElementById('cacheClearConfirm')?.remove()
-  return new Promise(resolve => {
-    const overlay = document.createElement('div')
-    overlay.className = 'modal-overlay'; overlay.id = 'cacheClearConfirm'
-    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="cacheClearConfirmTitle" style="max-width:500px">
-      <div class="modal-header"><h3 class="modal-title" id="cacheClearConfirmTitle">Clear application cache?</h3><button class="modal-close" type="button" aria-label="Close" data-cancel>✕</button></div>
-      <div class="modal-body"><p>Fresh application assets will be downloaded and the page will reload.</p><p style="margin-top:8px;color:var(--text-3);font-size:13px">Your account and preferences will not be affected.</p></div>
-      <div class="modal-footer"><button class="btn btn-secondary" type="button" data-cancel>Cancel</button><button class="btn btn-primary" type="button" data-confirm>Clear cache</button></div>
-    </div>`
-    document.body.appendChild(overlay); overlay.classList.add('open')
-    let settled = false
-    const finish = value => { if (settled) return; settled = true; overlay.remove(); resolve(value) }
-    overlay.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => finish(false)))
-    overlay.querySelector('[data-confirm]')?.addEventListener('click', () => finish(true))
-    overlay.addEventListener('click', event => { if (event.target === overlay) finish(false) })
-    setTimeout(() => overlay.querySelector('[data-cancel]')?.focus(), 0)
-  })
+  return confirmAction('Fresh application assets will be downloaded and the page will reload. Your account and preferences will not be affected.', { title: 'Clear application cache?', confirmLabel: 'Clear cache' })
 }
 
 async function clearAppCache() {
@@ -6033,7 +6031,7 @@ async function renderAccountPanel() {
 }
 
 async function signOutEverywhere() {
-  if (!confirm('This will invalidate all active sessions across every device and browser, including this one. Continue?')) return
+  if (!(await confirmAction('This will invalidate all active sessions across every device and browser, including this one. Continue?'))) return
   try {
     await api('/api/auth/revoke-all', { method: 'POST' })
     window.location.href = '/login.html'

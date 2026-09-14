@@ -68,13 +68,14 @@ router.get('/', requireAuth, (req, res) => {
 
     const orgs = db.prepare(`
       SELECT o.*,
-             COUNT(DISTINCT om.user_id)  AS member_count,
+             COUNT(DISTINCT CASE WHEN member_user.is_active = 1 THEN om.user_id END) AS member_count,
       COUNT(DISTINCT CASE WHEN lo.org_id = o.id THEN lo.location_id WHEN l.org_id = o.id THEN l.id END) AS location_count,
              COUNT(DISTINCT tl.id)       AS task_list_count,
              COUNT(DISTINCT st.id)       AS template_count,
              COUNT(DISTINCT t.id)        AS team_count
       FROM organisations o
       LEFT JOIN organisation_members om ON om.org_id = o.id
+      LEFT JOIN users member_user ON member_user.id = om.user_id
       LEFT JOIN locations l             ON l.org_id  = o.id
       LEFT JOIN location_organisations lo ON lo.org_id = o.id
       LEFT JOIN task_lists tl           ON tl.org_id = o.id

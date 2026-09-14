@@ -16,6 +16,9 @@ function validatePayload(body, existing) {
   if (!color) return { error: 'A valid role colour is required.' }
   const permissions = parsePermissions(body.permissions ?? existing?.permissions)
   if (body.permissions !== undefined && !Array.isArray(body.permissions)) return { error: 'permissions must be an array.' }
+  if (Array.isArray(body.permissions) && body.permissions.some(key => !PERMISSION_CATALOG.some(permission => permission.key === key))) {
+    return { error: 'One or more selected permissions are not supported by this server. Refresh the page and check the server update before saving again.' }
+  }
   return { name, color, permissions }
 }
 

@@ -28,7 +28,7 @@ const PERMISSION_CATALOG = [
   { key: 'edit_other_shifts', label: 'Edit shifts for other users', description: 'Change another user’s shifts within the account scope.', category: 'Shifts' },
   { key: 'delete_other_shifts', label: 'Delete shifts for other users', description: 'Remove another user’s shifts within the account scope.', category: 'Shifts' },
   { key: 'manage_team_shifts', label: 'Manage shifts for your teams', description: 'Add, edit and remove shifts for assigned teams.', category: 'Shifts', scope: 'Organisation/team members only' },
-  { key: 'manage_org_shifts', label: 'Manage shifts across your organisation', description: 'Add, edit and remove shifts for members of your organisations.', category: 'Shifts', scope: 'Organisation members only' },
+  { key: 'manage_org_shifts', label: 'Manage shifts across your organisation', description: 'Add, edit and remove shifts for organisation members.', category: 'Shifts', scope: 'Organisation members only' },
   { key: 'manage_all_shifts', label: 'Manage all shifts', description: 'Add, edit and remove shifts for any active user.', category: 'Shifts', scope: 'All active users' },
   { key: 'manage_tasks', label: 'Manage tasks and assignments', description: 'Create, edit and assign task lists within the account scope.', category: 'Tasks' },
   { key: 'manage_team_tasks', label: 'Manage tasks for your teams', description: 'Manage task lists and assignments for assigned teams.', category: 'Tasks', scope: 'Organisation/team members only' },
@@ -120,8 +120,9 @@ function hasPermission(userOrReq, permission) {
 
 function serializeRole(role) {
   if (!role) return null
+  const builtin = Object.values(BUILTIN).find(item => item.id === role.id)
   return {
-    id: role.id, name: role.name, color: role.color,
+    id: role.id, name: role.name, description: role.description || builtin?.description || null, color: role.color,
     permissions: rolePermissions(role),
     is_builtin: !!role.is_builtin, is_system: !!role.is_system,
     deletable: !role.is_builtin && !role.is_system,

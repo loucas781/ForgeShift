@@ -16,7 +16,7 @@ const builtinCount = (builtinSource.match(/^  [a-z_]+:\s*\{/gm) || []).length
 
 const required = [
   'view_calendar', 'view_shifts', 'view_tasks', 'view_templates', 'view_teams',
-  'view_team_rotas', 'view_all_rotas', 'manage_team_shifts', 'manage_all_shifts',
+  'view_team_rotas', 'view_all_rotas', 'manage_team_shifts', 'manage_org_shifts', 'manage_all_shifts',
   'manage_team_tasks', 'manage_all_tasks', 'manage_own_teams', 'manage_all_teams',
 ]
 const keys = new Set(permissionKeys)

@@ -105,6 +105,7 @@ function canViewUser(req, userId) {
   const visibleIds = getVisibleUserScope(req)
   return visibleIds === null || visibleIds.has(userId)
 }
+
 // ── GET /api/users ────────────────────────────────────────────────────────────
 // Supports optional ?limit=N&offset=N pagination. Without these params returns all users.
 router.get('/', requireAuth, (req, res) => {
@@ -152,8 +153,8 @@ router.get('/', requireAuth, (req, res) => {
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id LEFT JOIN roles r ON r.id=u.role_id${where}
      GROUP BY u.id
      ORDER BY u.name`
-   ).all(...(visibleIds ? [...visibleIds] : []))
-   res.json(users.map(user => serializeUser(user, req)))
+  ).all(...(visibleIds ? [...visibleIds] : []))
+  res.json(users.map(user => serializeUser(user, req)))
 })
 
 // ── GET /api/users/me ─────────────────────────────────────────────────────────
@@ -169,6 +170,7 @@ router.get('/me', requireAuth, (req, res) => {
 
 // ── GET /api/users/:id/avatar — serve avatar image ───────────────────────────
 router.get('/:id/avatar', requireAuth, (req, res) => {
+  if (!canViewUser(req, req.params.id)) return res.status(403).json({ error: 'Forbidden' })
   const filePath = path.join(AVATARS_DIR, `${req.params.id}.jpg`)
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No avatar' })
   res.sendFile(filePath)
@@ -176,6 +178,7 @@ router.get('/:id/avatar', requireAuth, (req, res) => {
 
 // ── GET /api/users/:id ────────────────────────────────────────────────────────
 router.get('/:id', requireAuth, (req, res) => {
+  if (!canViewUser(req, req.params.id)) return res.status(403).json({ error: 'Forbidden' })
   const user = db.prepare(
     `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
             r.name AS role_name, r.color AS role_color, r.permissions AS permissions, u.is_active, u.created_at

@@ -1,11 +1,18 @@
 # Changelog
 
-## 2.2.5
+## 2026-09-14
 
 - Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
 - Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
-- Added a role permission to bypass the inactive account timer for approved extended-absence roles.
-- Inactive accounts are omitted from organisation, team and rota views and cannot be re-added to teams until re-enabled.
+- Added a role permission to bypass the inactive account timer for roles such as maternity or other approved extended-absence functions; Admin includes this permission by default.
+- Inactive accounts are now omitted from organisation, team and rota views and cannot be re-added to teams until re-enabled.
+
+## 2026-09-05
+
+- Made Settings show loading feedback immediately and load system sections only when opened, reducing unnecessary background requests.
+- Brought confirmation and naming dialogs in Settings and Your Profile into the app’s theme, with keyboard navigation and focus restoration.
+- Fixed team names and profile details containing special characters breaking the layout, and added a fallback for missing team member counts.
+- Added a clear error when a role contains permissions unsupported by the server, preventing apparently successful saves that silently drop selections.
 
 ## 2.2.2
 
@@ -21,6 +28,7 @@
 - Fixed role saves dropping `assign_own_tasks` by adding it to the server’s authoritative permission catalogue.
 - Replaced the browser-native Clear App Cache prompt with the consistent themed settings dialog.
 - Made **View task lists settings** functional by granting read-only access to the Features page and its Task Lists section.
+- Kept task-list browsing inside Features consistent across release channels.
 
 ## 2026-09-03
 
@@ -56,18 +64,21 @@
 
 ## 2026-08-24
 
-- Added an **Absent / Sick** day status alongside Annual Leave.
-- Absent days appear as all-day **“Absent”** events in iCal feeds.
-- Added database migration and backup support for absence types.
-- Kept existing day-off records as Annual Leave.
-- Improved organisation and team assignment dialogs with clearer guidance and searchable people lists.
-- Added absence status to the existing shift API for native clients.
 - Fixed users appearing multiple times in People & Teams when one account belongs to multiple teams or organisations.
 - Clarified the difference between My Team (personal view) and People & Teams (administration); administrators now manage teams from People & Teams only.
+- Added an Absent / Sick day status alongside Annual Leave. Absent days appear as all-day “Absent” events in iCal feeds and are included in the existing shift API for native clients.
+- Added a migration and backup support for the new absence type while keeping existing day-off records as Annual Leave.
+- Improved organisation and team assignment dialogs with clearer scope guidance and searchable people lists.
 
 ## 2026-08-13
 
+- Fixed custom rota, shift, task and team permissions across web and native API clients.
+- Fixed team-scoped and all-user rota permissions so the correct active users are returned to calendar selectors.
+- Added compatible nested task feature flags for native clients while preserving the existing API fields.
+- Removed inactive accounts from team member responses.
+- Aligned the development release metadata back to the 2.1.3 development line.
 - Added descriptions for every role permission and separated legacy compatibility permissions into a clearly labelled Legacy section.
+- Restored the development release metadata to the 2.1.3 line to match staging.
 - Restored built-in role descriptions when older or partially migrated role APIs return empty descriptions.
 - Restored the staging release candidate metadata to 2.1.3-rc.
 - Hardened task-list and template-group reads so view-only roles require the matching section permission and only receive groups assigned to them.
@@ -82,6 +93,10 @@
 - Added scope descriptions to role comparison so administrators can distinguish team-level and global access.
 - Removed duplicated task-route permission middleware in favour of one shared capability check.
 - Applied the new assigned-team and all-team permissions to team management endpoints while preserving the legacy `manage_teams` permission.
+- Changed Manager defaults from global rota access to organisation/team-scoped rota viewing and editing; only Admin retains global rota permissions.
+- Made global rota visibility require the explicit `view_all_rotas` permission (or Admin), so legacy `view_other_rotas` cannot bypass organisation boundaries.
+- Separated Manager and Shift Lead rota permissions: Managers use organisation-level shift management, while Shift Leads use team-level shift management.
+- Added clear administrator-facing descriptions for Member, Shift Lead, Manager, Admin and Inactive roles.
 - Added the native Team screen’s member fallback endpoint (`GET /api/teams/:id/members`) with the same role and organisation visibility rules as the main teams feed.
 - Fixed Manager organisation views so assigned members are shown directly instead of appearing undefined.
 - Added a shared My Team view for any role with team-view permission, while keeping team editing controls restricted to team managers.
