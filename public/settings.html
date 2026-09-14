@@ -1933,7 +1933,7 @@ async function loadRoles() {
     if (permission?.key && !rolePermissionCatalog.some(item => item.key === permission.key)) rolePermissionCatalog.push(permission)
   }
 }
-async function loadUsers() { try { users = await api('/api/users') } catch { users = [] } }
+async function loadUsers() { try { users = await api(hasPermission('view_people_teams') ? '/api/users?include_inactive=1' : '/api/users') } catch { users = [] } }
 async function loadLocations() { locations = await api('/api/locations') }
 async function loadOrgs() { try { orgs = await api('/api/organisations') } catch { orgs = [] } }
 
@@ -2956,7 +2956,7 @@ function renderTeamListFiltered() {
     return
   }
   el.innerHTML = filtered.map(u => `
-    <div class="member-row">
+    <div class="member-row" style="${u.is_active ? '' : 'opacity:.58;'}">
       <div class="member-info">
         ${_avatarHTML(u)}
         <div style="min-width:0">

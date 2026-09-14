@@ -125,7 +125,8 @@ router.get('/', requireAuth, (req, res) => {
     }
     return res.json(user ? [serializeUser(user, req)] : [])
   }
-  const activeOnly = !canViewFullUserDirectory(req)
+  const canViewInactiveDirectory = req.query.include_inactive === '1' && hasPermission(req, 'view_people_teams')
+  const activeOnly = !canViewFullUserDirectory(req) && !canViewInactiveDirectory
   if (req.query.limit !== undefined || req.query.offset !== undefined) {
     const limit  = Math.min(Math.max(parseInt(req.query.limit  || '50'), 1), 200)
     const offset = Math.max(parseInt(req.query.offset || '0'), 0)
