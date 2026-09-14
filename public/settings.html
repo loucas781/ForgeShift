@@ -2949,7 +2949,7 @@ function renderTeamListFiltered() {
   if (!el) return
   const showInactive = document.getElementById('showInactive')?.checked ?? false
   const selectedRole = roles.find(role => role.id === activeRoleTab)
-  const filtered = users.filter(user => (user.role_id || roleForUser(user)?.id) === activeRoleTab && (selectedRole?.is_system || showInactive || user.is_active))
+  const filtered = users.filter(user => (user.role_id || roleForUser(user)?.id) === activeRoleTab && (showInactive || user.is_active))
   if (!filtered.length) {
     const role = roles.find(item => item.id === activeRoleTab)
     el.innerHTML = `<p style="color:var(--text-3);font-size:13px;padding:8px 0">No ${showInactive ? '' : 'active '}${escHtml(role?.name || 'users')} assigned yet.</p>`

@@ -2,6 +2,8 @@
 
 ## 2026-09-14
 
+- Fixed the People & Teams “Show inactive” filter so inactive accounts are hidden by default and shown only when enabled.
+- Preserved team memberships when accounts become inactive, allowing memberships to return automatically when the account is re-enabled.
 - Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
 - Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
 - Added a role permission to bypass the inactive account timer for roles such as maternity or other approved extended-absence functions; Admin includes this permission by default.
