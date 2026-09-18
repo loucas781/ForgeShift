@@ -14,6 +14,7 @@
 - Fixed Admin and stored-role detection so countdowns and bypass indicators are returned consistently across the directory.
 - Hidden the inactivity timer badge entirely when the system timer is disabled.
 - Restored automatic staging RC patch increments for normal pushes and cherry-picks from develop.
+- Fixed active account timer badges by distinguishing an enabled timer from a disabled or bypassed timer.
 - Applied a one-time 30-day rollout baseline to all previously existing accounts.
 - Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
 - Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
