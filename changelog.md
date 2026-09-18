@@ -11,6 +11,8 @@
 - Team and organisation membership saves now preserve inactive members instead of deleting them from the group.
 - Re-enabling an account starts a fresh inactivity window without changing its existing password.
 - Fixed countdowns to use the latest account activity and correctly show `∞` for bypass roles.
+- Fixed Admin and stored-role detection so countdowns and bypass indicators are returned consistently across the directory.
+- Hidden the inactivity timer badge entirely when the system timer is disabled.
 - Applied a one-time 30-day rollout baseline to all previously existing accounts.
 - Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
 - Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
