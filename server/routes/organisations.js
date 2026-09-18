@@ -190,7 +190,8 @@ router.put('/:id/members', requireAuth, requirePermission('manage_organisations'
     const { user_ids } = req.body
     if (!Array.isArray(user_ids)) return res.status(400).json({ error: 'user_ids must be an array.' })
     const tx = db.transaction(() => {
-      db.prepare('DELETE FROM organisation_members WHERE org_id = ?').run(req.params.id)
+      // Preserve inactive members when the active membership list is edited.
+      db.prepare('DELETE FROM organisation_members WHERE org_id = ? AND user_id IN (SELECT id FROM users WHERE is_active = 1)').run(req.params.id)
       const ins = db.prepare('INSERT OR IGNORE INTO organisation_members (org_id, user_id) VALUES (?,?)')
       user_ids.forEach(uid => ins.run(req.params.id, uid))
     })

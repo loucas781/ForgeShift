@@ -48,6 +48,7 @@ function migrate() {
       is_active   INTEGER NOT NULL DEFAULT 1,
       totp_secret TEXT,
       totp_enabled INTEGER NOT NULL DEFAULT 0,
+      inactivity_baseline_at TEXT NOT NULL DEFAULT (datetime('now')),
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -669,6 +670,10 @@ function migrateRoles() {
   if (!roleCols.includes('created_at')) db.exec("ALTER TABLE roles ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))")
   if (!roleCols.includes('updated_at')) db.exec("ALTER TABLE roles ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
   const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name)
+  if (!userCols.includes('inactivity_baseline_at')) {
+    db.exec("ALTER TABLE users ADD COLUMN inactivity_baseline_at TEXT NOT NULL DEFAULT (datetime('now'))")
+    console.log('✓ Added inactivity baseline for existing accounts')
+  }
   if (!userCols.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
   if (!userCols.includes('previous_role_id')) db.exec('ALTER TABLE users ADD COLUMN previous_role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
 

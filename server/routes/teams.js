@@ -246,7 +246,9 @@ router.put('/:id/members', requireAuth, requireTeamManagement, (req, res) => {
     resolvedIds = allowed
   }
 
-  db.prepare('DELETE FROM team_members WHERE team_id = ?').run(req.params.id)
+  // Replace only active memberships. Inactive accounts remain assigned so
+  // their exact team membership returns when they are re-enabled.
+  db.prepare('DELETE FROM team_members WHERE team_id = ? AND user_id IN (SELECT id FROM users WHERE is_active = 1)').run(req.params.id)
   const insert = db.prepare('INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?,?)')
   resolvedIds.forEach(uid => insert.run(req.params.id, uid))
   audit(req.user.id, 'team.members_update', 'team', req.params.id, team.name, { count: resolvedIds.length, by: req.user.name })

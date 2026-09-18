@@ -16,8 +16,9 @@ function getAccountInactivityDays() {
 function enforceAccountInactivity(userId, roleRow) {
   const days = getAccountInactivityDays()
   if (!days || rolePermissions(roleRow).includes('bypass_inactive_account_timer')) return false
+  const user = db.prepare('SELECT inactivity_baseline_at FROM users WHERE id = ?').get(userId)
   const lastActivity = db.prepare(`SELECT MAX(last_used_at) AS last_used_at FROM user_sessions WHERE user_id = ?`).get(userId)?.last_used_at
-    || db.prepare('SELECT created_at FROM users WHERE id = ?').get(userId)?.created_at
+    || user?.inactivity_baseline_at
   if (!lastActivity || Date.now() - new Date(lastActivity).getTime() <= days * 86400000) return false
   db.prepare("UPDATE users SET is_active = 0, role_id = 'system-inactive', previous_role_id = COALESCE(previous_role_id, role_id), token_version = COALESCE(token_version, 0) + 1 WHERE id = ? AND is_active = 1").run(userId)
   db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId)
