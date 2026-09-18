@@ -115,9 +115,9 @@ jobs:
             fi
           elif [[ "$BRANCH" == "staging" ]]; then
             # Keep an existing release candidate stable when a merge or other
-            # follow-up push triggers this workflow; only create the next RC
-            # when staging is still on a base release version.
-            if echo "$CURRENT" | grep -q '\-rc'; then
+            # follow-up push triggers this workflow. Manual dispatches are
+            # explicit release bumps and must advance the patch version.
+            if [[ "$EVENT" != "workflow_dispatch" ]] && echo "$CURRENT" | grep -q '\-rc'; then
               NEW_VERSION="$CURRENT"
             else
               PATCH=$((PATCH + 1))
