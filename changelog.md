@@ -10,6 +10,8 @@
 - The first admin-configured timer value now establishes the rollout baseline for all existing accounts, including custom values such as 60 days.
 - Team and organisation membership saves now preserve inactive members instead of deleting them from the group.
 - Re-enabling an account starts a fresh inactivity window without changing its existing password.
+- Fixed countdowns to use the latest account activity and correctly show `∞` for bypass roles.
+- Applied a one-time 30-day rollout baseline to all previously existing accounts.
 - Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
 - Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.
 - Added a role permission to bypass the inactive account timer for roles such as maternity or other approved extended-absence functions; Admin includes this permission by default.

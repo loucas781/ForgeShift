@@ -114,8 +114,15 @@ jobs:
               NEW_VERSION=$(base_version "$STAGING_CURRENT")
             fi
           elif [[ "$BRANCH" == "staging" ]]; then
-            PATCH=$((PATCH + 1))
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
+            # Keep an existing release candidate stable when a merge or other
+            # follow-up push triggers this workflow; only create the next RC
+            # when staging is still on a base release version.
+            if echo "$CURRENT" | grep -q '\-rc'; then
+              NEW_VERSION="$CURRENT"
+            else
+              PATCH=$((PATCH + 1))
+              NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
+            fi
           else
             if echo "$CURRENT" | grep -q '\-dev\.'; then
               LAST_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
