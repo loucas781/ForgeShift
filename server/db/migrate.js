@@ -667,11 +667,20 @@ function migrateRoles() {
   if (!roleCols.includes('is_builtin')) db.exec('ALTER TABLE roles ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0')
   if (!roleCols.includes('is_system')) db.exec('ALTER TABLE roles ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0')
   if (!roleCols.includes('created_by')) db.exec('ALTER TABLE roles ADD COLUMN created_by TEXT REFERENCES users(id) ON DELETE SET NULL')
-  if (!roleCols.includes('created_at')) db.exec("ALTER TABLE roles ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))")
-  if (!roleCols.includes('updated_at')) db.exec("ALTER TABLE roles ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
+  if (!roleCols.includes('created_at')) {
+    // SQLite does not allow a non-constant default in ALTER TABLE ... ADD COLUMN.
+    db.exec('ALTER TABLE roles ADD COLUMN created_at TEXT')
+    db.exec("UPDATE roles SET created_at = datetime('now') WHERE created_at IS NULL")
+  }
+  if (!roleCols.includes('updated_at')) {
+    db.exec('ALTER TABLE roles ADD COLUMN updated_at TEXT')
+    db.exec("UPDATE roles SET updated_at = datetime('now') WHERE updated_at IS NULL")
+  }
   const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name)
   if (!userCols.includes('inactivity_baseline_at')) {
-    db.exec("ALTER TABLE users ADD COLUMN inactivity_baseline_at TEXT NOT NULL DEFAULT (datetime('now'))")
+    // SQLite does not allow a non-constant default in ALTER TABLE ... ADD COLUMN.
+    db.exec('ALTER TABLE users ADD COLUMN inactivity_baseline_at TEXT')
+    db.exec("UPDATE users SET inactivity_baseline_at = datetime('now') WHERE inactivity_baseline_at IS NULL")
     console.log('✓ Added inactivity baseline for existing accounts')
   }
   // One-time rollout reset: every account that existed before this feature
