@@ -124,11 +124,14 @@ jobs:
               NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
             fi
           else
-            if echo "$CURRENT" | grep -q '\-dev\.'; then
-              LAST_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
-            else
-              LAST_NUM=0
-            fi
+            # Never allow a cherry-pick or branch sync to reset the DEV
+            # counter. Use the highest published DEV suffix as a floor.
+            git fetch --tags --force 2>/dev/null || true
+            CURRENT_NUM=$(echo "$CURRENT" | sed -n 's/.*-dev\.\([0-9]*\).*/\1/p')
+            LATEST_TAG_NUM=$(git tag -l 'v*-dev.*' | sed -n 's/.*-dev\.\([0-9]*\)$/\1/p' | sort -n | tail -1)
+            CURRENT_NUM=${CURRENT_NUM:-0}
+            LATEST_TAG_NUM=${LATEST_TAG_NUM:-0}
+            LAST_NUM=$(( CURRENT_NUM > LATEST_TAG_NUM ? CURRENT_NUM : LATEST_TAG_NUM ))
             DEV_NUM=$(( LAST_NUM + 1 ))
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}"
           fi
@@ -173,12 +176,15 @@ jobs:
 
           for TARGET in $DOWNSTREAM; do
             git fetch origin $TARGET
+            git fetch --tags --force 2>/dev/null || true
             git checkout $TARGET
             CURRENT=$(cat .version | tr -d '[:space:]')
             if [[ "$TARGET" == "staging" ]]; then
               NEW_TARGET_VERSION="${NEW_BASE}-rc"
             elif echo "$CURRENT" | grep -q '\-dev\.'; then
               DEV_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
+              LATEST_TAG_NUM=$(git tag -l 'v*-dev.*' | sed -n 's/.*-dev\.\([0-9]*\)$/\1/p' | sort -n | tail -1)
+              if [[ -n "$LATEST_TAG_NUM" && "$LATEST_TAG_NUM" -gt "$DEV_NUM" ]]; then DEV_NUM="$LATEST_TAG_NUM"; fi
               NEW_TARGET_VERSION="${NEW_BASE}-dev.${DEV_NUM}"
             elif echo "$CURRENT" | grep -q '\-rc'; then
               NEW_TARGET_VERSION="${NEW_BASE}-rc"
