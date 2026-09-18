@@ -40,6 +40,7 @@ function addInactivityStatus(user) {
   if (!user || !user.is_active) return user
   const configured = loadOverrides().ACCOUNT_INACTIVITY_DAYS
   const days = configured == null ? 30 : parseInt(configured, 10)
+  user.inactivity_timer_enabled = Number.isFinite(days) && days > 0
   const storedRole = user.role_id ? db.prepare('SELECT id, name, permissions, is_builtin, is_system FROM roles WHERE id = ?').get(user.role_id) : null
   const bypassed = user.role === 'admin' || rolePermissions(storedRole || { id: user.role_id, role: user.role, permissions: user.permissions }).includes('bypass_inactive_account_timer')
   user.inactivity_bypassed = bypassed
@@ -48,7 +49,7 @@ function addInactivityStatus(user) {
     new Date(user.inactivity_baseline_at || user.created_at).getTime(),
     lastSession ? new Date(lastSession).getTime() : 0,
   )
-  user.inactivity_days_remaining = bypassed || !Number.isFinite(days) || days <= 0
+  user.inactivity_days_remaining = bypassed || !user.inactivity_timer_enabled
     ? null
     : Math.max(0, Math.ceil((days * 86400000 - (Date.now() - lastActivityAt)) / 86400000))
   return user
