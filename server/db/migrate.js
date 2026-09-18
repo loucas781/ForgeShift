@@ -674,6 +674,14 @@ function migrateRoles() {
     db.exec("ALTER TABLE users ADD COLUMN inactivity_baseline_at TEXT NOT NULL DEFAULT (datetime('now'))")
     console.log('✓ Added inactivity baseline for existing accounts')
   }
+  // One-time rollout reset: every account that existed before this feature
+  // receives the full default window, including accounts with bypass roles.
+  const baselineRollout = db.prepare("SELECT value FROM app_preferences WHERE key = 'inactivity_baseline_rollout_v2'").get()
+  if (!baselineRollout) {
+    db.prepare("UPDATE users SET inactivity_baseline_at = datetime('now')").run()
+    db.prepare("INSERT INTO app_preferences (key, value, updated_at) VALUES ('inactivity_baseline_rollout_v2', 'true', datetime('now'))").run()
+    console.log('✓ Reset inactivity baseline for existing accounts')
+  }
   if (!userCols.includes('role_id')) db.exec('ALTER TABLE users ADD COLUMN role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
   if (!userCols.includes('previous_role_id')) db.exec('ALTER TABLE users ADD COLUMN previous_role_id TEXT REFERENCES roles(id) ON DELETE SET NULL')
 

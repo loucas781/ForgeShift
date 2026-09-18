@@ -1,0 +1,11 @@
+# Default owner for repo changes
+* @loucas781
+
+# Public installer/update scripts (staging + production paths)
+# Require explicit owner review for any changes.
+/proxmox/ct/forgeshift.sh @loucas781
+/proxmox/install/forgeshift-install.sh @loucas781
+
+# Developer installer/update scripts
+/proxmox/ct/forgeshift-dev.sh @loucas781
+/proxmox/install/forgeshift-install-dev.sh @loucas781
