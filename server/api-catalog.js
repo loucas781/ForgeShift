@@ -205,7 +205,7 @@ function buildApiCatalog() {
 }
 
 module.exports = {
-  API_CATALOG_VERSION: 2,
+  API_CATALOG_VERSION: 3,
   MOBILE_API_CONTRACT,
   buildApiCatalog,
 }
