@@ -11,7 +11,7 @@ const multer  = require('multer')
 const logger  = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
 const { getShiftLeadScope, getOrganisationScope } = require('../utils/scope')
-const { BUILTIN, parsePermissions, hasPermission, canGrantRole, canManageUserRole } = require('../utils/roles')
+const { BUILTIN, parsePermissions, rolePermissions, hasPermission, canGrantRole, canManageUserRole } = require('../utils/roles')
 
 // ── Avatar upload storage ──────────────────────────────────────────────────────
 const AVATARS_DIR = path.join(__dirname, '../../public/uploads/avatars')
@@ -36,6 +36,17 @@ function getInitials(name) {
 function canViewFullUserDirectory(req) {
   return req.user.role === 'admin' || hasPermission(req, 'manage_users')
 }
+function addInactivityStatus(user) {
+  if (!user || !user.is_active) return user
+  const configured = loadOverrides().ACCOUNT_INACTIVITY_DAYS
+  const days = configured == null ? 30 : parseInt(configured, 10)
+  const bypassed = rolePermissions({ id: user.role_id, role: user.role, permissions: user.permissions }).includes('bypass_inactive_account_timer')
+  user.inactivity_bypassed = bypassed
+  user.inactivity_days_remaining = bypassed || !Number.isFinite(days) || days <= 0
+    ? null
+    : Math.max(0, Math.ceil((days * 86400000 - (Date.now() - new Date(user.inactivity_baseline_at || user.created_at).getTime())) / 86400000))
+  return user
+}
 function serializeUser(user, req) {
   if (!user) return user
   if (typeof user.permissions === 'string') user.permissions = parsePermissions(user.permissions)
@@ -45,7 +56,7 @@ function serializeUser(user, req) {
     delete user.previous_role_id
     delete user.created_at
   }
-  return user
+  return addInactivityStatus(user)
 }
 function canListUsers(req) {
   return [
@@ -116,7 +127,7 @@ router.get('/', requireAuth, (req, res) => {
     const user = db.prepare(
       `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
               r.name AS role_name, r.color AS role_color, r.permissions AS permissions,
-              u.previous_role_id, u.is_active, u.created_at FROM users u LEFT JOIN roles r ON r.id=u.role_id WHERE u.id = ?`
+              u.previous_role_id, u.is_active, u.created_at, u.inactivity_baseline_at FROM users u LEFT JOIN roles r ON r.id=u.role_id WHERE u.id = ?`
     ).get(req.user.id)
     if (req.query.limit !== undefined || req.query.offset !== undefined) {
       const limit = Math.min(Math.max(parseInt(req.query.limit || '50'), 1), 200)
@@ -138,7 +149,7 @@ router.get('/', requireAuth, (req, res) => {
     const users  = db.prepare(
       `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
               r.name AS role_name, r.color AS role_color, r.permissions AS permissions,
-              u.previous_role_id, u.is_active, u.created_at FROM users u LEFT JOIN roles r ON r.id=u.role_id${where} ORDER BY u.name LIMIT ? OFFSET ?`
+              u.previous_role_id, u.is_active, u.created_at, u.inactivity_baseline_at FROM users u LEFT JOIN roles r ON r.id=u.role_id${where} ORDER BY u.name LIMIT ? OFFSET ?`
     ).all(...baseParams, limit, offset)
     const total = db.prepare(`SELECT COUNT(*) as c FROM users u${where}`).get(...baseParams).c
       return res.json({ users: users.map(user => serializeUser(user, req)), total, limit, offset })
@@ -149,7 +160,7 @@ router.get('/', requireAuth, (req, res) => {
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : ''
   const users = db.prepare(
     `SELECT u.id, u.name, u.email, u.initials, u.color, u.avatar, u.role, u.role_id,
-            r.name AS role_name, r.color AS role_color, r.permissions AS permissions, u.previous_role_id, u.is_active, u.created_at,
+            r.name AS role_name, r.color AS role_color, r.permissions AS permissions, u.previous_role_id, u.is_active, u.created_at, u.inactivity_baseline_at,
             MIN(tm.team_id) AS team_id
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id LEFT JOIN roles r ON r.id=u.role_id${where}
      GROUP BY u.id
@@ -272,7 +283,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req, res) => {
         updates.push('previous_role_id = ?, role_id = ?, is_active = ?')
         vals.push(selectedRole?.id || user.role_id, BUILTIN.inactive.id, 0)
       } else if (active && !user.is_active) {
-        updates.push('role_id = ?, previous_role_id = NULL, is_active = ?')
+        updates.push("role_id = ?, previous_role_id = NULL, is_active = ?, inactivity_baseline_at = datetime('now')")
         vals.push(selectedRole ? selectedRole.id : (user.previous_role_id || BUILTIN.member.id), 1)
       } else updates.push('is_active = ?'), vals.push(active)
     }
