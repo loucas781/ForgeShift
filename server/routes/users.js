@@ -42,21 +42,29 @@ function addInactivityStatus(user) {
   const days = configured == null ? 30 : parseInt(configured, 10)
   const bypassed = rolePermissions({ id: user.role_id, role: user.role, permissions: user.permissions }).includes('bypass_inactive_account_timer')
   user.inactivity_bypassed = bypassed
+  const lastSession = db.prepare('SELECT MAX(last_used_at) AS last_used_at FROM user_sessions WHERE user_id = ?').get(user.id)?.last_used_at
+  const lastActivityAt = Math.max(
+    new Date(user.inactivity_baseline_at || user.created_at).getTime(),
+    lastSession ? new Date(lastSession).getTime() : 0,
+  )
   user.inactivity_days_remaining = bypassed || !Number.isFinite(days) || days <= 0
     ? null
-    : Math.max(0, Math.ceil((days * 86400000 - (Date.now() - new Date(user.inactivity_baseline_at || user.created_at).getTime())) / 86400000))
+    : Math.max(0, Math.ceil((days * 86400000 - (Date.now() - lastActivityAt)) / 86400000))
   return user
 }
 function serializeUser(user, req) {
   if (!user) return user
   if (typeof user.permissions === 'string') user.permissions = parsePermissions(user.permissions)
+  // Calculate security metadata before hiding sensitive role fields from
+  // users who can view the directory but not manage users.
+  addInactivityStatus(user)
   if (req && user.id !== req.user.id && !canViewFullUserDirectory(req)) {
     delete user.email
     delete user.permissions
     delete user.previous_role_id
     delete user.created_at
   }
-  return addInactivityStatus(user)
+  return user
 }
 function canListUsers(req) {
   return [
