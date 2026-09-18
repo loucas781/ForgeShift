@@ -225,7 +225,7 @@ router.post('/login', async (req, res) => {
     const role = getRoleForUser(user.id)
     const overrides = loadOverrides()
     const days = overrides.ACCOUNT_INACTIVITY_DAYS == null ? 30 : parseInt(overrides.ACCOUNT_INACTIVITY_DAYS, 10)
-    const lastActivity = db.prepare('SELECT MAX(last_used_at) AS last_used_at FROM user_sessions WHERE user_id = ?').get(user.id)?.last_used_at || user.created_at
+    const lastActivity = db.prepare('SELECT MAX(last_used_at) AS last_used_at FROM user_sessions WHERE user_id = ?').get(user.id)?.last_used_at || user.inactivity_baseline_at
     if (user.is_active !== 0 && days > 0 && !rolePermissions(role).includes('bypass_inactive_account_timer') && Date.now() - new Date(lastActivity).getTime() > days * 86400000) {
       db.prepare("UPDATE users SET is_active = 0, role_id = 'system-inactive', previous_role_id = COALESCE(previous_role_id, role_id), token_version = COALESCE(token_version, 0) + 1 WHERE id = ?").run(user.id)
       user.is_active = 0

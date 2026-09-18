@@ -289,6 +289,7 @@ app.patch('/api/features', requireAuth, (req, res) => {
 // ── Admin: toggle runtime settings ────────────────────────────────────────────
 app.patch('/api/config', requireAuth, (req, res) => {
   if (!hasPermission(req, 'manage_settings')) return res.status(403).json({ error: 'Admin only' })
+  const db = require('./db/connection')
   const overrides = loadOverrides()
   if (typeof req.body.allowSignup === 'boolean')  overrides.ALLOW_SIGNUP   = req.body.allowSignup  ? 'true' : 'false'
   if (typeof req.body.maintenanceMode === 'boolean') overrides.MAINTENANCE_MODE = req.body.maintenanceMode ? 'true' : 'false'
@@ -315,7 +316,17 @@ app.patch('/api/config', requireAuth, (req, res) => {
   if (req.body.accountInactivityDays !== undefined) {
     const v = req.body.accountInactivityDays
     if (v === null || v === 0) overrides.ACCOUNT_INACTIVITY_DAYS = 0
-    else { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 1 || n > 3650) return res.status(400).json({ error: 'Account inactivity must be 1–3650 days, or 0 to disable' }); overrides.ACCOUNT_INACTIVITY_DAYS = n }
+    else {
+      const n = parseInt(v, 10)
+      if (!Number.isFinite(n) || n < 1 || n > 3650) return res.status(400).json({ error: 'Account inactivity must be 1–3650 days, or 0 to disable' })
+      // The first admin configuration establishes the rollout baseline for
+      // every existing account. Future accounts use the column default.
+      if (overrides.ACCOUNT_INACTIVITY_INITIALIZED !== 'true') {
+        db.prepare("UPDATE users SET inactivity_baseline_at = datetime('now')").run()
+        overrides.ACCOUNT_INACTIVITY_INITIALIZED = 'true'
+      }
+      overrides.ACCOUNT_INACTIVITY_DAYS = n
+    }
   }
   saveOverrides(overrides)
   res.json({
