@@ -2966,7 +2966,7 @@ function renderTeamListFiltered() {
       </div>
       <div class="team-member-status" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <span class="badge badge-${u.is_active?'green':'red'}">${u.is_active?'Active':'Inactive'}</span>
-        ${u.is_active ? `<span class="badge badge-gray" title="${u.inactivity_bypassed ? 'This role bypasses the inactive account timer' : 'Estimated time until automatic lock'}">${u.inactivity_bypassed ? '∞' : `${u.inactivity_days_remaining ?? '—'}d left`}</span>` : ''}
+        ${u.is_active && (u.inactivity_bypassed || u.inactivity_days_remaining != null) ? `<span class="badge badge-gray" title="${u.inactivity_bypassed ? 'This role bypasses the inactive account timer' : 'Estimated time until automatic lock'}">${u.inactivity_bypassed ? '∞' : `${u.inactivity_days_remaining}d left`}</span>` : ''}
       </div>
       <div class="member-actions">
         ${(() => {
