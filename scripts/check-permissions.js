@@ -43,4 +43,23 @@ for (const permission of ['view_team_rotas', 'view_all_rotas', 'manage_team_shif
   if (!configSource.includes(`'${permission}'`)) throw new Error(`/api/config section access does not recognise ${permission}`)
 }
 
+const usersSource = fs.readFileSync(path.join(__dirname, '..', 'server/routes/users.js'), 'utf8')
+const listAllUsersSource = usersSource.match(/function canListAllUsers\(req\) \{([\s\S]*?)\n\}/)?.[1] || ''
+for (const scopedPermission of ['manage_tasks', 'manage_team_tasks', 'manage_teams', 'manage_team_shifts', 'manage_org_shifts']) {
+  if (listAllUsersSource.includes(`'${scopedPermission}'`)) throw new Error(`${scopedPermission} must not expose the global user directory`)
+}
+
+const calendarSource = fs.readFileSync(path.join(__dirname, '..', 'public/index.html'), 'utf8')
+if (!calendarSource.includes('function canTargetTaskUsers()')) throw new Error('Task selectors do not distinguish scoped task assignment permissions')
+if (!calendarSource.includes('const taskUsers = canTargetTaskUsers()')) throw new Error('Task selector can expose users through generic task management')
+
+const tasksSource = fs.readFileSync(path.join(__dirname, '..', 'server/routes/tasks.js'), 'utf8')
+const manageAllTasksSource = tasksSource.match(/function canManageAllTasks\(req\) \{([\s\S]*?)\n\}/)?.[1] || ''
+if (manageAllTasksSource.includes("'manage_tasks'")) throw new Error('manage_tasks must not imply global task management')
+if (!tasksSource.includes('getAccessibleTaskList')) throw new Error('Task-list object access is not scope checked')
+
+const scopeSource = fs.readFileSync(path.join(__dirname, '..', 'server/utils/scope.js'), 'utf8')
+const teamScopeSource = scopeSource.match(/function getTeamScope\(userId\) \{([\s\S]*?)\n\}/)?.[1] || ''
+if (teamScopeSource.includes('organisation_members')) throw new Error('Team scope must not expand through organisation membership')
+
 console.log(`Permissions OK: ${permissionKeys.length} catalogue entries; ${builtinCount} built-in roles checked.`)

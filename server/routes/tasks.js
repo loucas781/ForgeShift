@@ -34,6 +34,16 @@ function requireTaskAssignment(req, res, next) {
 function assertTaskTarget(req, userId) {
   return canManageAllTasks(req) || (canManageTeamTasks(req) && taskScope(req).has(userId)) || (hasPermission(req, 'assign_own_tasks') && userId === req.user.id)
 }
+function canAccessTaskList(req, list) {
+  if (!list) return false
+  if (canManageAllTasks(req)) return true
+  if (!list.org_id) return true
+  return !!db.prepare('SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?').get(list.org_id, req.user.id)
+}
+function getAccessibleTaskList(req, taskListId) {
+  const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(taskListId)
+  return canAccessTaskList(req, list) ? list : null
+}
 
 // ── GET /api/tasks/lists — list all task lists ────────────────────────────────
 // Admin: all lists. Others: unassigned lists (org_id IS NULL) + lists in their orgs.
@@ -78,6 +88,7 @@ router.post('/lists', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const { name, color, description, location_id, sort_order, org_id, label } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required.' })
+    if (org_id && !canAccessTaskList(req, { org_id })) return res.status(403).json({ error: 'You cannot create task lists for that organisation.' })
     const id = uuidv4()
     db.prepare('INSERT INTO task_lists (id, name, color, description, location_id, sort_order, org_id, label, created_by) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(
@@ -110,7 +121,9 @@ router.put('/lists/:id', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
+    if (!canAccessTaskList(req, list)) return res.status(403).json({ error: 'You cannot edit this task list.' })
     const { name, color, description, location_id, sort_order, org_id, label } = req.body
+    if (org_id && !canAccessTaskList(req, { org_id })) return res.status(403).json({ error: 'You cannot move task lists into that organisation.' })
     db.prepare('UPDATE task_lists SET name=?, color=?, description=?, location_id=?, sort_order=?, org_id=?, label=? WHERE id=?')
       .run(
         name?.trim() || list.name,
@@ -141,6 +154,7 @@ router.delete('/lists/:id', requireAuth, requireTaskManagement, (req, res) => {
   try {
     const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(req.params.id)
     if (!list) return res.status(404).json({ error: 'Task list not found' })
+    if (!canAccessTaskList(req, list)) return res.status(403).json({ error: 'You cannot delete this task list.' })
     db.prepare('DELETE FROM task_lists WHERE id = ?').run(req.params.id)
     audit(req.user.id, 'task_list.delete', 'task_list', req.params.id, list.name)
     res.json({ ok: true })
@@ -217,6 +231,7 @@ router.post('/assignments', requireAuth, requireTaskAssignment, (req, res) => {
       db.prepare('DELETE FROM task_assignments WHERE user_id = ? AND date = ?').run(user_id, date)
       return res.json({ ok: true, cleared: true })
     }
+    if (!getAccessibleTaskList(req, task_list_id)) return res.status(403).json({ error: 'That task list is outside your organisation scope.' })
 
     // Prevent duplicate (user+list+date)
     const existing = db.prepare(
@@ -252,6 +267,7 @@ router.post('/assignments/bulk', requireAuth, requireTaskAssignment, (req, res) 
     if (!user_id || !task_list_id) return res.status(400).json({ error: 'user_id and task_list_id are required.' })
     if (!Array.isArray(dates) || !dates.length) return res.status(400).json({ error: 'dates must be a non-empty array.' })
     if (!assertTaskTarget(req, user_id)) return res.status(403).json({ error: 'That user is outside your team scope.' })
+    if (!getAccessibleTaskList(req, task_list_id)) return res.status(403).json({ error: 'That task list is outside your organisation scope.' })
 
     const insert = db.prepare(
       'INSERT OR IGNORE INTO task_assignments (id, user_id, task_list_id, date, created_by) VALUES (?,?,?,?,?)'

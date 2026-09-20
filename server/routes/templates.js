@@ -80,6 +80,13 @@ function clearTemplateDays(templateId) {
   db.prepare('DELETE FROM template_pattern_days WHERE template_id = ?').run(templateId)
 }
 
+function canAccessTemplate(req, template) {
+  if (!template) return false
+  if (req.user.role === 'admin' || hasPermission(req, 'manage_templates')) return true
+  if (!template.org_id) return true
+  return !!db.prepare('SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?').get(template.org_id, req.user.id)
+}
+
 function validateTemplatePayload(body) {
   const name = body.name?.trim()
   if (!name) return { error: 'Template name is required.' }
@@ -147,6 +154,7 @@ router.get('/:id', requireAuth, (req, res) => {
   if (!hasPermission(req, 'view_templates') && !hasPermission(req, 'manage_templates')) return res.status(403).json({ error: 'You do not have permission to view templates.' })
   const template = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(req.params.id)
   if (!template) return res.status(404).json({ error: 'Template not found' })
+  if (!canAccessTemplate(req, template)) return res.status(403).json({ error: 'That template is outside your organisation scope.' })
   const serialized = serializeTemplate(template)
   const days = loadTemplateDays(db, req.params.id, serialized.template_type)
   res.json({ ...serialized, days })

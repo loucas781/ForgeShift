@@ -27,8 +27,8 @@ router.get('/', requireAuth, (req, res) => {
     ].some(permission => hasPermission(req, permission))
 
     if (!canManageOrganisations && needsOrganisationOptions) {
-      const canViewAllOrganisationOptions = req.user.role === 'manager' || [
-        'manage_locations', 'manage_templates', 'manage_tasks', 'manage_teams'
+      const canViewAllOrganisationOptions = [
+        'manage_locations', 'manage_templates'
       ].some(permission => hasPermission(req, permission))
       const orgs = canViewAllOrganisationOptions
         ? db.prepare('SELECT o.id, o.name, o.color FROM organisations o ORDER BY o.name').all()

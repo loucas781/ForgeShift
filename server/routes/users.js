@@ -89,7 +89,6 @@ function canListUsers(req) {
     'manage_all_teams',
     'manage_locations',
     'manage_organisations',
-    'manage_tasks',
   ]
     .some(permission => hasPermission(req, permission))
 }
@@ -100,8 +99,6 @@ function canListAllUsers(req) {
     'manage_all_shifts',
     'manage_all_tasks',
     'manage_all_teams',
-    'manage_tasks',
-    'manage_teams',
     'manage_locations',
     'manage_organisations',
     'manage_users',
@@ -114,7 +111,7 @@ function getVisibleUserScope(req) {
   if (req.user.role === 'admin') return null
   if (req.user.role === 'manager') return getOrganisationScope(req.user.id)
   if (canListAllUsers(req)) return null
-  if (hasPermission(req, 'manage_org_shifts')) return getOrganisationScope(req.user.id)
+  if (hasPermission(req, 'manage_org_shifts') || hasPermission(req, 'manage_teams')) return getOrganisationScope(req.user.id)
   if (canListUsers(req)) return getTeamScope(req.user.id)
   return new Set([req.user.id])
 }

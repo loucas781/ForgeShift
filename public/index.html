@@ -366,7 +366,8 @@ function hasPermission(permission) {
 }
 function canViewOtherRotas() { return ['view_other_rotas','view_team_rotas','view_all_rotas','manage_team_shifts','manage_org_shifts','manage_all_shifts'].some(hasPermission) }
 function canManageTasks() { return ['manage_tasks','manage_team_tasks','manage_all_tasks'].some(hasPermission) }
-function canAssignOwnTasks() { return canManageTasks() || hasPermission('assign_own_tasks') }
+function canAssignOwnTasks() { return hasPermission('assign_own_tasks') || hasPermission('manage_team_tasks') || hasPermission('manage_all_tasks') }
+function canTargetTaskUsers() { return hasPermission('manage_team_tasks') || hasPermission('manage_all_tasks') }
 function canTargetOtherUsers() {
   return canViewOtherRotas() || ['add_other_shifts','edit_other_shifts','delete_other_shifts'].some(hasPermission)
 }
@@ -409,7 +410,7 @@ function getTaskBannerPresentation(taskAssignment, alpha = '22') {
 
 function renderTaskDots(dayAssignments, dateStr, className = '') {
   if (!cfg.featureTasks || !dayAssignments.length) return ''
-  const canOpen = canManageTasks() || (canAssignOwnTasks() && dayAssignments.some(a => a.user_id === cfg?.user?.id))
+  const canOpen = canAssignOwnTasks() && (canTargetTaskUsers() || dayAssignments.some(a => a.user_id === cfg?.user?.id))
   const clickAttr = canOpen
     ? `onclick="event.stopPropagation();openTaskAssignModal('${dateStr}')"`
     : ''
@@ -625,7 +626,7 @@ async function loadLocations() {
 
 async function loadUsers() {
   // The backend applies team/permission scope; do not duplicate role rules here.
-  users = canTargetOtherUsers() ? await api('/api/users') : [cfg.user]
+  users = (canTargetOtherUsers() || canTargetTaskUsers()) ? await api('/api/users') : [cfg.user]
   const msel = document.getElementById('modalUser')
   const tasel = document.getElementById('taUser')
   const mFrag = document.createDocumentFragment()
@@ -634,14 +635,14 @@ async function loadUsers() {
     const o = document.createElement('option'); o.value = u.id; o.textContent = u.name
     mFrag.appendChild(o)
   })
-  const taskUsers = canManageTasks() ? users.filter(u => u.is_active) : [cfg.user]
+  const taskUsers = canTargetTaskUsers() ? users.filter(u => u.is_active) : [cfg.user]
   taskUsers.forEach(u => {
     const o2 = document.createElement('option'); o2.value = u.id; o2.textContent = u.name
     taFrag.appendChild(o2)
   })
   msel.appendChild(mFrag)
   tasel.appendChild(taFrag)
-  if (!canManageTasks()) tasel.disabled = true
+  if (!canAssignOwnTasks()) tasel.disabled = true
 }
 
 let teams = []
