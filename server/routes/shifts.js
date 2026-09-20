@@ -314,6 +314,10 @@ router.post('/apply-template', requireAuth, (req, res) => {
 
     const tmpl = db.prepare('SELECT * FROM shift_templates WHERE id = ?').get(template_id)
     if (!tmpl) return res.status(404).json({ error: 'Template not found' })
+    if (tmpl.org_id && req.user.role !== 'admin' && !hasPermission(req, 'manage_templates')) {
+      const belongsToOrganisation = db.prepare('SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?').get(tmpl.org_id, req.user.id)
+      if (!belongsToOrganisation) return res.status(403).json({ error: 'That template is outside your organisation scope.' })
+    }
     const templateType = normalizeTemplateType(tmpl.template_type)
     const baseDate = templateType === PATTERN_TEMPLATE_TYPE ? start_date : week_start
     if (!baseDate) {

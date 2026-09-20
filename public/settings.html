@@ -1202,7 +1202,7 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'view_templates', label:'View shift templates', category:'Workspace' },
   { key:'view_own_rota', label:'View own rota', category:'Rota' },
   { key:'view_other_rotas', label:'View other users’ rotas', description:'Legacy compatibility permission. Prefer View team rotas or View all rotas for new roles.', category:'Legacy', legacy:true },
-  { key:'view_team_rotas', label:'View team rotas', category:'Rota', scope:'Organisation/team members only' },
+  { key:'view_team_rotas', label:'View team rotas', description:'View rotas for members of the user’s assigned or owned teams.', category:'Rota', scope:'Assigned team members only' },
   { key:'view_all_rotas', label:'View all rotas', category:'Rota', scope:'All active users' },
   { key:'view_teams', label:'View organisation team members', category:'Teams' },
   { key:'view_people_teams', label:'View People & Teams administration', description:'Open the People & Teams settings page to review organisation users, roles and team assignments.', category:'Administration' },
@@ -1216,11 +1216,11 @@ const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
   { key:'add_other_shifts', label:'Add shifts for other users', category:'Shifts' },
   { key:'edit_other_shifts', label:'Edit shifts for other users', category:'Shifts' },
   { key:'delete_other_shifts', label:'Delete shifts for other users', category:'Shifts' },
-  { key:'manage_team_shifts', label:'Manage shifts for your teams', category:'Shifts', scope:'Organisation/team members only' },
+  { key:'manage_team_shifts', label:'Manage shifts for your teams', category:'Shifts', scope:'Assigned team members only' },
   { key:'manage_org_shifts', label:'Manage shifts across your organisation', category:'Shifts', scope:'Organisation members only' },
   { key:'manage_all_shifts', label:'Manage all shifts', category:'Shifts', scope:'All active users' },
-  { key:'manage_tasks', label:'Manage tasks and assignments', category:'Tasks' },
-  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Tasks', scope:'Organisation/team members only' },
+  { key:'manage_tasks', label:'Manage task lists', description:'Create and edit task lists. Assigning them to users requires an own, team or global task-assignment permission.', category:'Tasks' },
+  { key:'manage_team_tasks', label:'Manage tasks for your teams', category:'Tasks', scope:'Assigned team members only' },
   { key:'manage_all_tasks', label:'Manage all tasks', category:'Tasks', scope:'All active users' },
   { key:'manage_templates', label:'Manage shift templates', category:'Administration' },
   { key:'manage_teams', label:'Manage teams', category:'Administration' },
@@ -1258,7 +1258,7 @@ function permissionTags(permission) {
   if (categoryTags[permission?.category]) tags.push(categoryTags[permission.category])
   if (permission?.scope === 'All active users' || permission?.scope === 'All teams') tags.push('Global scope')
   else if (permission?.scope === 'Organisation members only') tags.push('Organisation scope')
-  else if (permission?.scope === 'Organisation/team members only') tags.push('Team scope')
+  else if (permission?.scope === 'Assigned team members only') tags.push('Team scope')
   if (permission?.key?.includes('_own_') || permission?.key === 'view_own_rota' || permission?.key === 'assign_own_tasks') tags.push('Own account')
   return [...new Set(tags)]
 }
