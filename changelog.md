@@ -17,6 +17,9 @@
 - Fixed active account timer badges by distinguishing an enabled timer from a disabled or bypassed timer.
 - Fixed SQLite migrations failing when adding role timestamps or inactivity baselines to existing databases.
 - Updated the API Reference to Catalogue v3 for the inactive-account status fields returned by the users endpoint.
+- Reworked team, organisation and global permission scopes so assignment and shift user lists cannot expand beyond the role’s explicit scope.
+- Added Mobile tags to permissions that affect native iOS and Android UI/API behaviour.
+- Added scenario and scope tags for feature area, own-account, team, organisation, global and legacy permissions.
 - Applied a one-time 30-day rollout baseline to all previously existing accounts.
 - Added an administrator-controlled inactive account timer, defaulting to 30 days and configurable or disableable from Security settings.
 - Accounts that exceed the timer are automatically locked from signing in until re-enabled by an administrator.

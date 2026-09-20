@@ -5,7 +5,7 @@ const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
 const { buildHolidayMapServer } = require('../holidays')
-const { getShiftLeadScope, getOrganisationScope } = require('../utils/scope')
+const { getTeamScope: getAssignedTeamScope, getOrganisationScope } = require('../utils/scope')
 const logger = require('../utils/logger')
 const { hasPermission } = require('../utils/roles')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
@@ -40,8 +40,8 @@ function isTeamScoped(req) {
     || hasPermission(req, 'manage_org_shifts')
 }
 function getTeamScope(req) {
-  return req.user.role === 'shift_lead' && !hasPermission(req, 'manage_org_shifts')
-    ? getShiftLeadScope(req.user.id)
+  return !hasPermission(req, 'manage_org_shifts')
+    ? getAssignedTeamScope(req.user.id)
     : getOrganisationScope(req.user.id)
 }
 

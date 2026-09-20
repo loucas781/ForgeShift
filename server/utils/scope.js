@@ -2,28 +2,11 @@
 const db = require('../db/connection')
 
 /**
- * Returns a Set of user IDs that a shift_lead is allowed to see/manage.
- *
- * Primary: all members of any organisation the shift_lead belongs to.
- * Fallback (no orgs configured): members of teams they own/created (legacy behaviour).
- * Always includes the shift_lead themselves.
+ * Returns members of teams the user is assigned to, plus the user themselves.
+ * Team-scoped permissions must not expand to every member of the user's
+ * organisation.
  */
-function getShiftLeadScope(userId) {
-  // Check which organisations this shift_lead belongs to
-  const orgRows = db.prepare('SELECT org_id FROM organisation_members WHERE user_id = ?').all(userId)
-  const orgIds = orgRows.map(r => r.org_id)
-
-  if (orgIds.length) {
-    const placeholders = orgIds.map(() => '?').join(',')
-    const members = db.prepare(
-      `SELECT DISTINCT user_id FROM organisation_members WHERE org_id IN (${placeholders})`
-    ).all(...orgIds)
-    const ids = new Set(members.map(m => m.user_id))
-    ids.add(userId)
-    return ids
-  }
-
-  // Fallback: teams they own, created, or are a member of (pre-organisations behaviour)
+function getTeamScope(userId) {
   const teams = db.prepare(`
     SELECT DISTINCT t.id FROM teams t
     LEFT JOIN team_members tm ON tm.team_id = t.id
@@ -37,6 +20,10 @@ function getShiftLeadScope(userId) {
   const ids = new Set(members.map(m => m.user_id))
   ids.add(userId)
   return ids
+}
+
+function getShiftLeadScope(userId) {
+  return getTeamScope(userId)
 }
 
 // Scope used by custom roles that explicitly receive team-level permissions.
@@ -57,4 +44,4 @@ function getOrganisationScope(userId) {
   const ids = new Set(rows.map(row => row.user_id)); ids.add(userId); return ids
 }
 
-module.exports = { getShiftLeadScope, getOrganisationScope }
+module.exports = { getTeamScope, getShiftLeadScope, getOrganisationScope }

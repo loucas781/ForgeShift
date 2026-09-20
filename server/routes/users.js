@@ -10,7 +10,7 @@ const path    = require('path')
 const multer  = require('multer')
 const logger  = require('../utils/logger')
 const { loadOverrides } = require('../utils/overrides')
-const { getShiftLeadScope, getOrganisationScope } = require('../utils/scope')
+const { getTeamScope, getOrganisationScope } = require('../utils/scope')
 const { BUILTIN, parsePermissions, rolePermissions, hasPermission, canGrantRole, canManageUserRole } = require('../utils/roles')
 
 // ── Avatar upload storage ──────────────────────────────────────────────────────
@@ -109,13 +109,13 @@ function canListAllUsers(req) {
 }
 
 function getVisibleUserScope(req) {
-  // Built-in Manager and Shift Lead remain organisation/team scoped even though
-  // they retain several legacy generic management permissions.
+  // Scope is determined by the strongest explicit scope permission, not by the
+  // user's legacy role label. This keeps custom roles aligned with built-ins.
   if (req.user.role === 'admin') return null
-  if (req.user.role === 'shift_lead') return getShiftLeadScope(req.user.id)
   if (req.user.role === 'manager') return getOrganisationScope(req.user.id)
   if (canListAllUsers(req)) return null
-  if (canListUsers(req)) return getOrganisationScope(req.user.id)
+  if (hasPermission(req, 'manage_org_shifts')) return getOrganisationScope(req.user.id)
+  if (canListUsers(req)) return getTeamScope(req.user.id)
   return new Set([req.user.id])
 }
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
