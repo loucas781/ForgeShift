@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-20
+
+- Corrected user-directory scoping so `manage_tasks` alone cannot expose all active users.
+- Restricted the task-assignment user selector to self, team or global scope according to the explicit task assignment permissions.
+- Clarified that Manage task lists does not grant permission to assign tasks to other users.
+- Restricted generic team management to organisations the administrator belongs to; Manage all teams remains the explicit global permission.
+- Added object-level organisation checks for creating, editing, deleting and assigning task lists.
+- Restricted task-list group visibility and membership management to the creator’s permitted users unless Manage all tasks is granted.
+- Limited Shift Lead team visibility to assigned or owned teams and stopped generic team management from exposing unrelated organisations.
+- Clarified team-scoped permission descriptions so they no longer imply organisation-wide access.
+- Added organisation-level access checks when loading or applying shift templates by ID.
+- Expanded the permission regression checker to detect accidental global directory, task and team-scope escalation.
+
 ## 2026-09-14
 
 - Fixed the People & Teams “Show inactive” filter so inactive accounts are hidden by default and shown only when enabled.

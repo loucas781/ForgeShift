@@ -14,13 +14,21 @@ function requireTeamManagement(req, res, next) {
   next()
 }
 
+function hasOrganisationAccess(user, orgId) {
+  if (!orgId) return false
+  if (user.role === 'admin' || hasPermission(user, 'manage_all_teams')) return true
+  return !!db.prepare('SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?').get(orgId, user.id)
+}
+
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
 // Can this user rename or delete the team?
 function canManageTeam(user, team) {
-  if (user.role === 'admin' || user.role === 'manager') return true
+  if (user.role === 'admin' || hasPermission(user, 'manage_all_teams')) return true
   if (user.role === 'shift_lead') return team.owned_by === user.id || team.created_by === user.id
-  if (hasPermission(user, 'manage_all_teams') || hasPermission(user, 'manage_teams')) return true
+  if (user.role === 'manager' || hasPermission(user, 'manage_teams')) {
+    return hasOrganisationAccess(user, team.org_id) || team.owned_by === user.id || team.created_by === user.id
+  }
   if (hasPermission(user, 'manage_own_teams')) {
     return team.owned_by === user.id || team.created_by === user.id || !!db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
   }
@@ -30,13 +38,15 @@ function canManageTeam(user, team) {
 // Can this user add/remove members from the team?
 // Shift leads can manage members of any team they belong to (owned or assigned).
 function canManageMembers(user, team, db) {
-  if (user.role === 'admin' || user.role === 'manager') return true
+  if (user.role === 'admin' || hasPermission(user, 'manage_all_teams')) return true
   if (user.role === 'shift_lead') {
     if (team.owned_by === user.id || team.created_by === user.id) return true
     const row = db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
     return !!row
   }
-  if (hasPermission(user, 'manage_all_teams') || hasPermission(user, 'manage_teams')) return true
+  if (user.role === 'manager' || hasPermission(user, 'manage_teams')) {
+    return hasOrganisationAccess(user, team.org_id) || team.owned_by === user.id || team.created_by === user.id
+  }
   if (hasPermission(user, 'manage_own_teams')) {
     return team.owned_by === user.id || team.created_by === user.id || !!db.prepare('SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?').get(team.id, user.id)
   }
@@ -49,8 +59,8 @@ router.get('/', requireAuth, (req, res) => {
   const { role, id: userId } = req.user
   let teams
 
-  const canManageAllTeams = role === 'admin' || role === 'manager' || (role !== 'shift_lead' && (hasPermission(req.user, 'manage_all_teams') || hasPermission(req.user, 'manage_teams')))
-  const canViewOrganisationTeams = role !== 'shift_lead' && (hasPermission(req.user, 'view_teams') || hasPermission(req.user, 'manage_own_teams'))
+  const canManageAllTeams = role === 'admin' || hasPermission(req.user, 'manage_all_teams')
+  const canViewOrganisationTeams = role !== 'shift_lead' && (role === 'manager' || hasPermission(req.user, 'view_teams') || hasPermission(req.user, 'manage_teams') || hasPermission(req.user, 'manage_own_teams'))
   if (canManageAllTeams) {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
@@ -59,20 +69,19 @@ router.get('/', requireAuth, (req, res) => {
       GROUP BY t.id ORDER BY t.name
     `).all()
   } else if (role === 'shift_lead') {
-    // Shift lead sees teams in their orgs, teams they own/created, or teams they're a member of
+    // Shift leads see only teams they own, created, or are assigned to.
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by, t.created_by,
              COUNT(tm.user_id) AS member_count
       FROM teams t LEFT JOIN team_members tm ON tm.team_id = t.id
-      WHERE t.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)
-         OR t.owned_by = ? OR t.created_by = ?
+      WHERE t.owned_by = ? OR t.created_by = ?
          OR t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
       GROUP BY t.id ORDER BY t.name
-    `).all(userId, userId, userId, userId)
+    `).all(userId, userId, userId)
   } else if (canViewOrganisationTeams) {
     // Custom roles with view_teams can see teams and members only inside
     // organisations they belong to. They receive no management capability.
-    const orgTeamClause = hasPermission(req.user, 'view_teams')
+    const orgTeamClause = role === 'manager' || hasPermission(req.user, 'view_teams') || hasPermission(req.user, 'manage_teams')
       ? 't.org_id IN (SELECT org_id FROM organisation_members WHERE user_id = ?)'
       : '0'
     const ownedTeamClause = hasPermission(req.user, 'manage_own_teams')
@@ -86,7 +95,7 @@ router.get('/', requireAuth, (req, res) => {
          OR t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
          OR ${ownedTeamClause}
       GROUP BY t.id ORDER BY t.name
-    `).all(...(hasPermission(req.user, 'view_teams') ? [userId] : []), userId, ...(hasPermission(req.user, 'manage_own_teams') ? [userId, userId] : []))
+    `).all(...((role === 'manager' || hasPermission(req.user, 'view_teams') || hasPermission(req.user, 'manage_teams')) ? [userId] : []), userId, ...(hasPermission(req.user, 'manage_own_teams') ? [userId, userId] : []))
   } else {
     teams = db.prepare(`
       SELECT t.id, t.name, t.color, t.org_id, t.created_at, t.owned_by,
@@ -143,13 +152,12 @@ router.get('/:id/members', requireAuth, (req, res) => {
   if (!team) return res.status(404).json({ error: 'Team not found' })
 
   const { role, id: userId } = req.user
-  let visible = role === 'admin' || role === 'manager' || hasPermission(req.user, 'manage_teams') || hasPermission(req.user, 'manage_all_teams')
+  let visible = role === 'admin' || hasPermission(req.user, 'manage_all_teams')
+  if (!visible && (role === 'manager' || hasPermission(req.user, 'manage_teams'))) visible = hasOrganisationAccess(req.user, team.org_id)
   if (!visible && role === 'shift_lead') {
     visible = team.owned_by === userId || team.created_by === userId || !!db.prepare(
       'SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?'
-    ).get(team.id, userId) || !!db.prepare(
-      'SELECT 1 FROM organisation_members WHERE org_id = ? AND user_id = ?'
-    ).get(team.org_id, userId)
+    ).get(team.id, userId)
   }
   if (!visible && hasPermission(req.user, 'view_teams')) {
     visible = !!db.prepare(
@@ -190,6 +198,7 @@ router.get('/:id/members', requireAuth, (req, res) => {
 router.post('/', requireAuth, requireTeamManagement, (req, res) => {
   const { name, color, org_id } = req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Team name is required.' })
+  if (org_id && !hasOrganisationAccess(req.user, org_id)) return res.status(403).json({ error: 'You cannot create teams in that organisation.' })
 
   const count = db.prepare('SELECT COUNT(*) AS c FROM teams').get().c
   const teamColor = color || COLORS[count % COLORS.length]
@@ -208,6 +217,7 @@ router.patch('/:id', requireAuth, requireTeamManagement, (req, res) => {
   const team = db.prepare('SELECT * FROM teams WHERE id = ?').get(req.params.id)
   if (!team) return res.status(404).json({ error: 'Team not found' })
   if (!canManageTeam(req.user, team)) return res.status(403).json({ error: 'You can only edit your own teams' })
+  if (org_id && !hasOrganisationAccess(req.user, org_id)) return res.status(403).json({ error: 'You cannot move teams into that organisation.' })
   const updates = []; const vals = []
   if (name?.trim())         { updates.push('name = ?');   vals.push(name.trim()) }
   if (color)                { updates.push('color = ?');  vals.push(color) }

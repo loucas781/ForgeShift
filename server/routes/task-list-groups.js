@@ -4,8 +4,13 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth, requirePermission } = require('../middleware/auth')
 const { hasPermission } = require('../utils/roles')
+const { getTeamScope } = require('../utils/scope')
 const audit  = require('../audit')
 const logger = require('../utils/logger')
+
+function canManageGroup(req, group) {
+  return hasPermission(req, 'manage_all_tasks') || group?.created_by === req.user.id
+}
 
 // ── GET /api/task-list-groups ─────────────────────────────────────────────────
 // Admin: all groups with full member details. Others: only groups they belong to.
@@ -13,14 +18,14 @@ router.get('/', requireAuth, (req, res) => {
   if (!hasPermission(req, 'view_tasks') && !hasPermission(req, 'assign_own_tasks') && !hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) {
     return res.status(403).json({ error: 'You do not have permission to view tasks.' })
   }
-  if (!hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_all_tasks')) {
+  if (!hasPermission(req, 'manage_all_tasks')) {
     const groups = db.prepare(`
       SELECT g.id, g.name, g.sort_order
       FROM task_list_groups g
-      JOIN user_task_list_groups utlg ON utlg.group_id = g.id
-      WHERE utlg.user_id = ?
+      LEFT JOIN user_task_list_groups utlg ON utlg.group_id = g.id AND utlg.user_id = ?
+      WHERE utlg.user_id IS NOT NULL OR g.created_by = ?
       ORDER BY g.sort_order, g.name
-    `).all(req.user.id)
+    `).all(req.user.id, req.user.id)
     return res.json(groups)
   }
 
@@ -76,6 +81,7 @@ router.patch('/:id', requireAuth, requirePermission('manage_tasks'), (req, res) 
   try {
     const group = db.prepare('SELECT * FROM task_list_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
+    if (!canManageGroup(req, group)) return res.status(403).json({ error: 'You cannot edit this task-list group.' })
     const name = req.body.name?.trim() ?? group.name
     if (!name) return res.status(400).json({ error: 'Group name is required.' })
     db.prepare('UPDATE task_list_groups SET name = ? WHERE id = ?').run(name, req.params.id)
@@ -91,6 +97,7 @@ router.delete('/:id', requireAuth, requirePermission('manage_tasks'), (req, res)
   try {
     const group = db.prepare('SELECT * FROM task_list_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
+    if (!canManageGroup(req, group)) return res.status(403).json({ error: 'You cannot delete this task-list group.' })
     db.prepare('UPDATE task_lists SET group_id = NULL WHERE group_id = ?').run(req.params.id)
     db.prepare('DELETE FROM user_task_list_groups WHERE group_id = ?').run(req.params.id)
     db.prepare('DELETE FROM task_list_groups WHERE id = ?').run(req.params.id)
@@ -106,13 +113,19 @@ router.put('/:id/members', requireAuth, requirePermission('manage_tasks'), (req,
   try {
     const group = db.prepare('SELECT * FROM task_list_groups WHERE id = ?').get(req.params.id)
     if (!group) return res.status(404).json({ error: 'Group not found' })
+    if (!canManageGroup(req, group)) return res.status(403).json({ error: 'You cannot manage this task-list group.' })
     const { user_ids } = req.body
     if (!Array.isArray(user_ids)) return res.status(400).json({ error: 'user_ids must be an array.' })
 
+    let resolvedIds = user_ids
+    if (!hasPermission(req, 'manage_all_tasks')) {
+      const scope = hasPermission(req, 'manage_team_tasks') ? getTeamScope(req.user.id) : new Set([req.user.id])
+      resolvedIds = user_ids.filter(userId => scope.has(userId))
+    }
     const tx = db.transaction(() => {
       db.prepare('DELETE FROM user_task_list_groups WHERE group_id = ?').run(req.params.id)
       const ins = db.prepare('INSERT OR IGNORE INTO user_task_list_groups (user_id, group_id) VALUES (?,?)')
-      user_ids.forEach(uid => ins.run(uid, req.params.id))
+      resolvedIds.forEach(uid => ins.run(uid, req.params.id))
     })
     tx()
     audit(req.user.id, 'task_list_group.members_updated', 'task_list_group', req.params.id, group.name)
