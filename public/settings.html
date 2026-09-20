@@ -1194,9 +1194,9 @@ let settingsModalObserver = null
 // upgraded. These values intentionally mirror server/utils/roles.js so a
 // partial roles API response can never make protected roles appear empty.
 const ROLE_PERMISSION_CATALOG_FALLBACK = Object.freeze([
-  { key:'view_calendar', label:'View calendar', category:'Workspace' },
-  { key:'view_shifts', label:'View shifts', category:'Workspace' },
-  { key:'view_tasks', label:'View tasks', category:'Tasks' },
+  { key:'view_calendar', label:'View calendar', category:'Workspace', mobile:true },
+  { key:'view_shifts', label:'View shifts', category:'Workspace', mobile:true },
+  { key:'view_tasks', label:'View tasks', category:'Tasks', mobile:true },
   { key:'view_task_lists', label:'View task lists settings', description:'Open the Task Lists settings page; edit actions remain controlled by task management permissions.', category:'Tasks' },
   { key:'assign_own_tasks', label:'Assign task lists to self', description:'Assign available task lists to the signed-in user without creating or editing task lists.', category:'Tasks' },
   { key:'view_templates', label:'View shift templates', category:'Workspace' },
@@ -1243,6 +1243,25 @@ const BUILTIN_ROLE_FALLBACK = Object.freeze([
   { id:'builtin-admin', name:'Admin', description:'Full instance access, including global rotas, users, roles, settings and backups.', color:'#4f46e5', permissions:ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => permission.key), is_builtin:true, is_system:false },
   { id:'system-inactive', name:'Inactive', description:'System role for disabled accounts. Cannot sign in until re-enabled.', color:'#6b7280', permissions:[], is_builtin:true, is_system:true },
 ])
+const MOBILE_PERMISSION_KEYS = new Set([
+  'view_calendar','view_shifts','view_tasks','view_task_lists','assign_own_tasks','view_templates',
+  'view_own_rota','view_other_rotas','view_team_rotas','view_all_rotas','view_teams',
+  'view_locations','view_organisations','add_own_shifts','edit_own_shifts','delete_own_shifts',
+  'add_other_shifts','edit_other_shifts','delete_other_shifts','manage_team_shifts',
+  'manage_org_shifts','manage_all_shifts','manage_tasks','manage_team_tasks','manage_all_tasks',
+])
+function permissionTags(permission) {
+  if (Array.isArray(permission?.tags) && permission.tags.length) return permission.tags
+  const tags = []
+  if (MOBILE_PERMISSION_KEYS.has(permission?.key)) tags.push('Mobile')
+  const categoryTags = { Rota:'Calendar & rota', Tasks:'Tasks', Teams:'Teams', Workspace:'Workspace', Administration:'Administration', Legacy:'Legacy' }
+  if (categoryTags[permission?.category]) tags.push(categoryTags[permission.category])
+  if (permission?.scope === 'All active users' || permission?.scope === 'All teams') tags.push('Global scope')
+  else if (permission?.scope === 'Organisation members only') tags.push('Organisation scope')
+  else if (permission?.scope === 'Organisation/team members only') tags.push('Team scope')
+  if (permission?.key?.includes('_own_') || permission?.key === 'view_own_rota' || permission?.key === 'assign_own_tasks') tags.push('Own account')
+  return [...new Set(tags)]
+}
 const ROLE_API_UNAVAILABLE_MESSAGE = 'Roles API is unavailable. Restart/update the ForgeShift server before managing roles.'
 
 function isRoleApiUnavailable(error) {
@@ -1928,9 +1947,9 @@ async function loadRoles() {
   // is temporarily talking to an older server during a rolling deployment.
   const serverCatalog = Array.isArray(catalogPayload?.permissions) ? catalogPayload.permissions : []
   const catalogByKey = new Map(serverCatalog.filter(permission => permission?.key).map(permission => [permission.key, permission]))
-  rolePermissionCatalog = ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => ({ ...permission, ...(catalogByKey.get(permission.key) || {}) }))
+  rolePermissionCatalog = ROLE_PERMISSION_CATALOG_FALLBACK.map(permission => { const merged = { ...permission, ...(catalogByKey.get(permission.key) || {}), mobile: MOBILE_PERMISSION_KEYS.has(permission.key) || catalogByKey.get(permission.key)?.mobile === true }; return { ...merged, tags: permissionTags(merged) } })
   for (const permission of serverCatalog) {
-    if (permission?.key && !rolePermissionCatalog.some(item => item.key === permission.key)) rolePermissionCatalog.push(permission)
+    if (permission?.key && !rolePermissionCatalog.some(item => item.key === permission.key)) { const merged = { ...permission, mobile: MOBILE_PERMISSION_KEYS.has(permission.key) || permission.mobile === true }; rolePermissionCatalog.push({ ...merged, tags: permissionTags(merged) }) }
   }
 }
 async function loadUsers() { try { users = await api(hasPermission('view_people_teams') ? '/api/users?include_inactive=1' : '/api/users') } catch { users = [] } }
@@ -2793,7 +2812,7 @@ function renderRoleComparison() {
   if (!a || !b) return
   const aSet = new Set(a.permissions || []), bSet = new Set(b.permissions || [])
   const keys = rolePermissionCatalog.map(permission => permission.key)
-  document.getElementById('roleCompareBody').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Permission</th><th>${escHtml(a.name)}</th><th>${escHtml(b.name)}</th></tr></thead><tbody>${keys.map(key => { const permission = rolePermissionCatalog.find(p => p.key === key); const label = permission?.label || key; const scope = permission?.scope ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px">${escHtml(permission.scope)}</div>` : ''; return `<tr><td>${escHtml(label)}${scope}</td><td>${aSet.has(key) ? '✓' : '—'}</td><td>${bSet.has(key) ? '✓' : '—'}</td></tr>` }).join('')}</tbody></table></div>`
+  document.getElementById('roleCompareBody').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Permission</th><th>${escHtml(a.name)}</th><th>${escHtml(b.name)}</th></tr></thead><tbody>${keys.map(key => { const permission = rolePermissionCatalog.find(p => p.key === key); const label = permission?.label || key; const scope = permission?.scope ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px">${escHtml(permission.scope)}</div>` : ''; const tags = permissionTags(permission).map(tag => `<span class="badge badge-blue" style="font-size:9px;padding:2px 5px;margin-left:4px">${escHtml(tag)}</span>`).join(''); return `<tr><td>${escHtml(label)}${tags}${scope}</td><td>${aSet.has(key) ? '✓' : '—'}</td><td>${bSet.has(key) ? '✓' : '—'}</td></tr>` }).join('')}</tbody></table></div>`
 }
 
 function openRoleModal(id = null) {
@@ -2826,7 +2845,7 @@ function openRoleModal(id = null) {
         <div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(true)">Select all</button><button class="btn btn-ghost btn-sm" onclick="setAllRolePermissions(false)">Clear</button></div>
       </div>
       <div class="role-permission-groups">
-        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}${category === 'Legacy' ? ' <span style="font-weight:600;letter-spacing:0;text-transform:none">(compatibility only)</span>' : ''}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span class="role-permission-option-copy"><span>${escHtml(permission.label)}</span>${permission.description ? `<small>${escHtml(permission.description)}</small>` : ''}${permission.scope ? `<small>Scope: ${escHtml(permission.scope)}</small>` : ''}</span></label>`).join('')}</div></section>`).join('')}
+        ${Object.entries(groups).map(([category, permissions]) => `<section class="role-permission-group"><h4>${escHtml(category)}${category === 'Legacy' ? ' <span style="font-weight:600;letter-spacing:0;text-transform:none">(compatibility only)</span>' : ''}</h4><div class="role-permission-options">${permissions.map(permission => `<label class="role-permission-option"><input type="checkbox" name="rolePermission" value="${permission.key}" ${selected.has(permission.key) ? 'checked' : ''}><span class="role-permission-option-copy"><span>${escHtml(permission.label)} ${permissionTags(permission).map(tag => `<span class="badge badge-blue" style="font-size:9px;padding:2px 5px">${escHtml(tag)}</span>`).join('')}</span>${permission.description ? `<small>${escHtml(permission.description)}</small>` : ''}${permission.scope ? `<small>Scope: ${escHtml(permission.scope)}</small>` : ''}</span></label>`).join('')}</div></section>`).join('')}
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('roleModal').remove()">Cancel</button><button class="btn btn-primary" onclick="saveRole()">${role ? 'Save changes' : 'Create role'}</button></div>

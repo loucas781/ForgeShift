@@ -4,6 +4,27 @@ const db = require('../db/connection')
 
 // Keep permission identifiers stable: they are persisted in custom role JSON and
 // consumed by both the web and native clients.
+const MOBILE_PERMISSION_KEYS = new Set([
+  'view_calendar', 'view_shifts', 'view_tasks', 'view_task_lists', 'assign_own_tasks',
+  'view_templates', 'view_own_rota', 'view_other_rotas', 'view_team_rotas', 'view_all_rotas',
+  'view_teams', 'view_locations', 'view_organisations',
+  'add_own_shifts', 'edit_own_shifts', 'delete_own_shifts',
+  'add_other_shifts', 'edit_other_shifts', 'delete_other_shifts',
+  'manage_team_shifts', 'manage_org_shifts', 'manage_all_shifts',
+  'manage_tasks', 'manage_team_tasks', 'manage_all_tasks',
+])
+
+function permissionTags(permission) {
+  const tags = []
+  if (MOBILE_PERMISSION_KEYS.has(permission.key)) tags.push('Mobile')
+  const categoryTags = { Rota: 'Calendar & rota', Tasks: 'Tasks', Teams: 'Teams', Workspace: 'Workspace', Administration: 'Administration', Legacy: 'Legacy' }
+  if (categoryTags[permission.category]) tags.push(categoryTags[permission.category])
+  if (permission.scope === 'All active users' || permission.scope === 'All teams') tags.push('Global scope')
+  else if (permission.scope === 'Organisation members only' || permission.scope === 'Organisation/team members only') tags.push(permission.scope.startsWith('Organisation members') ? 'Organisation scope' : 'Team scope')
+  if (permission.key.includes('_own_') || permission.key === 'view_own_rota' || permission.key === 'assign_own_tasks') tags.push('Own account')
+  return [...new Set(tags)]
+}
+
 const PERMISSION_CATALOG = [
   { key: 'view_calendar', label: 'View calendar', description: 'Open the calendar and switch between month, week and agenda views.', category: 'Workspace' },
   { key: 'view_shifts', label: 'View shifts', description: 'Read shift details that the account is allowed to access.', category: 'Workspace' },
@@ -46,7 +67,10 @@ const PERMISSION_CATALOG = [
   { key: 'view_audit', label: 'View audit log', description: 'Read the record of administrative and security actions.', category: 'Administration' },
   { key: 'manage_backups', label: 'Manage backups', description: 'Create, restore and manage application backups.', category: 'Administration' },
   { key: 'manage_holidays', label: 'Manage holidays', description: 'Configure bank holidays and holiday overrides.', category: 'Administration' },
-]
+].map(permission => {
+  const enriched = MOBILE_PERMISSION_KEYS.has(permission.key) ? { ...permission, mobile: true } : permission
+  return { ...enriched, tags: permissionTags(enriched) }
+})
 const ALL_PERMISSIONS = PERMISSION_CATALOG.map(p => p.key)
 
 const BUILTIN = {

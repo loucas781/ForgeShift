@@ -4,19 +4,19 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
-const { getShiftLeadScope, getOrganisationScope } = require('../utils/scope')
+const { getTeamScope } = require('../utils/scope')
 const { DEFAULT_COLOR, normalizeColorInput, resolveStoredColor } = require('../utils/color-utils')
 const logger = require('../utils/logger')
 const { hasPermission } = require('../utils/roles')
 
 function canManageAllTasks(req) {
-  return hasPermission(req, 'manage_all_tasks') || (hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks'))
+  return hasPermission(req, 'manage_all_tasks')
 }
 function canManageTeamTasks(req) {
   return hasPermission(req, 'manage_team_tasks')
 }
 function taskScope(req) {
-  return req.user.role === 'shift_lead' ? getShiftLeadScope(req.user.id) : getOrganisationScope(req.user.id)
+  return getTeamScope(req.user.id)
 }
 function requireTaskManagement(req, res, next) {
   if (!hasPermission(req, 'manage_tasks') && !hasPermission(req, 'manage_team_tasks') && !hasPermission(req, 'manage_all_tasks')) {
